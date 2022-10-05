@@ -2,42 +2,77 @@
 
 <head>
   <style>
+
+    :root {
+      --post-list-border-radius: 0.5em;
+    }
+
     body,
     html {
-      background-color: #444;
+      background-color: #fff;
       color: #000;
       font-family: sans-serif;
     }
 
     posts {
-      width: 70%;
-      margin-left: 15%;
+      width: 50%;
+      margin-left: 25%;
       padding: 0;
       display:block;
+      margin-bottom:10em;
     }
 
     post {
-      box-shadow: 0 0 .5em .1em #000;
-      background-color: #ddd;
+      box-shadow: .25em .25em  0.8em .001em #aaa;
+      background-color: #fff;
+      border: 1px solid #aaa;
       display: block;
-      padding: 1em;
+      padding: calc(var(--post-list-border-radius) * 0.25);
       margin-top: 2em;
-      height: 10em;
-      border-radius: 0.25em;
+      height: 15em;
+      border-radius: var(--post-list-border-radius);
     }
+
+    post img {
+      border-radius: var(--post-list-border-radius);
+      height: 100%;
+      display: inline-block;
+      filter: grayscale(90%);
+    }
+    post:hover img {
+      filter: none;
+    }
+
+
   </style>
 </head>
 
 <body>
   <posts>
     <post>
-      a post
+      <img src="./tumbled-aluminum.jpg" />
+      <text>
+        a post
+      </text>
     </post>
     <post>
-      another post
+      <img src="./orange-cnc.jpg" />
+      <text>
+        a post
+      </text>
+
     </post>
-    <post>git s
-      another post
+    <post>
+      <img src="./seedlings.jpg" />
+      <text>
+        a post
+      </text>
+    </post>
+    <post>
+      <img src="./many-voxels.png" />
+      <text>
+        a post
+      </text>
     </post>
     <post>
       another post
