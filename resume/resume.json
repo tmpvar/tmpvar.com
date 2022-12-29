@@ -1,0 +1,202 @@
+{
+  "basics": {
+    "name": "Elijah Insua",
+    "label": "Engineer",
+    "picture": "",
+    "email": "tmpvar@gmail.com",
+    "phone": "646.318.0846",
+    "website": "https://tmpvar.com",
+    "summary": "Elijah Insua is a JavaScript and hardware enthusiast who is a huge fan of DIY, personal manufacturing, and tactile computer interfaces. He is the creator of jsdom, which has proven to be quite popular by enabling manipulation and composition of browser content on the server. He is also the creator of npmsearch.com, which offers lightning fast searching of the npm registry with packages organized by a custom relevance rating algorithm. Elijah is also well known for in-depth visualizations to assist effective hardware implementations.",
+    "location": {
+      "address": "192 Huron Street",
+      "postalCode": "NY 11222",
+      "city": "Brooklyn",
+      "countryCode": "US",
+      "region": "New York"
+    },
+    "profiles": [
+      {
+        "network": "Github",
+        "username": "tmpvar",
+        "url": "https://github.com/tmpvar"
+      }
+    ]
+  },
+  "work": [
+    {
+      "company": "Splice",
+      "position": "Engineer",
+      "website": "https://splice.com",
+      "startDate": "2017",
+      "endDate": "2020",
+      "summary": "",
+      "highlights": [
+        "Took ownership of a 50k+ daily user desktop application",
+        "Drastically reduced the number of crashes in the desktop application",
+        "Handled support tickets and worked through countless data race issues",
+        "Implemented product features spanning the entire stack",
+        "Built tooling to help identify and eliminate crashes"
+      ]
+    },
+    {
+      "company": "NodeFirm / NodeSource",
+      "position": "Senior Engineer",
+      "website": "https://nodesource.com/",
+      "startDate": "2013",
+      "endDate": "2017",
+      "summary": "",
+      "highlights": [
+        "Conducted Node.js trainings at enterprise companies like Paypal",
+        "Conducted architectural evaluations at places such as NASA and Harvard",
+        "Led the N|Ship team and N|Solid frontend team",
+        "Built the certification pipeline for NodeSource Certified Modules"
+      ]
+    },
+    {
+      "company": "Arc90 Inc.",
+      "position": "Engineer",
+      "website": "http://arc90.com",
+      "startDate": "2008",
+      "endDate": "2012",
+      "summary": "",
+      "highlights": [
+        "Made use of the Zend Framework to develop RESTful services",
+        "Wrote/Maintained WADLs to define RESTful services",
+        "Wrote a complete frontend for 6+ disperate RESTful services completely in javascript",
+        "Utilized the Kindling codebase to create Thebetterproject.org",
+        "Integrated software authentication with Facebook Connect, OAuth, OpenId and a custom WebHook implementation",
+        "Assumed the responsibilities of an entire IT staff when our client laid them all off",
+        "Implemented a CI/CD system to reduce deployment disasters",
+        "Led team through a rewrite of the existing Java stack into python",
+        "Built a, fully tested, browser based ebook reader",
+        "Used Node.js (0.2.x) as a rewriting proxy to allow the team to incrementally replace parts of the Java stack"
+      ]
+    },
+    {
+      "company": "Wisconson Energy Conservation Corporation",
+      "position": "Engineer",
+      "website": "http://www.weccusa.org",
+      "startDate": "2008",
+      "endDate": "2008",
+      "summary": "",
+      "highlights": [
+        "Made use of the Zend Framework to quickly create a flexible pdf generator for wisconson weatherization agencies",
+        "Updated existing applications to conform to standards and feature requirements",
+        "Used jQuery and Dojo to validate client side forms and execute JSON requests",
+        "Converted abstract requirement documentation into maintainable code and database schemas"
+      ]
+    },
+    {
+      "company": "Sproutware",
+      "position": "Co-founder / Engineer",
+      "website": "",
+      "startDate": "2007",
+      "endDate": "2008",
+      "summary": "",
+      "highlights": [
+        "Created an extremely flexible content management system which we used to build web based products for local businesses",
+        "Managed an agile team by turning client requests into user stories and driving development cylce",
+        "Took technical service calls and brought new clients on board",
+        "Worked closely with business to create an custom fit application to suite their business needs",
+        "Build various API integrations using protocols like SOAP, REST, and XML-RPC"
+      ]
+    },
+    {
+      "company": "Web Search & Design",
+      "position": "Engineer",
+      "website": "",
+      "startDate": "2006",
+      "endDate": "2007",
+      "summary": "",
+      "highlights": [
+        "Designed and implemented a shopping cart with a plugable constraint system",
+        "Converted existing project over to Seagull based framework",
+        "Optimized SQL Queries for a 200% performance gain",
+        "Converted Photoshop psd's into XHML and CSS",
+        "Provided design and development for 6 projects ranging from ecommerce websites to dynamic photo galleries",
+        "Developed feature requests and fixed bugs for Seagull based projects"
+      ]
+    },
+    {
+      "company": "Freelancer's Union",
+      "position": "Engineer",
+      "website": "https://www.freelancersunion.org/",
+      "startDate": "2006",
+      "endDate": "2006",
+      "summary": "",
+      "highlights": [
+        "Implemented article revisioning timeline graphing",
+        "Used Dojo for cross-browser compatibility and accessiblity",
+        "Used PHP4 and MySQL / Postgres"
+      ]
+    },
+    {
+      "company": "SDA Inc.",
+      "position": "QA Engineer / Engineer",
+      "website": "http://www.s-d-a-inc.com/",
+      "startDate": "2001",
+      "endDate": "2003",
+      "summary": "",
+      "highlights": [
+        "Tested flight management systems for Honeywell",
+        "Developed, documented, and tested features in a custom waypoint database and flight management systems",
+        "Bug tested software systems on hardware at Honeywell’s facilities"
+      ]
+    }
+  ],
+  "volunteer": [],
+  "education": [],
+  "awards": [],
+  "publications": [],
+  "skills": [
+    {
+      "name": "Frontend",
+      "level": "Master",
+      "keywords": [
+        "HTML",
+        "CSS",
+        "Javascript",
+        "React"
+      ]
+    },
+    {
+      "name": "Backend",
+      "level": "Master",
+      "keywords": [
+        "Node.js",
+        "C/C++",
+        "Python",
+        "PHP"
+      ]
+    },
+    {
+      "name": "Infrastructure",
+      "level": "Medium",
+      "keywords": [
+        "AWS (ECS, SQS, EC2, S3, CloudFormation, RDS)",
+        "Docker"
+      ]
+    }
+  ],
+  "languages": [
+    {
+      "language": "English",
+      "fluency": "Native speaker"
+    }
+  ],
+  "interests": [
+    {
+      "name": "Metalworking",
+      "keywords": []
+    },
+    {
+      "name": "Realtime rendering of volumetric surfaces",
+      "keywords": []
+    },
+    {
+      "name": "Computer aided design and manufacture",
+      "keywords": []
+    }
+  ],
+  "references": []
+}

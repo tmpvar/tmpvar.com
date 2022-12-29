@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "build": "resume export index.html -f html resume.json --theme compact"
+  },
+  "dependencies": {
+    "jsonresume-theme-compact": "^1.0.4",
+    "resume-cli": "^3.0.8"
+  }
+}
