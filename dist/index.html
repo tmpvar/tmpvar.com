@@ -1,4 +1,311 @@
 <html>
-  <head></head>
-  <body></body>
+
+<head>
+  <title>tmpvar.com</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500&family=Poppins:wght@200;500&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="font/hack/hack-subset.css">
+
+  <style>
+    :root {
+      /* --color-background: #1a1c2c; */
+      --color-background: #111122;
+      --color-maroon: #5d275d;
+      --color-red: #b13e53;
+      --color-orange: #ef7d57;
+      --color-yellow: #ffcd75;
+      --color-light-green: #a7f070;
+      --color-green: #38b764;
+      --color-dark-green: #257179;
+      --color-purple: #29366f;
+      --color-dark-blue: #3b5dc9;
+      --color-blue: #41a6f6;
+      --color-light-blue: #73eff7;
+      --color-white: #f4f4f4;
+      --color-light-grey: #94b0c2;
+      --color-grey: #566c86;
+      --color-dark-grey: #333c57;
+
+    }
+
+    body {
+      background: var(--color-background);
+      color: var(--color-white);
+    }
+
+    #main {
+      display: flex;
+      justify-content: center;
+      background: var(--color-background);
+    }
+
+    .center-align {
+      display: flex;
+      justify-content: center;
+    }
+
+    #posts {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 500;
+      width: 64em;
+      color: var(--color-white);
+    }
+
+    .post {
+      background: var(--color-dark-grey);
+
+      border: 1px solid var(--color-dark-green);
+
+      border-top: 3px solid var(--color-green);
+      /* border-left: 1px solid var(--color-green);
+      border-right: 1px solid var(--color-green); */
+      padding: 1.0em;
+      margin: 2.5em;
+
+      font-size: 1.25em;
+      border-radius: 5px;
+      font-weight: 200;
+    }
+
+    .post .caption {
+      font-family: Hack, monospace;
+      font-size: 0.7em;
+      text-align: center;
+      margin-bottom:4rem;
+    }
+
+    .post h1,
+    .post h2,
+    .post h3,
+    .post h4
+    .post h5 {
+      font-size: 2.4rem;
+      font-family: 'Oxanium', cursive;
+      padding: 0;
+      margin: 0;
+      font-weight: 500;
+      letter-spacing: 0.005rem;
+      margin-top: 1em;
+    }
+
+    .post h1 {
+      margin: 0;
+    }
+
+    .post a {
+      color: var(--color-light-green);
+    }
+
+    .post .image-container {
+      display: flex;
+      justify-content: center;
+      padding: 1em;
+    }
+
+    .post pre {
+      background: var(--color-dark-green);
+
+      padding: 0.5em;
+      border-radius: 2px;
+    }
+
+    .post code {
+      color: var(--color-light-blue);
+      font-size: 1.125rem;
+    }
+
+    .post pre code {
+      font-size: 1.0rem;
+    }
+
+    code {
+      /* font-size: 0.125em; */
+      font-family: Hack, monospace;
+    }
+  </style>
+</head>
+
+<body>
+  <section id="main">
+    <section id="posts">
+      
+      <section class="post" id="radiosity-2d-cpu"><h1>Blur Based 2D Realtime Radiosity (CPU)</h1>
+<section class="center-align">
+<video controls>
+<source src="posts/radiosity-2d-cpu/radiosity-sand-sim.mp4" type="video/mp4" />
+</video>
+</section>
+<p><section class="image-container"><img src="posts/radiosity-2d-cpu/2d-flood-fill-light-2021-06-12-12-56-02.png" alt="A screenshot of this approach, everything is fully dynamic (lights &amp; occluders)"></section></p>
+<p class="caption">A screenshot of this approach, everything is fully dynamic (lights & occluders)</p>
+<p>This experiment is an attempt to find a simple &amp; parallel algorithm for lighting a scene with low-frequency light (read: global illumination, soft shadows). This approach stems from <a href="https://en.wikipedia.org/wiki/Radiosity_(computer_graphics)">radiosity</a>, so instead of shooting rays from every visible surface to each light we instead fill a grid with energy from each light.</p>
+<p>There is a ton of prior art for this approach:</p>
+<ul>
+<li><a href="https://www.cg.tuwien.ac.at/research/rendering/rays-radio/">https://www.cg.tuwien.ac.at/research/rendering/rays-radio/</a></li>
+<li><a href="https://github.com/diwi/PixelFlow">https://github.com/diwi/PixelFlow</a></li>
+<li>or search for &quot;2D radiosity&quot;</li>
+</ul>
+<h2>Data Structures</h2>
+<ul>
+<li><code>energy</code> a 2D grid where each cell contains:<ul>
+<li>color (RGB)</li>
+<li>float energy (0.0 .. 1.0)</li>
+</ul>
+</li>
+<li><code>occluders</code> a 2D grid where each cell contains:<ul>
+<li>color (RGB)</li>
+<li>other fields such as opacity / reflectivity / etc..</li>
+</ul>
+</li>
+<li><code>ray</code> represents the current state of a ray<ul>
+<li>color (RGB)</li>
+<li>energy (0.0 .. 1.0)</li>
+<li>direction (vec2)</li>
+<li>current_position (vec2)</li>
+</ul>
+</li>
+</ul>
+<h2>Scene Updates</h2>
+<p>The following steps happen on a per frame basis.</p>
+<p><strong>Lower the energy over the entire grid by a small amount</strong></p>
+<p>Instead of clearing the <code>energy</code> grid on every frame, we want to keep the energy from the previous frame to avoid some amount of flickering as lights move.</p>
+<pre><code class="language-cpp">const float delta = 0.125;
+for (auto &amp;cell : energy) {
+    cell.color = max(energy_cell.color - vec3(delta), vec3(0.0));
+    cell.value = max(energy_cell.value - delta, 0.0);
+}
+</code></pre>
+<p><strong>Inject energy into a grid</strong></p>
+<p>From each light, emit rays in equally around a circle.</p>
+<p><section class="image-container"><img src="posts/radiosity-2d-cpu/2d-flood-fill-light-2021-06-12-13-22-55.png" alt="16 rays using 2D DDA"></section></p>
+<p class="caption">16 rays using 2D DDA</p>
+<p>We don't need full coverage, but there is a balance between performance and flicker as lights move. If you had a static scene you could probably use fewer rays. Rays are painted into the <code>energy</code> grid using <a href="https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm">Bresenham</a> / <a href="https://en.wikipedia.org/wiki/Digital_differential_analyzer_(graphics_algorithm)">DDA</a> (<a href="https://gist.github.com/tmpvar/437363604061ac0cfd1bdd8c41dc5bbe">branchless 3D DDA implementation</a> ).</p>
+<p>As the ray moves further away from the light we attenuate it. In this experiment, attenuation is derived from the diameter of the <code>energy</code> grid (currently 64).</p>
+<pre><code class="language-cpp">float diameter = 64.0;
+// the energy available to this ray at the moment it was emitted
+// this changes based on light intensity for primary rays or the
+// energy level of primary rays when emitting bounce rays.
+float initial_energy = 1.0;
+while (1) {
+    // inside the raymarcher, cell is a reference to the
+    // cell under the end of the ray
+    EnergyCell &amp;cell = energy.get(ray.pos.x, ray.pos.y);
+
+    float dist = distance(cell, light);
+    float attenuation = 1.0 / (1.0 + diameter * 0.75 * (dist * dist));
+
+    if (attenuation &lt; 0.01) {
+        break;
+    }
+
+    ray.energy = initial_energy * attentuation;
+
+    // Currently mixing colors by via component-wise max, which is not completely
+  // accurate, but works well in this low dynamic range environment.
+    cell.color = max(cell.color, ray.color * ray.energy);
+    cell.energy = (cell.energy + ray.energy) * 0.5;
+  ray.step();
+}
+</code></pre>
+<p><strong>Occluders</strong></p>
+<p>Terminating rays when they hit something is accomplished by looking at the <code>occluder</code> grid at every ray step - if the cell is fully opaque then we exit the ray march.</p>
+<p><section class="image-container"><img src="posts/radiosity-2d-cpu/2d-flood-fill-light-2021-06-12-14-15-15.png" alt="Red occluder cells cause rays to terminate."></section></p>
+<p class="caption">Red `occluder` cells cause rays to terminate.</p>
+<p>If the <code>occluder</code> cell is not opaque then we re-color the ray, ensuring that only the color of the <code>occluder</code> cell is propagated.</p>
+<pre><code>ray.color = ray.color * occluder_cell.color * (1.0 - occluder_cell.opacity);
+</code></pre>
+<p><section class="image-container"><img src="posts/radiosity-2d-cpu/2d-flood-fill-light-2021-06-12-14-14-41.png" alt="Propagating semi-transparent occluder color"></section></p>
+<p class="caption">Propagating semi-transparent occluder color</p>
+<p><strong>First bounce</strong></p>
+<p>Much like how we fill the <code>energy</code> grid with primary rays emitting from lights, we can similarly approach <code>occlusion</code> hits and emit new rays in a circle.</p>
+<p><section class="image-container"><img src="posts/radiosity-2d-cpu/2d-flood-fill-light-2021-06-12-14-09-50.png" alt="Emitting 8 new rays from the surface of an occluder cell."></section></p>
+<p class="caption">Emitting 8 new rays from the surface of an `occluder` cell.</p>
+<pre><code class="language-cpp">vec2 hit_center = floor(vec2(primary_ray.gridPos)) + 0.5f;
+float TAU = 3.1459 * 2.0;
+// 8 bounce rays
+float bounce_angle = TAU / 8.0f;
+for (float i=0.0; i&lt;TAU; i+=bounce_angle) {
+  vec2 bounce_dir(sin(i), cos(i));
+
+    // color bleed based on occluder color
+  vec3 bounce_color = (occluder_cell.color * primary_ray.color);
+
+    // emit a new ray of `bounce_color` in `bounce_dir`
+  // Note: ensure you propagate the energy/attenuation from primary ray or the
+  //       bounce will be brighter than the light!
+  emit_radiosity_ray(
+        // this could be offset from the surface normal to avoid self occlusion
+    hit_center,
+    bounce_dir,
+    bounce_color,
+    primary_ray.energy
+  );
+}
+</code></pre>
+<p><strong>Propagate energy with multiple steps of via blur</strong></p>
+<p>Blurring brings this whole technique together while acting as a low-pass filter. What we are trying to achieve is subtle lighting effects where light flows gently around corners leaving soft shadows and colors are blended together smoothly.</p>
+<p><section class="image-container"><img src="posts/radiosity-2d-cpu/2d-flood-fill-light-2021-06-12-13-41-46.png" alt="multiple steps of blurring after 16 initial rays. If you look closely you should see &quot;fingers&quot; at the extents of the light where the blur couldn't successfully join the rays together."></section></p>
+<p>multiple steps of blurring after 16 initial rays. If you look closely you should see &quot;fingers&quot; at the extents of the light where the blur couldn't successfully join the rays together.</p>
+<p><section class="image-container"><img src="posts/radiosity-2d-cpu/2d-flood-fill-light-2021-06-12-14-21-35.png" alt="multiple steps of blurring after 16 initial rays with a single bounce of 8 rays off of an occluder."></section></p>
+<p>multiple steps of blurring after 16 initial rays with a single bounce of 8 rays off of an occluder.</p>
+<p>To achieve this I'm <em>currently</em> using a naive, occluder aware, blur:</p>
+<pre><code class="language-cpp">void blur(i32 src_x, i32 src_y, i32 dst_x, i32 dst_y) {
+  auto prev = energy.get(src_x, src_y, 0);
+  auto cur = energy.get(dst_x, dst_y, 0);
+
+  f32 ratio = 0.5f;
+  auto occ = occluders.get(src_x, src_y, 0);
+  if (occ &amp;&amp; occ-&gt;opacity &gt; 0.0) {
+        // occluders are skipped, otherwise we'll see light bleed
+        // through the walls
+    return;
+  }
+
+  cur-&gt;add = (cur-&gt;add + prev-&gt;add) * ratio;
+  cur-&gt;color = (cur-&gt;color + prev-&gt;color) * ratio;
+}
+</code></pre>
+<p>and then we run the blur pass multiple times, making discrete passes from left to right, right to left, top to bottom, and bottom to top.</p>
+<pre><code class="language-cpp">for (u32 step=0; step&lt;20; step++) {
+  for (i32 y = 0; y &lt; energy.height; y++) {
+        // left to right
+    for (i32 x = 1; x &lt; energy.height; x++) {
+      blur(x, y, x - 1, y);
+    }
+
+        // right to left
+    for (i32 x = energy.height-2; x &gt;= 0; x--) {
+      blur(x, y, x + 1, y);
+    }
+  }
+
+  for (i32 x = 0; x &lt; energy.width; x++) {
+        // bottom to top
+    for (i32 y = 1; y &lt; energy.height; y++) {
+      blur(x, y, x, y - 1);
+    }
+
+        // top to bottom
+    for (i32 y = energy.height-2; y &gt;= 0; y--) {
+      blur(x, y, x, y + 1);
+    }
+  }
+}
+</code></pre>
+<p>This is acceptable at low resolutions, I'm currently working at 64x64, but will be slower at higher resolutions.</p>
+<section class="center-align">
+<video controls>
+<source src="posts/radiosity-2d-cpu/radiosity-test.mp4" type="video/mp4" />
+</video>
+</section>
+</section>
+      
+    </section>
+  </section>
+</body>
+
 </html>
