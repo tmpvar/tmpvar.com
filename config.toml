@@ -10,7 +10,9 @@ build_search_index = true
 [markdown]
 # Whether to do syntax highlighting
 # Theme can be customised by setting the `highlight_theme` variable to a theme supported by Zola
+# todo: make one w/ https://tmtheme-editor.glitch.me/#!/editor/theme/1337
 highlight_code = true
+highlight_theme = "1337"
 
 [extra]
 # Put all your custom variables here
