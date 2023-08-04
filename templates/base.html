@@ -8,23 +8,33 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300&display=swap" rel="stylesheet">
-  
+
   <link rel="stylesheet" href="font/hack/hack.css">
   <style>
     html {
-      background: #111111;
+      /* background: #000; */
+      /* background-image: linear-gradient(rgba(16, 28, 32, 0.5), rgba(0, 0, 0, 0.5)) url(/img/dot.png); */
+      background-image: url(/img/dot.png), linear-gradient(rgba(16, 28, 32), rgba(0, 0, 0));
       color: #f8f8f2;
       font-family: 'Montserrat', sans-serif;
       font-size: 1.125em;
+      padding:0;
+    }
+    body {
+      margin: 0;
+      padding:0;
     }
 
     .container {
       min-width: 800px;
       max-width: 60em;
-      margin: auto;
+
+      margin: 64px auto;
+      background: #111111;
+      padding: 1em;
     }
 
-    .center-align { 
+    .center-align {
       text-align: center;
     }
 
@@ -38,6 +48,8 @@
     pre {
       padding: 1rem;
       overflow: auto;
+      border-radius: 0.5em;
+      border: #4c4974 1px dashed;
     }
 
     pre[data-linenos] {
@@ -52,7 +64,7 @@
       text-align: center;
       user-select: none;
       color: #888;
-      
+
     }
 
     pre table td:nth-of-type(2) {
