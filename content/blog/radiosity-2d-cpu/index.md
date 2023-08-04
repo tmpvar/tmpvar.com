@@ -146,7 +146,7 @@ for (float i = 0.0; i < TAU; i += bounce_angle) {
 }
 ```
 
-**Propagate energy with multiple steps of via blur**
+**Propagate energy with multiple blur passes**
 
 Blurring brings this whole technique together while acting as a low-pass filter. What we are trying to achieve is subtle lighting effects where light flows gently around corners leaving soft shadows and colors are blended together smoothly.
 
