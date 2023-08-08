@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% set articles_section = get_section(path="articles/_index.md") %}
+{% for year, posts in articles_section.pages | group_by(attribute="year") %}
+
+<!-- <h2>Writing</h2> -->
+
+{% for post in posts %}
+<section class="article-entry">
+  <h3>{{ post.title }}</h3>
+  <p>
+    {{ post.summary | safe }}
+    <a href="{{ post.permalink }}">read more</a>
+  </p>
+</section>
+{% endfor %}
+{% endfor %}
+
+
+<!-- <p>Click <a href="{{ get_url(path='@/articles/_index.md') }}">here</a> to see my posts.</p> -->
+{% endblock content %}

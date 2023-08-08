@@ -1,0 +1,20 @@
+# The URL the site will be built for
+base_url = "https://tmpvar.com"
+
+# Whether to automatically compile all Sass files in the sass directory
+compile_sass = false
+
+# Whether to build a search index to be used later on by a JavaScript library
+build_search_index = true
+
+
+[markdown]
+# Whether to do syntax highlighting
+# Theme can be customised by setting the `highlight_theme` variable to a theme supported by Zola
+# todo: make one w/ https://tmtheme-editor.glitch.me/#!/editor/theme/1337
+highlight_code = true
+highlight_theme = "1337"
+external_links_target_blank = true
+
+[extra]
+# Put all your custom variables here

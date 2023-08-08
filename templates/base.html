@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>tmpvar.com</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="font/hack/hack.css">
+  <style>
+    html {
+      /* background: #000; */
+      /* background-image: linear-gradient(rgba(16, 28, 32, 0.5), rgba(0, 0, 0, 0.5)) url(/img/dot.png); */
+      background-image: url(/img/dot.png), linear-gradient(rgba(16, 28, 32), rgba(0, 0, 0));
+      color: #f8f8f2;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.125em;
+      padding: 0;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    html {
+      min-height: 100%;
+    }
+
+    .container {
+      min-width: 800px;
+      max-width: 60em;
+
+      margin: 64px auto;
+      background: #111111;
+      padding: 1em;
+    }
+
+    .center-align {
+      text-align: center;
+    }
+
+    a {
+      color: #91b8ff;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.13em;
+    }
+
+
+    pre {
+      padding: 1rem;
+      overflow: auto;
+      border-radius: 0.5em;
+      border: #4c4974 1px dashed;
+    }
+
+    pre[data-linenos] {
+      padding: 1rem 0.5rem;
+    }
+
+    pre table td {
+      padding: 0;
+    }
+
+    pre table td:nth-of-type(1) {
+      text-align: center;
+      user-select: none;
+      color: #888;
+
+    }
+
+    pre table td:nth-of-type(2) {
+      padding-left: 1rem;
+    }
+
+    pre mark {
+      display: block;
+      background-color: rgba(254, 252, 232, 0.9);
+    }
+
+    pre table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    code {
+      font-family: Hack, monospace;
+    }
+
+    .caption {
+      font-family: Hack, monospace;
+      font-size: 0.9em;
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+  </style>
+</head>
+
+<body>
+  <section class="section">
+    <div class="container">
+      {% block content %} {% endblock %}
+    </div>
+  </section>
+</body>
+
+</html>
