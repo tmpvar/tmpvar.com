@@ -7,9 +7,9 @@ In Javascript land, we are pampered with hot code reloading machinery. Not only 
 
 <!-- more -->
 
-Typically when starting a c/c++ project there is this annoying step of setting up a build system. Makefiles, CMake, Ninja, Gyp, Gn, Bake, Meson, etc, etc... Many of these do not play well together and encourage you to buy fully into them to manage dependencies and do a bunch of things that are not even remotely needed to solve the problem at hand.
+Typically when starting a C/C++ project there is this annoying step of setting up a build system. Makefiles, CMake, Ninja, Gyp, Gn, Bake, Meson, etc, etc... Many of these do not play well together and encourage you to buy fully into them to manage dependencies and do a bunch of things that are not even remotely needed to solve the problem at hand.
 
-So what is the problem at hand? Lowering the friction between writing a c file, building, and launching it. I want it to feel basically effortless to create a new c project.
+So what is the problem at hand? Lowering the friction between writing a C file, building, and launching it. I want it to feel effortless to create a new c project.
 
 Goals:
 
