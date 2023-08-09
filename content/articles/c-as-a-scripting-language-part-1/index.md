@@ -3,7 +3,7 @@ title = "Using C/C++ as a scripting language (Part 1)"
 date = 2020-02-01
 +++
 
-In Javascript land, we are pampered with hot code reloading machinery. Not only that, but you can "run" a `.js` file via `node path/to/file.js`. Since I've been preferring c/c++ lately, how can these conveniences be ported to a lower-level language?
+In Javascript land, we are pampered with hot code reloading machinery. Not only that, but you can "run" a `.js` file via `node path/to/file.js`. Since I've been preferring C/C++ lately, how can these conveniences be ported to a lower-level language?
 
 <!-- more -->
 
@@ -77,8 +77,6 @@ c path/to/file.{c,cpp}
   <source src="assets/c.mp4" type="video/mp4" />
 </video>
 </section>
-
-<p></p>
 
 ```bash
 cwatch path/to/file.{c,cpp}
