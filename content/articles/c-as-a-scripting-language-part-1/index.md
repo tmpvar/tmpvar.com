@@ -15,12 +15,12 @@ Goals:
 
 - no noticeable compile step (e.g., `c path/to/file.c` immediately executes)
 - hot reload
-- maintain state across reloads
 - for trivial scripts, do not require a compiler / libc
-- allow callbacks to be late bound/reloaded
-- allow thread contents to be reloaded, maybe using a separate API like workers
+
 
 ## First round: Bash scripts
+
+
 
 `~/bin/c.sh`
 
@@ -30,6 +30,8 @@ CPATH=$(dirname "${BASH_SOURCE[0]}")
 SRC=$1
 DST=$(mktemp)
 EXT="${SRC##*.}"
+
+# Allow the source file to include some C flags that is requires
 FOUND_CFLAGS=$(
  grep "#pragma CFLAGS=" $SRC \
  | sed 's/#pragma CFLAGS=//' \
@@ -69,13 +71,29 @@ cwatch() {
 ```bash
 c path/to/file.{c,cpp}
 ```
-or
+
+<section class="center-align">
+<video controls>
+  <source src="assets/c.mp4" type="video/mp4" />
+</video>
+</section>
+
+<p></p>
 
 ```bash
 cwatch path/to/file.{c,cpp}
 ```
 
+<section class="center-align">
+<video controls>
+<source src="assets/cwatch.mp4" type="video/mp4" />
+</video>
+</section>
+
+
 ### Issues:
 
+- does not maintain state across reloads
 - no persistent state (e.g., if we created a window it would flash + muck with focus)
 - requires *nix and an installed compiler
+- `#include`ed files are not scanned for `#pragma CFLAGS`
