@@ -74,7 +74,7 @@ c path/to/file.{c,cpp}
 
 <section class="center-align">
 <video controls>
-  <source src="assets/c.mp4" type="video/mp4" />
+  <source src="assets/c.webm" type="video/webm" />
 </video>
 </section>
 
