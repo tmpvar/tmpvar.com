@@ -100,7 +100,7 @@ Terminating rays when they hit something is accomplished by looking at the `occl
 <section class="center-align">
   <img alt="Red `occluder` cells cause rays to terminate." src="assets/2d-flood-fill-light-2021-06-12-14-15-15.png" />
 
-<p class="caption">Red `occluder` cells cause rays to terminate.</p>
+<p class="caption">Red <code>occluder</code> cells cause rays to terminate.</p>
 </section>
 
 If the `occluder` cell is not opaque then we re-color the ray, ensuring that only the color of the `occluder` cell is propagated.
