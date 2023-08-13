@@ -8,11 +8,14 @@ This experiment is an attempt to find a simple & parallel algorithm for lighting
 
 <!-- more -->
 
-<section class="center-align">
-<video controls>
-<source src="assets/radiosity-sand-sim.mp4" type="video/mp4" />
-</video>
-</section>
+<div class="video-embed" style="position: relative; padding-top: 99.6742671009772%;">
+ <iframe
+    src="https://customer-vv39d21derhw1phl.cloudflarestream.com/ea5a20c8b13e90026c4126dbf5e565f8/iframe?preload=true&poster=https%3A%2F%2Fcustomer-vv39d21derhw1phl.cloudflarestream.com%2Fea5a20c8b13e90026c4126dbf5e565f8%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600&letterboxColor=transparent"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media"
+    allowfullscreen="true"
+  ></iframe>
+</div>
 
 <p class="caption">A video of this approach, everything is fully dynamic (lights & occluders)</p>
 
@@ -218,9 +221,11 @@ for (u32 step = 0; step < 20; step++) {
 
 This is acceptable at low resolutions, I'm currently working at 64x64, but will be slower at higher resolutions.
 
-
-<section class="center-align">
-<video controls>
-<source src="assets/radiosity-test.mp4" type="video/mp4" />
-</video>
-</section>
+<div class="video-embed" style="position: relative; padding-top: 99.6742671009772%;">
+  <iframe
+    src="https://customer-vv39d21derhw1phl.cloudflarestream.com/9af88abb947bebbbfa2d954fa47f77f2/iframe?preload=true&poster=https%3A%2F%2Fcustomer-vv39d21derhw1phl.cloudflarestream.com%2F9af88abb947bebbbfa2d954fa47f77f2%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600&letterboxColor=transparent"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+    allowfullscreen="true"
+  ></iframe>
+</div>
