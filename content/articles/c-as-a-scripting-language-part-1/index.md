@@ -62,7 +62,9 @@ c() {
 cwatch() {
  rp=$(realpath $1)
  rd=$(dirname $rp)
- watchexec -c -w $rd "bash ~/bin/c.sh $@"
+
+ # Note: you might want to add --poll 100ms if you are working under WSL
+ watchexec --clear=reset --restart --poll 100ms -w $rd "bash ~/bin/c.sh $@"
 }
 ```
 
@@ -72,22 +74,28 @@ cwatch() {
 c path/to/file.{c,cpp}
 ```
 
-<section class="center-align">
-<video controls>
-  <source src="assets/c.webm" type="video/webm" />
-</video>
-</section>
+
+<div class="video-embed" style="position: relative; padding-top: 51.4689880304679%;">
+  <iframe
+    src="https://customer-vv39d21derhw1phl.cloudflarestream.com/a7f5f41531356f2ce9cc992a695f88ae/iframe?poster=https%3A%2F%2Fcustomer-vv39d21derhw1phl.cloudflarestream.com%2Fa7f5f41531356f2ce9cc992a695f88ae%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600&letterboxColor=transparent"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media"
+    allowfullscreen="true"
+  ></iframe>
+</div>
 
 ```bash
 cwatch path/to/file.{c,cpp}
 ```
 
-<section class="center-align">
-<video controls>
-<source src="assets/cwatch.mp4" type="video/mp4" />
-</video>
-</section>
-
+<div class="video-embed" style="position: relative; padding-top: 47.39583333333333%;">
+ <iframe
+    src="https://customer-vv39d21derhw1phl.cloudflarestream.com/b414674dcd5aa6431b5996dca2e560c1/iframe?preload=true&poster=https%3A%2F%2Fcustomer-vv39d21derhw1phl.cloudflarestream.com%2Fb414674dcd5aa6431b5996dca2e560c1%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600&letterboxColor=transparent"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media"
+    allowfullscreen="true"
+  ></iframe>
+</div>
 
 ### Issues:
 
