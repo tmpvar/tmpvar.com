@@ -10,7 +10,6 @@ Using [kitty](https://sw.kovidgoyal.net/kitty/)'s graphics protocol, one can bui
 
 
 ## TODO
-- get kitty running under wsl
 - generate a freestanding kr.h that can be embedded in the post
 - capture some better images
 
