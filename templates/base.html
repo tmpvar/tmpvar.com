@@ -3,12 +3,13 @@
 
 <head>
   <meta charset="utf-8">
-  <title>tmpvar.com</title>
+  <title>tmpvar</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300&display=swap" rel="stylesheet">
 
+  <link rel="icon" type="image/x-icon" href="/img/favicon.ico">
   <link rel="stylesheet" href="/font/hack/hack.css">
   <style>
     @font-face {
@@ -24,6 +25,7 @@
       font-family: 'Montserrat', sans-serif;
       font-size: 1.125em;
       padding: 0;
+      margin-left: calc(100vw - 100%);
     }
 
     body {
@@ -36,13 +38,44 @@
       min-height: 100%;
     }
 
+
+    .header {
+      display:block;
+      user-select: none;
+      min-width: 800px;
+      max-width: 60em;
+
+
+      margin: 1em auto;
+      background: rgba(10, 10, 10, 0.75);
+      padding: 1em;
+
+    }
+
+    .header {
+      font-size: 2em;
+      color: #fff;
+      padding-left: 2em;
+      border-radius: 5px;
+    }
+
+    .header a {
+      text-decoration: none;
+      color: #aaa;
+
+    }
+
     .container {
       min-width: 800px;
       max-width: 60em;
 
       margin: 64px auto;
+    }
+
+    .container .content {
       background: #111111;
       padding: 1em;
+      border-radius: 5px;
     }
 
     .center-align {
@@ -53,6 +86,11 @@
       color: #91b8ff;
       font-family: 'Montserrat', sans-serif;
       font-size: 1.13em;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: dotted underline;
     }
 
 
@@ -115,18 +153,28 @@
       display: block;
     }
 
-    h1:target,h2:target,h3:target,h4:target {
+    h1:target,
+    h2:target,
+    h3:target,
+    h4:target {
       color: #9de64e;
     }
+
   </style>
 </head>
 
 <body>
-  <section class="section">
-    <div class="container">
+  <div class="container">
+    <section class="header">
+      <a href="/" alt="home">
+        <img src="/img/wrench.png"/>
+      </a>
+    </section>
+
+    <section class="content">
       {% block content %} {% endblock %}
-    </div>
-  </section>
+    </section>
+  </div>
 </body>
 
 </html>
