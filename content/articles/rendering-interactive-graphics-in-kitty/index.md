@@ -18,6 +18,8 @@ Using [kitty](https://sw.kovidgoyal.net/kitty/)'s graphics protocol, one can bui
 
 using [Ubuntu-22.04.2 LTS](https://apps.microsoft.com/store/detail/ubuntu-22042-lts/9PN20MSR04DW?hl=en-us&gl=us&rtc=1) from the Windows app store
 
+Note: kitty is very out of date on `apt` so I'd recommend following the install instructions [here](https://sw.kovidgoyal.net/kitty/binary/)
+
 I'm on NVidia which requires the Cuda toolkit for some reason!
 
 ```bash
