@@ -6,7 +6,7 @@ const API_HOST = "app.posthog.com" // Change to "eu.posthog.com" for the EU regi
 
 export async function onRequest(event) {
     const pathname = (new URL(event.request.url).pathname).replace("/api/userdata", "");
-    console.log("url:", event.request.url, "catchall:", context.params.catchall)
+    console.log("url:", event.request.url, "catchall:", event.params.catchall)
     if (pathname.startsWith("/static/")) {
         return retrieveStatic(event, pathname)
     } else {
