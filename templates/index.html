@@ -9,10 +9,9 @@
 
 {% for post in posts %}
 <section class="article-entry">
-  <h3>{{ post.title }}</h3>
+  <h3><a href="{{ post.permalink }}">{{ post.title }}</h3></a></h3>
   <p>
     {{ post.summary | safe }}
-    <a href="{{ post.permalink }}">read more</a>
   </p>
 </section>
 {% endfor %}
