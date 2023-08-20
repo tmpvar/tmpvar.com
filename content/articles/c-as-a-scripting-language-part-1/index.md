@@ -3,7 +3,7 @@ title = "Using C/C++ as a scripting language (Part 1)"
 date = 2020-02-01
 +++
 
-In Javascript land, we are pampered with hot code reloading machinery. Not only that, but you can "run" a `.js` file via `node path/to/file.js`. Since I've been preferring C/C++ lately, how can these conveniences be ported to a lower-level language?
+Those familiar with web development will probably have used some form of hot module reloading. This dramatically reduces the development to test iteration time. It is also very common to run a Javascript file via `node path/to/file.js` or similar. Since I've been preferring C/C++ lately, how can these conveniences be ported to a lower-level language?
 
 <!-- more -->
 
