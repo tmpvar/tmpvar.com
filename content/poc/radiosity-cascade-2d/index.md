@@ -10,7 +10,7 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
 
 
 ## Radiance Intervals
-In 2D these are bands of radiance values where each cascade doubles the inner radius of the band and the width of the band. The radiance values are calculated 2x the number of rays per cascade. Per the paper, this arrives at a 2x of probe rays and 1/2 total rays per cascade level.
+In 2D these are bands of radiance values where each cascade doubles the inner radius of the band and the width of the band. The radiance values are calculated 2x the number of rays per cascade. Per the paper, the current cascade has 2x the number of probe rays and 1/2 the total rays when compared to the previous level (e.g., 1024 total rays on level 0 means 512 total rays on level 1)
 
 ### Ray Distributions
 <p>
