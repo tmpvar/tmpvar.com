@@ -3,18 +3,29 @@ title = "Radiance Cascades (2D)"
 date = 2020-04-01
 +++
 
-Trying to build up my intuition around Suslik's [Radiance Cascades](https://drive.google.com/file/d/1L6v1_7HY2X-LV3Ofb6oyTIxgEaP4LOI6/view?usp=sharing) GI approach.
+Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
+- [paper](https://drive.google.com/file/d/1L6v1_7HY2X-LV3Ofb6oyTIxgEaP4LOI6/view?usp=sharing)
+- [demo](https://www.youtube.com/watch?v=xkJ6i2N32Pc)
+- [Exilecon talk](https://www.youtube.com/watch?v=B-ODrtmtpzM)
+
 
 ## Radiance Intervals
+In 2D these are bands of radiance values where each cascade doubles the inner radius of the band and the width of the band. The radiance values are calculated 2x the number of rays per cascade. Per the paper, this arrives at a 2x of probe rays and 1/2 total rays per cascade level.
 
-In 2D these are bands of radiance values where each cascade doubles the inner radius of the band and the width of the band.
-
+### Ray Viz
 <p>
 level: <input type="range" min="0" max="5" value="1" id="radiance-cascades-2d-canvas-level-slider">
 </p>
 
 <p>
+level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-cascades-2d-canvas-level-0-ray-count">
+</p>
+
+<p>
 color lower levels: <input type="checkbox" value="1" id="radiance-cascades-2d-canvas-color-lower-levels">
+</p>
+<p>
+show cascade ray counts: <input type="checkbox" value="1" id="radiance-cascades-2d-canvas-show-cascade-ray-counts">
 </p>
 
 <section class="center-align">
@@ -59,14 +70,17 @@ color lower levels: <input type="checkbox" value="1" id="radiance-cascades-2d-ca
     // CanvasDrawMouse();
 
     let levelSlider = Number(document.getElementById('radiance-cascades-2d-canvas-level-slider').value)
+    let level0RayCountSlider = Number(document.getElementById('radiance-cascades-2d-canvas-level-0-ray-count').value)
     let colorLowerLevels = !!document.getElementById('radiance-cascades-2d-canvas-color-lower-levels').checked
+    let showCascadeRayCounts = !!document.getElementById('radiance-cascades-2d-canvas-show-cascade-ray-counts').checked
+
     let levelColors = ([
       '#f3a833',
       '#9de64e',
       '#36c5f4',
       '#ffa2ac',
       '#cc99ff',
-      '#a6cb96',
+      '#ec273f',
       '#de5d3a'
     ]).map((v,i) => {
       return (i == levelSlider || (i < levelSlider && colorLowerLevels)) ? v : '#222'
@@ -75,12 +89,12 @@ color lower levels: <input type="checkbox" value="1" id="radiance-cascades-2d-ca
     // Draw the actual cascades
     let levels = 6;
     let baseSize = 32;
-    let baseAngularSteps = 4
+    let baseAngularSteps = level0RayCountSlider
     let TAU = Math.PI * 2.0
     let angleOffset = Math.PI * 0.25
 
     let radianceIntervalStart = 0;
-
+    let cascadeRayCounts = [];
     for (let level=0; level<=levelSlider; level++) {
       let size = baseSize << level
       let angularSteps = baseAngularSteps << level
@@ -89,6 +103,7 @@ color lower levels: <input type="checkbox" value="1" id="radiance-cascades-2d-ca
 
       state.ctx.strokeStyle = levelColors[level]
       state.ctx.fillStyle = '#f0f'
+      let cascadeRayCount = 0;
       for (let x = 0; x<state.canvas.width; x+=size) {
         for (let y = 0; y<state.canvas.height; y+=size) {
 
@@ -105,14 +120,24 @@ color lower levels: <input type="checkbox" value="1" id="radiance-cascades-2d-ca
 
             state.ctx.moveTo(centerX + dirX * radianceIntervalStart, centerY + dirY * radianceIntervalStart);
             state.ctx.lineTo(centerX + dirX * radius, centerY + dirY * radius)
+            cascadeRayCount++;
           }
           state.ctx.stroke();
         }
       }
+      cascadeRayCounts.push(cascadeRayCount);
       radianceIntervalStart = radius;
     }
 
-
+    if (showCascadeRayCounts) {
+      state.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)'
+      state.ctx.fillRect(0, 0, 230, 20 + 30 * cascadeRayCounts.length)
+      cascadeRayCounts.forEach((count, level) => {
+        state.ctx.fillStyle = 'white'
+        state.ctx.font = '20px monospace'
+        state.ctx.fillText(`level:${level} rays:${count}`, 20, 30 + level * 30)
+      })
+    }
     window.requestAnimationFrame(DrawRadianceCascades2D)
   }
   window.requestAnimationFrame(DrawRadianceCascades2D)
