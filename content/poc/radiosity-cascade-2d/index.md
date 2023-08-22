@@ -12,29 +12,29 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
 ## Radiance Intervals
 In 2D these are bands of radiance values where each cascade doubles the inner radius of the band and the width of the band. The radiance values are calculated 2x the number of rays per cascade. Per the paper, this arrives at a 2x of probe rays and 1/2 total rays per cascade level.
 
-### Ray Viz
+### Ray Distributions
 <p>
-level: <input type="range" min="0" max="5" value="1" id="radiance-cascades-2d-canvas-level-slider">
+level: <input type="range" min="0" max="5" value="1" id="ray-distributions-2d-canvas-level-slider">
 </p>
 
 <p>
-level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-cascades-2d-canvas-level-0-ray-count">
+level 0 ray count: <input type="range" min="1" max="32" value="4" id="ray-distributions-2d-canvas-level-0-ray-count">
 </p>
 
 <p>
-color lower levels: <input type="checkbox" value="1" id="radiance-cascades-2d-canvas-color-lower-levels">
+color lower levels: <input type="checkbox" value="1" id="ray-distributions-2d-canvas-color-lower-levels">
 </p>
 <p>
-show cascade ray counts: <input type="checkbox" value="1" id="radiance-cascades-2d-canvas-show-cascade-ray-counts">
+show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-2d-canvas-show-cascade-ray-counts">
 </p>
 
 <section class="center-align">
-  <canvas id="radiance-cascades-2d-canvas" width="1024" height="1024"></canvas>
+  <canvas id="ray-distributions-2d-canvas" width="1024" height="1024"></canvas>
 </section>
 
 <script>
   // Setup
-  let canvas = document.getElementById('radiance-cascades-2d-canvas');
+  let canvas = document.getElementById('ray-distributions-2d-canvas');
   let state = {
     mouse: [0, 0],
     canvas: canvas,
@@ -62,17 +62,14 @@ show cascade ray counts: <input type="checkbox" value="1" id="radiance-cascades-
     state.mouse = CanvasGetLocalPos(e.clientX, e.clientY)
   });
 
-
-
-
   function DrawRadianceCascades2D() {
     CanvasClear();
     // CanvasDrawMouse();
 
-    let levelSlider = Number(document.getElementById('radiance-cascades-2d-canvas-level-slider').value)
-    let level0RayCountSlider = Number(document.getElementById('radiance-cascades-2d-canvas-level-0-ray-count').value)
-    let colorLowerLevels = !!document.getElementById('radiance-cascades-2d-canvas-color-lower-levels').checked
-    let showCascadeRayCounts = !!document.getElementById('radiance-cascades-2d-canvas-show-cascade-ray-counts').checked
+    let levelSlider = Number(document.getElementById('ray-distributions-2d-canvas-level-slider').value)
+    let level0RayCountSlider = Number(document.getElementById('ray-distributions-2d-canvas-level-0-ray-count').value)
+    let colorLowerLevels = !!document.getElementById('ray-distributions-2d-canvas-color-lower-levels').checked
+    let showCascadeRayCounts = !!document.getElementById('ray-distributions-2d-canvas-show-cascade-ray-counts').checked
 
     let levelColors = ([
       '#f3a833',
@@ -130,17 +127,20 @@ show cascade ray counts: <input type="checkbox" value="1" id="radiance-cascades-
     }
 
     if (showCascadeRayCounts) {
+      let totalRays = 0;
       state.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)'
-      state.ctx.fillRect(0, 0, 230, 20 + 30 * cascadeRayCounts.length)
+      state.ctx.fillRect(0, 0, 230, 20 + 30 * (cascadeRayCounts.length + 1))
+      state.ctx.fillStyle = 'white'
+      state.ctx.font = '20px monospace'
       cascadeRayCounts.forEach((count, level) => {
-        state.ctx.fillStyle = 'white'
-        state.ctx.font = '20px monospace'
         state.ctx.fillText(`level:${level} rays:${count}`, 20, 30 + level * 30)
+        totalRays += count;
       })
+
+      state.ctx.fillText(`total rays:${totalRays}`, 20, 30 + cascadeRayCounts.length * 30)
     }
     window.requestAnimationFrame(DrawRadianceCascades2D)
   }
-  window.requestAnimationFrame(DrawRadianceCascades2D)
 
-
+  DrawRadianceCascades2D()
 </script>
