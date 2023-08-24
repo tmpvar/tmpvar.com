@@ -375,7 +375,6 @@ click/drag to move the light
       // position a light
       if (!state.positionedWithMouse) {
         let t = Date.now() * lightSpeed
-        // t = 1.2;
         state.lightPos[0] = centerX + Math.sin(t) * lightDistanceFromCenter
         state.lightPos[1] = centerY + Math.cos(t) * lightDistanceFromCenter
       }
@@ -419,6 +418,7 @@ click/drag to move the light
             if (!inInterval) {
               continue;
             }
+
 
             let dx = state.lightPos[0] - probeCenterX;
             let dy = state.lightPos[1] - probeCenterY
@@ -469,6 +469,9 @@ click/drag to move the light
               Math.pow(probeCenterY - state.lightPos[1], 2)
             )
 
+            let dirx = (probeCenterX - state.lightPos[0]) / dist
+            let diry = (probeCenterY - state.lightPos[1]) / dist
+
             let inInterval = dist <= radius && dist >= radianceIntervalStart
             if (!inInterval) {
               continue;
@@ -477,11 +480,30 @@ click/drag to move the light
             let dx = state.lightPos[0] - probeCenterX;
             let dy = state.lightPos[1] - probeCenterY
 
-            let lightAngle = AngleTo( state.lightPos[0], state.lightPos[1], probeCenterX, probeCenterY)
+            let alo = AngleTo(
+              state.lightPos[0] + diry * lightRadius,
+              state.lightPos[1] - dirx * lightRadius,
+              probeCenterX,
+              probeCenterY
+            )
+
+            let ahi = AngleTo(
+              state.lightPos[0] - diry * lightRadius,
+              state.lightPos[1] + dirx * lightRadius,
+              probeCenterX,
+              probeCenterY
+            )
+
             for (let step = 0; step<angularSteps; step++) {
               let angle = step * stepAngle;
               let nextAngle = angle + stepAngle;
-              let inAngle = lightAngle >= angle && lightAngle <= nextAngle;
+
+              let inAngle = false
+              if (alo > ahi) {
+                inAngle = (angle >= alo && angle <= TAU) || (angle >= 0 && angle <= ahi)
+              } else {
+                inAngle = (angle >= alo && angle <= ahi)
+              }
 
               state.ctx.beginPath()
               if (!inAngle) {
