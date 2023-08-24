@@ -272,6 +272,184 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
   }
 </script>
 
+## Probe Storage (2D)
+
+Visualize the radiance intervals that have a light in their bounds by drawing the quantized angle to the light
+
+<section class="center-align">
+  <canvas id="probe-storage-2d-canvas" width="1024" height="1024"></canvas>
+</section>
+
+
+<script>
+  // tuck this into a scope so we can have multiple interactive context2ds on this page
+  {
+    // Setup
+    let canvas = document.getElementById('probe-storage-2d-canvas');
+    let state = {
+      canvas: canvas,
+      ctx: canvas.getContext('2d'),
+      params: {
+        levelSlider: -1,
+        level0RayCountSlider: -1,
+        colorLowerLevels: -1,
+        showCascadeRayCounts: -1,
+      },
+      lightPos: [0, 0]
+    }
+
+    function Param(name, value) {
+      if (state.params[name] != value) {
+        state.params[name] = value;
+        return true;
+      }
+      return false;
+    }
+
+
+    // clear the canvas
+    state.ctx.fillStyle = '#111';
+    state.ctx.fillRect(0, 0, canvas.width, canvas.height);
+    let levelCount = 6;
+    let levelColors = [
+      '#f3a833',
+      '#9de64e',
+      '#36c5f4',
+      '#ffa2ac',
+      '#cc99ff',
+      '#ec273f',
+      '#de5d3a'
+    ]
+
+    function AngleTo(ax, ay, bx, by) {
+      let dx = ax - bx
+      let dy = ay - by
+
+      let angle = Math.atan2(dx, dy);
+      return angle < 0 ? Math.PI * 2 + angle : angle
+    }
+
+    function DrawProbeStorage() {
+      window.requestAnimationFrame(DrawProbeStorage)
+      // let dirty = false;
+      // dirty = dirty || Param(
+      //   'level0RayCountSlider',
+      //   parseFloat(document.getElementById('radiance-intervals-2d-canvas-level-0-ray-count').value)
+      // )
+      // if (!dirty) {
+      //   return
+      // }
+
+      // clear the canvas
+      state.ctx.fillStyle = '#111';
+      state.ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+      let centerX = Math.floor(state.canvas.width / 2.0)
+      let centerY = Math.floor(state.canvas.height / 2.0)
+      let lightDistanceFromCenter =  state.canvas.width * 0.45
+      let lightRadius = 16.0
+      let lightSpeed = 0.001
+      let levelCount = 6;
+      // position a light
+      let t = Date.now() * lightSpeed
+      // t = 1.2;
+      state.lightPos[0] = centerX + Math.sin(t) * lightDistanceFromCenter
+      state.lightPos[1] = centerY + Math.cos(t) * lightDistanceFromCenter
+
+      // draw the probes that are affected by the light
+      let levels = 6;
+      let baseSize = 16;
+      let baseAngularSteps = 4
+      let TAU = Math.PI * 2.0
+      let angleOffset = Math.PI * 0.25
+
+      // draw a light
+      state.ctx.strokeStyle = 'white'
+      state.ctx.beginPath()
+      state.ctx.moveTo(state.lightPos[0] + lightRadius, state.lightPos[1]);
+      state.ctx.arc(state.lightPos[0], state.lightPos[1], lightRadius, 0, Math.PI * 2.0)
+      state.ctx.stroke();
+
+      let cascadeRayCounts = [];
+      for (let level=0; level<=levelCount; level++) {
+        let size = baseSize << level
+        let angularSteps = baseAngularSteps << level
+        let stepAngle = TAU / angularSteps
+        let radianceIntervalStart = level > 0 ? baseSize << (level - 2) : 0;
+        let radius = size / 2.0
+
+
+        state.ctx.strokeStyle = levelColors[level]
+        state.ctx.fillStyle = '#f0f'
+        let cascadeRayCount = 0;
+        for (let x = 0; x<state.canvas.width; x+=size) {
+          for (let y = 0; y<state.canvas.height; y+=size) {
+            let probeCenterX = x + radius
+            let probeCenterY = y + radius
+            let dist = Math.sqrt(
+              Math.pow(probeCenterX - state.lightPos[0], 2) +
+              Math.pow(probeCenterY - state.lightPos[1], 2)
+            )
+
+            let inInterval = dist <= radius && dist >= -radius
+
+            let dx = state.lightPos[0] - probeCenterX;
+            let dy = state.lightPos[1] - probeCenterY
+
+            let lightAngle = AngleTo( state.lightPos[0], state.lightPos[1], probeCenterX, probeCenterY)
+
+            // draw probe center - doesn't really help readability
+            // if (inInterval) {
+            //   state.ctx.beginPath()
+            //   state.ctx.moveTo(probeCenterX + 5, probeCenterY)
+            //   state.ctx.arc(probeCenterX, probeCenterY, 5, 0, TAU)
+            //   state.ctx.fillStyle = levelColors[level];
+            //   state.ctx.fill()
+            // }
+
+            for (let step = 0; step<angularSteps; step++) {
+              let angle = angleOffset + step * stepAngle;
+              let nextAngle = angle + stepAngle;
+              let inAngle = lightAngle >= angle && lightAngle <= nextAngle;
+
+              state.ctx.beginPath()
+              if (inInterval && inAngle) {
+                state.ctx.strokeStyle = levelColors[level];
+              } else {
+                state.ctx.strokeStyle = "#222";
+                continue;
+              }
+
+              let dirX = Math.sin(angle)
+              let dirY = Math.cos(angle)
+
+              state.ctx.moveTo(
+                probeCenterX + dirX * radianceIntervalStart,
+                probeCenterY + dirY * radianceIntervalStart
+              );
+
+              state.ctx.lineTo(
+                probeCenterX + dirX * radius,
+                probeCenterY + dirY * radius
+              )
+              cascadeRayCount++;
+              state.ctx.stroke();
+            }
+          }
+        }
+        cascadeRayCounts.push(cascadeRayCount);
+        radianceIntervalStart = radius;
+      }
+
+
+    }
+
+    DrawProbeStorage()
+
+  }
+</script>
+
 ## TODO
 - store actual radiance values and vizualize the atlas
 - how to accumulate bounces?
