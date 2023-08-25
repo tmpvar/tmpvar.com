@@ -40,7 +40,7 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-i
       }
     }
 
-    function Param(name, value) {
+    const Param = (name, value) => {
       if (state.params[name] != value) {
         state.params[name] = value;
         return true;
@@ -63,7 +63,7 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-i
       '#de5d3a'
     ]
 
-    function DrawRadianceIntervals() {
+    const DrawRadianceIntervals = () => {
       window.requestAnimationFrame(DrawRadianceIntervals)
       let dirty = false;
       dirty = dirty || Param(
@@ -157,7 +157,7 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
 
     window.demoRayDistributions = state;
 
-    function Param(name, value) {
+    const Param = (name, value) => {
       if (state.params[name] != value) {
         state.params[name] = value;
         return true;
@@ -165,7 +165,7 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
       return false;
     }
 
-    function DrawRayDistributions2D() {
+    const DrawRayDistributions2D = () => {
       window.requestAnimationFrame(DrawRayDistributions2D)
 
       // html sliders/checkboxes
@@ -297,13 +297,15 @@ click/drag to move the light
         colorLowerLevels: -1,
         showCascadeRayCounts: -1,
       },
+      lightRadius: 16.0,
       lightPos: [0, 0],
       positionedWithMouse: false,
       mouseIsDown: false,
-      lastMouseDown: [0, 0]
+      lastMouseDown: [0, 0],
+      dirty: true,
     }
 
-    function Param(name, value) {
+    const Param = (name, value) => {
       if (state.params[name] != value) {
         state.params[name] = value;
         return true;
@@ -311,11 +313,43 @@ click/drag to move the light
       return false;
     }
 
-    function MoveLight(e) {
-      let rect = canvas.getBoundingClientRect()
-      state.lightPos[0] = e.clientX - rect.x
-      state.lightPos[1] = e.clientY - rect.y
+    const ComputeOffset = (el, offset) => {
+      if (!el) {
+        return offset
+      }
+
+      offset.left += el.offsetLeft
+      offset.top += el.offsetTop
+      return ComputeOffset(el.parentOffset, offset)
+    }
+
+    const Min = Math.min
+    const Max = Math.max
+    const Clamp = (v, lo, hi) => {
+      return v < lo ? lo : (v > hi ? hi : v);
+    }
+
+    const MoveLight = (x, y) => {
+      let ratioX = canvas.width / canvas.clientWidth
+      let ratioY = canvas.height / canvas.clientHeight
+
+      state.lightPos[0] = x * ratioX
+      state.lightPos[1] = y * ratioY
+
+      state.lightPos[0] = Clamp(
+        state.lightPos[0],
+        state.lightRadius,
+        canvas.width - state.lightRadius
+      )
+
+      state.lightPos[1] = Clamp(
+        state.lightPos[1],
+        state.lightRadius,
+        canvas.height - state.lightRadius
+      )
+
       state.positionedWithMouse = true
+      state.dirty = true
     }
 
     window.addEventListener("mouseup", e => {
@@ -323,16 +357,38 @@ click/drag to move the light
     })
 
     canvas.addEventListener("mousedown", (e) => {
-
       state.mouseIsDown = true
-      MoveLight(e)
+      MoveLight(e.offsetX, e.offsetY)
     })
 
     canvas.addEventListener("mousemove", e => {
       if (state.mouseIsDown) {
-        MoveLight(e)
+        MoveLight(e.offsetX, e.offsetY)
       }
     })
+
+    canvas.addEventListener("touchstart", (e) => {
+      if (e.touches.length == 1) {
+        state.mouseIsDown = true
+        let touch = e.touches[0]
+
+        let rect = e.target.getBoundingClientRect();
+        MoveLight(touch.clientX - rect.x, touch.clientY - rect.y)
+        e.preventDefault()
+      }
+    }, { passive: false })
+
+
+    canvas.addEventListener("touchmove", e => {
+      if (e.touches.length == 1) {
+        if (state.mouseIsDown) {
+          let touch = e.touches[0]
+          let rect = e.target.getBoundingClientRect();
+          MoveLight(touch.clientX - rect.x, touch.clientY - rect.y)
+          e.preventDefault()
+        }
+      }
+    }, { passive: false })
 
 
     // clear the canvas
@@ -346,10 +402,11 @@ click/drag to move the light
       '#ffa2ac',
       '#cc99ff',
       '#ec273f',
-      '#de5d3a'
+      '#de5d3a',
+      '#006554',
     ]
 
-    function AngleTo(ax, ay, bx, by) {
+    const AngleTo = (ax, ay, bx, by) => {
       let dx = ax - bx
       let dy = ay - by
 
@@ -357,9 +414,17 @@ click/drag to move the light
       return angle < 0 ? Math.PI * 2 + angle : angle
     }
 
-    function DrawProbeStorage() {
+    const DrawProbeStorage = () => {
       window.requestAnimationFrame(DrawProbeStorage)
 
+      if (!state.positionedWithMouse) {
+        state.dirty = true;
+      }
+
+      if (!state.dirty) {
+        return
+      }
+      state.dirty = false;
 
       // clear the canvas
       state.ctx.fillStyle = '#111';
@@ -369,7 +434,7 @@ click/drag to move the light
       let centerX = Math.floor(state.canvas.width / 2.0)
       let centerY = Math.floor(state.canvas.height / 2.0)
       let lightDistanceFromCenter =  state.canvas.width * 0.45
-      let lightRadius = 16.0
+
       let lightSpeed = 0.0001
       let levelCount = 6;
       // position a light
@@ -388,8 +453,8 @@ click/drag to move the light
       // draw a light
       state.ctx.strokeStyle = 'white'
       state.ctx.beginPath()
-      state.ctx.moveTo(state.lightPos[0] + lightRadius, state.lightPos[1]);
-      state.ctx.arc(state.lightPos[0], state.lightPos[1], lightRadius, 0, Math.PI * 2.0)
+      state.ctx.moveTo(state.lightPos[0] + state.lightRadius, state.lightPos[1]);
+      state.ctx.arc(state.lightPos[0], state.lightPos[1], state.lightRadius, 0, Math.PI * 2.0)
       state.ctx.stroke();
 
       let cascadeRayCounts = [];
@@ -481,15 +546,15 @@ click/drag to move the light
             let dy = state.lightPos[1] - probeCenterY
 
             let alo = AngleTo(
-              state.lightPos[0] + diry * lightRadius,
-              state.lightPos[1] - dirx * lightRadius,
+              state.lightPos[0] + diry * state.lightRadius,
+              state.lightPos[1] - dirx * state.lightRadius,
               probeCenterX,
               probeCenterY
             )
 
             let ahi = AngleTo(
-              state.lightPos[0] - diry * lightRadius,
-              state.lightPos[1] + dirx * lightRadius,
+              state.lightPos[0] - diry * state.lightRadius,
+              state.lightPos[1] + dirx * state.lightRadius,
               probeCenterX,
               probeCenterY
             )
