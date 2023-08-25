@@ -359,13 +359,15 @@ click/drag to move the light
     canvas.addEventListener("mousedown", (e) => {
       state.mouseIsDown = true
       MoveLight(e.offsetX, e.offsetY)
-    })
+      e.preventDefault()
+    }, { passive: false })
 
     canvas.addEventListener("mousemove", e => {
       if (state.mouseIsDown) {
         MoveLight(e.offsetX, e.offsetY)
+        e.preventDefault()
       }
-    })
+    }, { passive: false })
 
     canvas.addEventListener("touchstart", (e) => {
       if (e.touches.length == 1) {
