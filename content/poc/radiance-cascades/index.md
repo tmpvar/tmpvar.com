@@ -79,6 +79,7 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-i
       // clear the canvas
       state.ctx.fillStyle = '#111';
       state.ctx.fillRect(0, 0, canvas.width, canvas.height);
+      state.ctx.lineWidth = 2;
 
       let centerX = Math.floor(state.canvas.width / 2.0)
       let centerY = Math.floor(state.canvas.height / 2.0)
@@ -121,7 +122,7 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-i
 ### Ray Distributions
 
 <p>
-level: <input type="range" min="0" max="5" value="1" id="ray-distributions-2d-canvas-level-slider">
+level: <input type="range" min="0" max="6" value="1" id="ray-distributions-2d-canvas-level-slider">
 </p>
 
 <p>
@@ -155,7 +156,7 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
       }
     }
 
-    window.demoRayDistributions = state;
+    state.ctx.lineWidth = 2;
 
     const Param = (name, value) => {
       if (state.params[name] != value) {
@@ -278,6 +279,14 @@ Visualize the radiance intervals that have a light in their bounds by drawing th
 
 click/drag to move the light
 
+<p>
+max level: <input type="range" min="0" max="6" value="5" id="probe-storage-2d-level-slider">
+</p>
+
+<p>
+light radius: <input type="range" min="64" max="500" value="1" id="probe-storage-2d-lightRadius-slider">
+</p>
+
 <section class="center-align">
   <canvas id="probe-storage-2d-canvas" width="1024" height="1024"></canvas>
 </section>
@@ -293,17 +302,16 @@ click/drag to move the light
       ctx: canvas.getContext('2d'),
       params: {
         levelSlider: -1,
-        level0RayCountSlider: -1,
-        colorLowerLevels: -1,
-        showCascadeRayCounts: -1,
+        lightRadius: 5,
       },
-      lightRadius: 16.0,
       lightPos: [0, 0],
       positionedWithMouse: false,
       mouseIsDown: false,
       lastMouseDown: [0, 0],
       dirty: true,
     }
+
+    state.ctx.lineWidth = 2;
 
     const Param = (name, value) => {
       if (state.params[name] != value) {
@@ -338,13 +346,13 @@ click/drag to move the light
 
       state.lightPos[0] = Clamp(
         state.lightPos[0],
-        state.lightRadius,
+        state.params.lightRadius,
         canvas.width - state.lightRadius
       )
 
       state.lightPos[1] = Clamp(
         state.lightPos[1],
-        state.lightRadius,
+        state.params.lightRadius,
         canvas.height - state.lightRadius
       )
 
@@ -380,7 +388,6 @@ click/drag to move the light
       }
     }, { passive: false })
 
-
     canvas.addEventListener("touchmove", e => {
       if (e.touches.length == 1) {
         if (state.mouseIsDown) {
@@ -396,7 +403,7 @@ click/drag to move the light
     // clear the canvas
     state.ctx.fillStyle = '#111';
     state.ctx.fillRect(0, 0, canvas.width, canvas.height);
-    let levelCount = 6;
+    let levelCount = 0;
     let levelColors = [
       '#f3a833',
       '#9de64e',
@@ -419,6 +426,17 @@ click/drag to move the light
     const DrawProbeStorage = () => {
       window.requestAnimationFrame(DrawProbeStorage)
 
+      state.dirty = state.dirty || Param(
+        'levelSlider',
+        parseFloat(document.getElementById('probe-storage-2d-level-slider').value)
+      )
+
+      state.dirty = state.dirty || Param(
+        'lightRadius',
+        parseFloat(document.getElementById('probe-storage-2d-lightRadius-slider').value)
+      )
+
+
       if (!state.positionedWithMouse) {
         state.dirty = true;
       }
@@ -435,13 +453,13 @@ click/drag to move the light
 
       let centerX = Math.floor(state.canvas.width / 2.0)
       let centerY = Math.floor(state.canvas.height / 2.0)
-      let lightDistanceFromCenter =  state.canvas.width * 0.45
+      let lightDistanceFromCenter =  state.canvas.width * 0.25
 
       let lightSpeed = 0.0001
-      let levelCount = 6;
       // position a light
       if (!state.positionedWithMouse) {
         let t = Date.now() * lightSpeed
+        t = Math.PI + 0.1
         state.lightPos[0] = centerX + Math.sin(t) * lightDistanceFromCenter
         state.lightPos[1] = centerY + Math.cos(t) * lightDistanceFromCenter
       }
@@ -455,18 +473,18 @@ click/drag to move the light
       // draw a light
       state.ctx.strokeStyle = 'white'
       state.ctx.beginPath()
-      state.ctx.moveTo(state.lightPos[0] + state.lightRadius, state.lightPos[1]);
-      state.ctx.arc(state.lightPos[0], state.lightPos[1], state.lightRadius, 0, Math.PI * 2.0)
+      state.ctx.moveTo(state.lightPos[0] + state.params.lightRadius, state.lightPos[1]);
+      state.ctx.arc(state.lightPos[0], state.lightPos[1], state.params.lightRadius, 0, Math.PI * 2.0)
       state.ctx.stroke();
 
       let cascadeRayCounts = [];
-      for (let level=0; level<=levelCount; level++) {
+      for (let level=0; level<=state.params.levelSlider; level++) {
         let size = baseSize << level
         let angularSteps = baseAngularSteps << level
         let stepAngle = TAU / angularSteps
         let radianceIntervalStart = level > 0 ? baseSize << (level - 2) : 0;
         let radius = size / 2.0
-
+        // let bandSize = radius - radianceIntervalStart
 
         state.ctx.strokeStyle = levelColors[level]
         state.ctx.fillStyle = '#f0f'
@@ -481,13 +499,21 @@ click/drag to move the light
               Math.pow(probeCenterY - state.lightPos[1], 2)
             )
 
-            let inInterval = dist <= radius && dist >= -radius
+            // let inInterval = dist <= radius && dist >= -radius
+            // let inInterval = dist <= (radius + state.lightRadius)
+            // let inLight = dist <= state.params.lightRadius + bandSize
+            let inLight = dist <= radius && state.params.lightRadius > radius
+            let inInterval = (
+              dist + state.params.lightRadius >= radianceIntervalStart &&
+              dist - state.params.lightRadius <= radius
+            ) || inLight
+
             if (!inInterval) {
               continue;
             }
 
 
-            let dx = state.lightPos[0] - probeCenterX;
+            let dx = state.lightPos[0] - probeCenterX
             let dy = state.lightPos[1] - probeCenterY
             let lightAngle = AngleTo( state.lightPos[0], state.lightPos[1], probeCenterX, probeCenterY)
             for (let step = 0; step<angularSteps; step++) {
@@ -518,9 +544,8 @@ click/drag to move the light
         cascadeRayCounts.push(cascadeRayCount);
       }
 
-      state.ctx.save();
-      state.ctx.lineWidth = 2;
-      for (let level=0; level<=levelCount; level++) {
+      for (let level=0; level<=state.params.levelSlider; level++) {
+
         let size = baseSize << level
         let angularSteps = baseAngularSteps << level
         let stepAngle = TAU / angularSteps
@@ -539,7 +564,12 @@ click/drag to move the light
             let dirx = (probeCenterX - state.lightPos[0]) / dist
             let diry = (probeCenterY - state.lightPos[1]) / dist
 
-            let inInterval = dist <= radius && dist >= radianceIntervalStart
+            // let inInterval = dist <= radius && dist >= radianceIntervalStart
+            let inLight = dist <= (state.params.lightRadius - radius) && state.params.lightRadius > radius
+            let inInterval = (
+              dist + state.params.lightRadius >= radianceIntervalStart &&
+              dist - state.params.lightRadius <= radius
+            ) || inLight
             if (!inInterval) {
               continue;
             }
@@ -548,21 +578,21 @@ click/drag to move the light
             let dy = state.lightPos[1] - probeCenterY
 
             let alo = AngleTo(
-              state.lightPos[0] + diry * state.lightRadius,
-              state.lightPos[1] - dirx * state.lightRadius,
+              state.lightPos[0] + diry * state.params.lightRadius,
+              state.lightPos[1] - dirx * state.params.lightRadius,
               probeCenterX,
               probeCenterY
             )
 
             let ahi = AngleTo(
-              state.lightPos[0] - diry * state.lightRadius,
-              state.lightPos[1] + dirx * state.lightRadius,
+              state.lightPos[0] - diry * state.params.lightRadius,
+              state.lightPos[1] + dirx * state.params.lightRadius,
               probeCenterX,
               probeCenterY
             )
 
             for (let step = 0; step<angularSteps; step++) {
-              let angle = step * stepAngle;
+              let angle = angleOffset + step * stepAngle;
               let nextAngle = angle + stepAngle;
 
               let inAngle = false
@@ -573,7 +603,7 @@ click/drag to move the light
               }
 
               state.ctx.beginPath()
-              if (!inAngle) {
+              if (!inAngle && !inLight) {
                 continue;
               }
 
@@ -596,9 +626,6 @@ click/drag to move the light
           }
         }
       }
-      state.ctx.restore();
-
-
     }
 
     DrawProbeStorage()
