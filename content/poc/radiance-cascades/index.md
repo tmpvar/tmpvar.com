@@ -280,11 +280,17 @@ Visualize the radiance intervals that have a light in their bounds by drawing th
 click/drag to move the light
 
 <p>
-max level: <input type="range" min="0" max="6" value="5" id="probe-storage-2d-level-slider">
+min level: <input type="range" min="0" max="6" value="0" id="probe-storage-2d-minLevel-slider">
+</p>
+<p>
+max level: <input type="range" min="0" max="6" value="6" id="probe-storage-2d-maxLevel-slider">
+</p>
+<p>
+light radius: <input type="range" min="64" max="500" value="1" id="probe-storage-2d-lightRadius-slider">
 </p>
 
 <p>
-light radius: <input type="range" min="64" max="500" value="1" id="probe-storage-2d-lightRadius-slider">
+show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-showProbeOverlapCheckbox" />
 </p>
 
 <section class="center-align">
@@ -301,7 +307,8 @@ light radius: <input type="range" min="64" max="500" value="1" id="probe-storage
       canvas: canvas,
       ctx: canvas.getContext('2d'),
       params: {
-        levelSlider: -1,
+        minLevel: 0,
+        maxLevel: 6,
         lightRadius: 5,
       },
       lightPos: [0, 0],
@@ -333,6 +340,8 @@ light radius: <input type="range" min="64" max="500" value="1" id="probe-storage
 
     const Min = Math.min
     const Max = Math.max
+    const Pow = Math.pow
+    const Sqrt = Math.sqrt
     const Clamp = (v, lo, hi) => {
       return v < lo ? lo : (v > hi ? hi : v);
     }
@@ -423,12 +432,48 @@ light radius: <input type="range" min="64" max="500" value="1" id="probe-storage
       return angle < 0 ? Math.PI * 2 + angle : angle
     }
 
+
+    /*
+      Calculate the intersection of a ray and a sphere
+      The line segment is defined from p1 to p2
+      The sphere is of radius r and centered at sc
+      There are potentially two points of intersection given by
+      p = p1 + mu1 (p2 - p1)
+      p = p1 + mu2 (p2 - p1)
+      Return FALSE if the ray doesn't intersect the sphere.
+    */
+    const RaySphere = (p1, p2, sc, r) => {
+      let dp = [
+        p2[0] - p1[0],
+        p2[1] - p1[1]
+      ]
+
+      let a = dp[0] * dp[0] + dp[1] * dp[1];
+      let b = 2 * (dp[0] * (p1[0] - sc[0]) + dp[1] * (p1[1] - sc[1]));
+      let c = sc[0] * sc[0] + sc[1] * sc[1];
+      c += p1[0] * p1[0] + p1[1] * p1[1];
+      c -= 2 * (sc[0] * p1[0] + sc[1] * p1[1]);
+      c -= r * r;
+      let bb4ac = b * b - 4 * a * c;
+      if (Math.abs(a) < 1e-10 || bb4ac < 0) {
+        return false;
+      }
+      return [
+        (-b + Sqrt(bb4ac)) / (2 * a),
+        (-b - Sqrt(bb4ac)) / (2 * a)
+      ]
+    }
+
     const DrawProbeStorage = () => {
       window.requestAnimationFrame(DrawProbeStorage)
 
       state.dirty = state.dirty || Param(
-        'levelSlider',
-        parseFloat(document.getElementById('probe-storage-2d-level-slider').value)
+        'minLevel',
+        parseFloat(document.getElementById('probe-storage-2d-minLevel-slider').value)
+      )
+      state.dirty = state.dirty || Param(
+        'maxLevel',
+        parseFloat(document.getElementById('probe-storage-2d-maxLevel-slider').value)
       )
 
       state.dirty = state.dirty || Param(
@@ -436,10 +481,14 @@ light radius: <input type="range" min="64" max="500" value="1" id="probe-storage
         parseFloat(document.getElementById('probe-storage-2d-lightRadius-slider').value)
       )
 
+      state.dirty = state.dirty || Param(
+        'showProbeOverlap',
+        !!document.getElementById('probe-storage-2d-showProbeOverlapCheckbox').checked
+      )
 
-      if (!state.positionedWithMouse) {
-        state.dirty = true;
-      }
+      // if (!state.positionedWithMouse) {
+      //   state.dirty = true;
+      // }
 
       if (!state.dirty) {
         return
@@ -459,8 +508,8 @@ light radius: <input type="range" min="64" max="500" value="1" id="probe-storage
       // position a light
       if (!state.positionedWithMouse) {
         let t = Date.now() * lightSpeed
-        t = Math.PI + 0.1
-        state.lightPos[0] = centerX + Math.sin(t) * lightDistanceFromCenter
+        t = Math.PI - 0.4
+        state.lightPos[0] = centerX + Math.sin(t) * lightDistanceFromCenter + 90
         state.lightPos[1] = centerY + Math.cos(t) * lightDistanceFromCenter
       }
 
@@ -477,74 +526,75 @@ light radius: <input type="range" min="64" max="500" value="1" id="probe-storage
       state.ctx.arc(state.lightPos[0], state.lightPos[1], state.params.lightRadius, 0, Math.PI * 2.0)
       state.ctx.stroke();
 
-      let cascadeRayCounts = [];
-      for (let level=0; level<=state.params.levelSlider; level++) {
-        let size = baseSize << level
-        let angularSteps = baseAngularSteps << level
-        let stepAngle = TAU / angularSteps
-        let radianceIntervalStart = level > 0 ? baseSize << (level - 2) : 0;
-        let radius = size / 2.0
-        // let bandSize = radius - radianceIntervalStart
 
-        state.ctx.strokeStyle = levelColors[level]
-        state.ctx.fillStyle = '#f0f'
+      if (state.params.showProbeOverlap) {
+        for (let level=state.params.minLevel; level<=state.params.maxLevel; level++) {
 
-        let cascadeRayCount = 0;
-        for (let x = 0; x<state.canvas.width; x+=size) {
-          for (let y = 0; y<state.canvas.height; y+=size) {
-            let probeCenterX = x + radius
-            let probeCenterY = y + radius
-            let dist = Math.sqrt(
-              Math.pow(probeCenterX - state.lightPos[0], 2) +
-              Math.pow(probeCenterY - state.lightPos[1], 2)
-            )
+          let size = baseSize << level
+          let angularSteps = baseAngularSteps << level
+          let stepAngle = TAU / angularSteps
+          let radianceIntervalStart = level > 0 ? baseSize << (level - 2) : 0;
+          let radius = size / 2.0
+          // let bandSize = radius - radianceIntervalStart
 
-            // let inInterval = dist <= radius && dist >= -radius
-            // let inInterval = dist <= (radius + state.lightRadius)
-            // let inLight = dist <= state.params.lightRadius + bandSize
-            let inLight = dist <= radius && state.params.lightRadius > radius
-            let inInterval = (
-              dist + state.params.lightRadius >= radianceIntervalStart &&
-              dist - state.params.lightRadius <= radius
-            ) || inLight
+          state.ctx.strokeStyle = levelColors[level]
+          state.ctx.fillStyle = '#f0f'
 
-            if (!inInterval) {
-              continue;
-            }
-
-
-            let dx = state.lightPos[0] - probeCenterX
-            let dy = state.lightPos[1] - probeCenterY
-            let lightAngle = AngleTo( state.lightPos[0], state.lightPos[1], probeCenterX, probeCenterY)
-            for (let step = 0; step<angularSteps; step++) {
-              let angle = angleOffset + step * stepAngle;
-              let nextAngle = angle + stepAngle;
-              let inAngle = lightAngle >= angle && lightAngle <= nextAngle;
-
-
-              state.ctx.strokeStyle = "#444";
-              state.ctx.beginPath()
-              let dirX = Math.sin(angle)
-              let dirY = Math.cos(angle)
-
-              state.ctx.moveTo(
-                probeCenterX + dirX * radianceIntervalStart,
-                probeCenterY + dirY * radianceIntervalStart
-              );
-
-              state.ctx.lineTo(
-                probeCenterX + dirX * radius,
-                probeCenterY + dirY * radius
+          for (let x = 0; x<state.canvas.width; x+=size) {
+            for (let y = 0; y<state.canvas.height; y+=size) {
+              let probeCenterX = x + radius
+              let probeCenterY = y + radius
+              let dist = Math.sqrt(
+                Math.pow(probeCenterX - state.lightPos[0], 2) +
+                Math.pow(probeCenterY - state.lightPos[1], 2)
               )
-              cascadeRayCount++;
-              state.ctx.stroke();
+
+
+              // let inInterval = dist <= radius && dist >= -radius
+              // let inInterval = dist <= (radius + state.lightRadius)
+              // let inLight = dist <= state.params.lightRadius + bandSize
+              let inLight = dist <= radius && state.params.lightRadius > radius
+              let inInterval = (
+                dist + state.params.lightRadius >= radianceIntervalStart &&
+                dist - state.params.lightRadius <= radius
+              ) || inLight
+
+              if (!inInterval) {
+                continue;
+              }
+
+
+              let dx = state.lightPos[0] - probeCenterX
+              let dy = state.lightPos[1] - probeCenterY
+              let lightAngle = AngleTo( state.lightPos[0], state.lightPos[1], probeCenterX, probeCenterY)
+              for (let step = 0; step<angularSteps; step++) {
+                let angle = angleOffset + step * stepAngle;
+                let nextAngle = angle + stepAngle;
+                let inAngle = lightAngle >= angle && lightAngle <= nextAngle;
+
+
+                state.ctx.strokeStyle = "#444";
+                state.ctx.beginPath()
+                let dirX = Math.sin(angle)
+                let dirY = Math.cos(angle)
+
+                state.ctx.moveTo(
+                  probeCenterX + dirX * radianceIntervalStart,
+                  probeCenterY + dirY * radianceIntervalStart
+                );
+
+                state.ctx.lineTo(
+                  probeCenterX + dirX * radius,
+                  probeCenterY + dirY * radius
+                )
+                state.ctx.stroke();
+              }
             }
           }
         }
-        cascadeRayCounts.push(cascadeRayCount);
       }
 
-      for (let level=0; level<=state.params.levelSlider; level++) {
+      for (let level=state.params.minLevel; level<=state.params.maxLevel; level++) {
 
         let size = baseSize << level
         let angularSteps = baseAngularSteps << level
@@ -574,43 +624,38 @@ light radius: <input type="range" min="64" max="500" value="1" id="probe-storage
               continue;
             }
 
-            let dx = state.lightPos[0] - probeCenterX;
-            let dy = state.lightPos[1] - probeCenterY
-
-            let alo = AngleTo(
-              state.lightPos[0] + diry * state.params.lightRadius,
-              state.lightPos[1] - dirx * state.params.lightRadius,
-              probeCenterX,
-              probeCenterY
-            )
-
-            let ahi = AngleTo(
-              state.lightPos[0] - diry * state.params.lightRadius,
-              state.lightPos[1] + dirx * state.params.lightRadius,
-              probeCenterX,
-              probeCenterY
-            )
-
             for (let step = 0; step<angularSteps; step++) {
               let angle = angleOffset + step * stepAngle;
               let nextAngle = angle + stepAngle;
 
-              let inAngle = false
-              if (alo > ahi) {
-                inAngle = (angle >= alo && angle <= TAU) || (angle >= 0 && angle <= ahi)
-              } else {
-                inAngle = (angle >= alo && angle <= ahi)
+              state.ctx.beginPath()
+
+              let dirX = Math.sin(angle)
+              let dirY = Math.cos(angle)
+
+              let result = RaySphere(
+                [
+                  probeCenterX + dirX * radianceIntervalStart,
+                  probeCenterY + dirY * radianceIntervalStart
+                ],
+                [
+                  probeCenterX + dirX * radius,
+                  probeCenterY + dirY * radius
+                ],
+                state.lightPos,
+                state.params.lightRadius
+              )
+
+              if (!result) {
+                continue;
               }
 
-              state.ctx.beginPath()
-              if (!inAngle && !inLight) {
+              if (result[0] < 0 && result[1] < 0) {
                 continue;
               }
 
               state.ctx.strokeStyle = levelColors[level]
 
-              let dirX = Math.sin(angle)
-              let dirY = Math.cos(angle)
 
               state.ctx.moveTo(
                 probeCenterX + dirX * radianceIntervalStart,
