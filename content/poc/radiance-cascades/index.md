@@ -286,7 +286,7 @@ min level: <input type="range" min="0" max="6" value="0" id="probe-storage-2d-mi
 max level: <input type="range" min="0" max="6" value="6" id="probe-storage-2d-maxLevel-slider">
 </p>
 <p>
-light radius: <input type="range" min="64" max="500" value="1" id="probe-storage-2d-lightRadius-slider">
+light radius: <input type="range" min="16" max="500" value="1" id="probe-storage-2d-lightRadius-slider">
 </p>
 
 <p>
@@ -355,14 +355,14 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 
       state.lightPos[0] = Clamp(
         state.lightPos[0],
-        state.params.lightRadius,
-        canvas.width - state.lightRadius
+        0,
+        canvas.width
       )
 
       state.lightPos[1] = Clamp(
         state.lightPos[1],
-        state.params.lightRadius,
-        canvas.height - state.lightRadius
+        0,
+        canvas.height
       )
 
       state.positionedWithMouse = true
