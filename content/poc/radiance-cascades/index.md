@@ -807,6 +807,23 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 
 ### Probe Ray DDA (2D)
 
+<p>
+erase <input type="checkbox" value="1" id="probe-ray-dda-2d-erase" />
+</p>
+
+<p>
+radiance: <input type="range" min="0" max="256" value="0" id="probe-ray-dda-2d-radiance-slider">
+</p>
+
+<p>
+brush radius: <input type="range" min="4" max="100" value="16" id="probe-ray-dda-2d-radius-slider">
+</p>
+
+<p>
+color: <input type="color" id="probe-ray-dda-2d-color" value="#ff0000">
+</p>
+
+
 <section class="center-align">
   <canvas id="probe-ray-dda-2d-canvas" width="1024" height="1024"></canvas>
 </section>
@@ -823,12 +840,11 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 ## Devlog
 
 ### Pending
-- probe-ray-dda-2d: controls for: add/remove, wall/light, color selector
 - probe-ray-dda-2d: for each cascade level & each probe: cast rays via dda and store result in probe atlas
 - probe-ray-dda-2d: debug render probe atlas
-
 - probe-ray-dda-2d: render final gather
 
 ### 2023-06-28
+- probe-ray-dda-2d: controls for: add/remove, wall/light, color selector
 - probe-ray-dda-2d: render world texture
 - probe-ray-dda-2d: draw into world texture using the current mouse position and touch/left mouse
