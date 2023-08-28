@@ -275,7 +275,132 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
   }
 </script>
 
-## Probe Storage (2D)
+
+### Probe Interpolation
+
+<p>
+min level: <input type="range" min="0" max="6" value="1" id="probe-interpolation-2d-canvas-minLevel-slider">
+</p>
+<p>
+max level: <input type="range" min="0" max="6" value="2" id="probe-interpolation-2d-canvas-maxLevel-slider">
+</p>
+
+<p>
+level 0 ray count: <input type="range" min="1" max="32" value="4" id="probe-interpolation-2d-canvas-level-0-ray-count">
+</p>
+
+<section class="center-align">
+  <canvas id="probe-interpolation-2d-canvas" width="1024" height="1024"></canvas>
+</section>
+
+<script>
+  // tuck this into a scope so we can have multiple interactive context2ds on this page
+  {
+    // Setup
+    let canvas = document.getElementById('probe-interpolation-2d-canvas');
+    let state = {
+      canvas: canvas,
+      ctx: canvas.getContext('2d'),
+      params: {
+        minLevel: 0,
+        maxLevel: 6,
+        level0RayCountSlider: 0,
+      }
+    }
+
+    state.ctx.lineWidth = 2;
+
+    const Param = (name, value) => {
+      if (state.params[name] != value) {
+        state.params[name] = value;
+        return true;
+      }
+      return false;
+    }
+
+    const DrawRayDistributions2D = () => {
+      window.requestAnimationFrame(DrawRayDistributions2D)
+
+      // html sliders/checkboxes
+      let dirty = false;
+      dirty = dirty || Param(
+        'minLevel',
+        parseFloat(document.getElementById('probe-interpolation-2d-canvas-minLevel-slider').value)
+      )
+      dirty = dirty || Param(
+        'maxLevel',
+        parseFloat(document.getElementById('probe-interpolation-2d-canvas-maxLevel-slider').value)
+      )
+
+      dirty = dirty || Param(
+        'level0RayCountSlider',
+        parseFloat(document.getElementById('probe-interpolation-2d-canvas-level-0-ray-count').value)
+      )
+
+      if (!dirty) {
+        return;
+      }
+
+      // clear the canvas
+      state.ctx.fillStyle = '#111';
+      state.ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      let levelColors = [
+        '#f3a833',
+        '#9de64e',
+        '#36c5f4',
+        '#ffa2ac',
+        '#cc99ff',
+        '#ec273f',
+        '#de5d3a'
+      ]
+
+      // Draw the actual cascades
+      let levels = 6;
+      let startingProbeRadius = 64;
+      let baseAngularSteps = state.params.level0RayCountSlider
+      let TAU = Math.PI * 2.0
+      let angleOffset = Math.PI * 0.25
+
+      let radianceIntervalStart = 0;
+      let cascadeRayCounts = [];
+      let diameter = startingProbeRadius * 2
+      let levelPadding = 0
+      for (let level=state.params.minLevel; level<=state.params.maxLevel; level++) {
+        let angularSteps = baseAngularSteps << level
+        let stepAngle = TAU / angularSteps
+        let radius = (startingProbeRadius << level) - levelPadding
+        let prevRadius = level > 0 ? (startingProbeRadius << (level - 1))  - levelPadding : 0;
+
+        state.ctx.strokeStyle = levelColors[level]
+        state.ctx.fillStyle = '#f0f'
+        let cascadeRayCount = 0;
+        for (let x = 0; x<state.canvas.width; x+=diameter) {
+          for (let y = 0; y<state.canvas.height; y+=diameter) {
+            state.ctx.beginPath()
+            let centerX = x + startingProbeRadius
+            let centerY = y + startingProbeRadius
+            for (let step = 0; step<angularSteps; step++) {
+              let angle = angleOffset + step * stepAngle;
+              let dirX = Math.sin(angle)
+              let dirY = Math.cos(angle)
+
+              state.ctx.moveTo(centerX + dirX * prevRadius, centerY + dirY * prevRadius);
+
+              state.ctx.lineTo(centerX + dirX * radius, centerY + dirY * radius)
+              cascadeRayCount++;
+            }
+            state.ctx.stroke();
+          }
+        }
+      }
+    }
+
+    DrawRayDistributions2D()
+  }
+</script>
+
+### Probe Rays vs Light
 
 Visualize the radiance intervals that have a light in their bounds by drawing the quantized angle to the light
 
@@ -443,6 +568,7 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
       p = p1 + mu1 (p2 - p1)
       p = p1 + mu2 (p2 - p1)
       Return FALSE if the ray doesn't intersect the sphere.
+      see: http://paulbourke.net/geometry/circlesphere/
     */
     const RaySphere = (p1, p2, sc, r) => {
       let dp = [
@@ -554,7 +680,7 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 
               let inLight = dist <= radius && state.params.lightRadius > radius
               let inInterval = (
-                dist + state.params.lightRadius >= radianceIntervalStart &&
+                dist + state.params.lightRadius >= prevRadius &&
                 dist - state.params.lightRadius <= radius
               ) || inLight
 
@@ -645,11 +771,13 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
                 state.params.lightRadius
               )
 
+
               if (!result) {
                 continue;
               }
 
-              if (result[0] < 0 && result[1] < 0) {
+              let valid = !(result[0] < 0 && result[1] < 0)
+              if (!valid) {
                 continue;
               }
 
@@ -677,7 +805,210 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
   }
 </script>
 
+### Probe Ray DDA (2D)
+
+
+<section class="center-align">
+  <canvas id="probe-ray-dda-2d-canvas" width="1024" height="1024"></canvas>
+</section>
+
+<script type="module">
+  import * as shaders from "./shaders.mjs"
+
+  (async function() {
+
+    const InitGPU = async(ctx) => {
+
+      let adapter = await navigator.gpu.requestAdapter()
+      let device = await adapter.requestDevice()
+
+      const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+
+      ctx.configure({
+        device,
+        format: presentationFormat,
+        alphaMode: 'premultiplied',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      });
+
+      return {
+        adapter,
+        device,
+        presentationFormat,
+      }
+    }
+
+    let canvas = document.getElementById('probe-ray-dda-2d-canvas');
+    let state = {
+      canvas: canvas,
+      ctx: canvas.getContext('webgpu'),
+      params: {},
+    }
+    state.gpu = await InitGPU(state.ctx)
+
+    // Create the world texture
+    {
+      state.worldTexture = state.gpu.device.createTexture({
+        size: [canvas.width, canvas.height, 1],
+        dimension: '2d',
+        // rgb, a=emission
+        format: 'rgba8unorm',
+        usage: (
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.COPY_SRC |
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.STORAGE_BINDING
+        )
+      })
+      state.worldTextureSampler = state.gpu.device.createSampler({
+        minFilter: 'nearest',
+        magFilter: 'nearest',
+      })
+    }
+
+    const ClearWorldWorkgroupSize = 16
+
+    state.shaderModules = {
+      blit: state.gpu.device.createShaderModule({
+        code: shaders.BlitSource()
+      }),
+      clearWorld: state.gpu.device.createShaderModule({
+        code: shaders.ClearTextureSource(
+          [0.0, 0.0, 0.0, 1.0],
+          [ClearWorldWorkgroupSize, ClearWorldWorkgroupSize, 1]
+        )
+      }),
+    }
+
+    state.bindGroupLayouts = {
+      blit: state.gpu.device.createBindGroupLayout({
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            sampler: {},
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: {},
+          }
+        ]
+      }),
+      clearWorld: state.gpu.device.createBindGroupLayout({
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+            storageTexture: {
+              format: "rgba8unorm"
+            },
+          }
+        ]
+      })
+    }
+
+    state.pipelines = {
+      blit: state.gpu.device.createRenderPipeline({
+        vertex: {
+          module: state.shaderModules.blit,
+          entryPoint: 'VertexMain',
+        },
+        fragment: {
+          module: state.shaderModules.blit,
+          entryPoint: 'FragmentMain',
+          targets: [{
+            format: state.gpu.presentationFormat
+          }]
+        },
+        primitive: {
+          topology: 'triangle-list'
+        },
+        layout: state.gpu.device.createPipelineLayout({
+          bindGroupLayouts: [
+            state.bindGroupLayouts.blit,
+          ]
+        }),
+      }),
+
+      clearWorld: state.gpu.device.createComputePipeline({
+        compute: {
+          module: state.shaderModules.clearWorld,
+          entryPoint: 'ComputeMain',
+        },
+        layout: state.gpu.device.createPipelineLayout({
+          bindGroupLayouts: [
+            state.bindGroupLayouts.clearWorld
+          ]
+        }),
+      }),
+    }
+
+    state.worldTextureBindGroup = state.gpu.device.createBindGroup({
+      layout: state.pipelines.blit.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: state.worldTextureSampler },
+        { binding: 1, resource: state.worldTexture.createView() }
+      ]
+    })
+
+    // clear the world texture
+    {
+      const clearWorldPipeline = state.pipelines.clearWorld
+
+      const clearWorldBindGroup = state.gpu.device.createBindGroup({
+        layout: clearWorldPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: state.worldTexture.createView() }
+        ]
+      })
+      let commandEncoder = state.gpu.device.createCommandEncoder()
+      let passEncoder = commandEncoder.beginComputePass()
+      passEncoder.setPipeline(clearWorldPipeline)
+      passEncoder.setBindGroup(0, clearWorldBindGroup)
+      passEncoder.dispatchWorkgroups(
+        Math.floor(state.canvas.width / ClearWorldWorkgroupSize + 1),
+        Math.floor(state.canvas.height / ClearWorldWorkgroupSize + 1),
+        1
+      )
+      passEncoder.end();
+      state.gpu.device.queue.submit([commandEncoder.finish()])
+    }
+
+    const RenderFrame = () => {
+      window.requestAnimationFrame(RenderFrame)
+
+      let commandEncoder = state.gpu.device.createCommandEncoder()
+
+      let colorAttachment = {
+          view: state.ctx.getCurrentTexture().createView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear',
+          storeOp: 'store'
+      };
+
+      const renderPassDesc = {
+        colorAttachments: [colorAttachment],
+      };
+
+      let passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
+      passEncoder.setPipeline(state.pipelines.blit);
+      passEncoder.setBindGroup(0, state.worldTextureBindGroup)
+      passEncoder.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
+      passEncoder.setScissorRect(0, 0, canvas.width, canvas.height);
+      passEncoder.draw(3);
+      passEncoder.end();
+
+      state.gpu.device.queue.submit([commandEncoder.finish()])
+    }
+
+    RenderFrame()
+  })()
+
+</script>
+
 ## TODO
+- find the place where it say interpolate spatially and radially
 - viz: store actual radiance values and vizualize the atlas
 - accumulate bounces
 
