@@ -276,7 +276,7 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
 </script>
 
 
-### Probe Interpolation
+### Probe Ray Interpolation
 
 <p>
 min level: <input type="range" min="0" max="6" value="1" id="probe-interpolation-2d-canvas-minLevel-slider">
@@ -807,211 +807,28 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 
 ### Probe Ray DDA (2D)
 
-
 <section class="center-align">
   <canvas id="probe-ray-dda-2d-canvas" width="1024" height="1024"></canvas>
 </section>
+<script type="module" src="probe-ray-dda-2d.js"></script>
 
-<script type="module">
-  import * as shaders from "./shaders.mjs"
-
-  (async function() {
-
-    const InitGPU = async(ctx) => {
-
-      let adapter = await navigator.gpu.requestAdapter()
-      let device = await adapter.requestDevice()
-
-      const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
-
-      ctx.configure({
-        device,
-        format: presentationFormat,
-        alphaMode: 'premultiplied',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
-      });
-
-      return {
-        adapter,
-        device,
-        presentationFormat,
-      }
-    }
-
-    let canvas = document.getElementById('probe-ray-dda-2d-canvas');
-    let state = {
-      canvas: canvas,
-      ctx: canvas.getContext('webgpu'),
-      params: {},
-    }
-    state.gpu = await InitGPU(state.ctx)
-
-    // Create the world texture
-    {
-      state.worldTexture = state.gpu.device.createTexture({
-        size: [canvas.width, canvas.height, 1],
-        dimension: '2d',
-        // rgb, a=emission
-        format: 'rgba8unorm',
-        usage: (
-          GPUTextureUsage.RENDER_ATTACHMENT |
-          GPUTextureUsage.COPY_SRC |
-          GPUTextureUsage.TEXTURE_BINDING |
-          GPUTextureUsage.STORAGE_BINDING
-        )
-      })
-      state.worldTextureSampler = state.gpu.device.createSampler({
-        minFilter: 'nearest',
-        magFilter: 'nearest',
-      })
-    }
-
-    const ClearWorldWorkgroupSize = 16
-
-    state.shaderModules = {
-      blit: state.gpu.device.createShaderModule({
-        code: shaders.BlitSource()
-      }),
-      clearWorld: state.gpu.device.createShaderModule({
-        code: shaders.ClearTextureSource(
-          [0.0, 0.0, 0.0, 1.0],
-          [ClearWorldWorkgroupSize, ClearWorldWorkgroupSize, 1]
-        )
-      }),
-    }
-
-    state.bindGroupLayouts = {
-      blit: state.gpu.device.createBindGroupLayout({
-        entries: [
-          {
-            binding: 0,
-            visibility: GPUShaderStage.FRAGMENT,
-            sampler: {},
-          },
-          {
-            binding: 1,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: {},
-          }
-        ]
-      }),
-      clearWorld: state.gpu.device.createBindGroupLayout({
-        entries: [
-          {
-            binding: 0,
-            visibility: GPUShaderStage.COMPUTE,
-            storageTexture: {
-              format: "rgba8unorm"
-            },
-          }
-        ]
-      })
-    }
-
-    state.pipelines = {
-      blit: state.gpu.device.createRenderPipeline({
-        vertex: {
-          module: state.shaderModules.blit,
-          entryPoint: 'VertexMain',
-        },
-        fragment: {
-          module: state.shaderModules.blit,
-          entryPoint: 'FragmentMain',
-          targets: [{
-            format: state.gpu.presentationFormat
-          }]
-        },
-        primitive: {
-          topology: 'triangle-list'
-        },
-        layout: state.gpu.device.createPipelineLayout({
-          bindGroupLayouts: [
-            state.bindGroupLayouts.blit,
-          ]
-        }),
-      }),
-
-      clearWorld: state.gpu.device.createComputePipeline({
-        compute: {
-          module: state.shaderModules.clearWorld,
-          entryPoint: 'ComputeMain',
-        },
-        layout: state.gpu.device.createPipelineLayout({
-          bindGroupLayouts: [
-            state.bindGroupLayouts.clearWorld
-          ]
-        }),
-      }),
-    }
-
-    state.worldTextureBindGroup = state.gpu.device.createBindGroup({
-      layout: state.pipelines.blit.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: state.worldTextureSampler },
-        { binding: 1, resource: state.worldTexture.createView() }
-      ]
-    })
-
-    // clear the world texture
-    {
-      const clearWorldPipeline = state.pipelines.clearWorld
-
-      const clearWorldBindGroup = state.gpu.device.createBindGroup({
-        layout: clearWorldPipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: state.worldTexture.createView() }
-        ]
-      })
-      let commandEncoder = state.gpu.device.createCommandEncoder()
-      let passEncoder = commandEncoder.beginComputePass()
-      passEncoder.setPipeline(clearWorldPipeline)
-      passEncoder.setBindGroup(0, clearWorldBindGroup)
-      passEncoder.dispatchWorkgroups(
-        Math.floor(state.canvas.width / ClearWorldWorkgroupSize + 1),
-        Math.floor(state.canvas.height / ClearWorldWorkgroupSize + 1),
-        1
-      )
-      passEncoder.end();
-      state.gpu.device.queue.submit([commandEncoder.finish()])
-    }
-
-    const RenderFrame = () => {
-      window.requestAnimationFrame(RenderFrame)
-
-      let commandEncoder = state.gpu.device.createCommandEncoder()
-
-      let colorAttachment = {
-          view: state.ctx.getCurrentTexture().createView(),
-          clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          loadOp: 'clear',
-          storeOp: 'store'
-      };
-
-      const renderPassDesc = {
-        colorAttachments: [colorAttachment],
-      };
-
-      let passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
-      passEncoder.setPipeline(state.pipelines.blit);
-      passEncoder.setBindGroup(0, state.worldTextureBindGroup)
-      passEncoder.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
-      passEncoder.setScissorRect(0, 0, canvas.width, canvas.height);
-      passEncoder.draw(3);
-      passEncoder.end();
-
-      state.gpu.device.queue.submit([commandEncoder.finish()])
-    }
-
-    RenderFrame()
-  })()
-
-</script>
-
-## TODO
-- find the place where it say interpolate spatially and radially
-- viz: store actual radiance values and vizualize the atlas
-- accumulate bounces
+<hr />
 
 ## Feedback / Notes
 - I wanted to visualize a ray going from the current mouse position to some arbitrary position, but
   generating the bent rays seems like a PITA, or I guess I could just blindly overlay upper cascades on every level 0 cascade... I don't think it really helps with intuition
+
+<hr />
+
+## Devlog
+
+### Pending
+- probe-ray-dda-2d: render world texture (scaled)
+- probe-ray-dda-2d: draw into world texture using the current mouse position and touch/left mouse
+- probe-ray-dda-2d: controls for: add/remove, wall/light, color selector
+- probe-ray-dda-2d: for each cascade level & each probe: cast rays via dda and store result in probe atlas
+- probe-ray-dda-2d: debug render probe atlas
+
+- probe-ray-dda-2d: render final gather
+
+### 2023-06-28
