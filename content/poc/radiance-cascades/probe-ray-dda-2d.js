@@ -185,7 +185,12 @@
           var radiusSquared : i32 = ubo.radius * ubo.radius;
           var distanceSquared : i32 = Squared(i32(id.x) - ubo.x) + Squared(i32(id.y) - ubo.y);
           if (distanceSquared <= radiusSquared) {
-            textureStore(texture, id.xy, vec4<f32>(1.0, 0.0, 1.0, 1.0));
+            textureStore(texture, id.xy, vec4<f32>(
+              f32((ubo.color >> 0) & 0xFF) / 256.0,
+              f32((ubo.color >> 8) & 0xFF) / 256.0,
+              f32((ubo.color >> 16) & 0xFF) / 256.0,
+              f32((ubo.color >> 24) & 0xFF) / 256.0,
+            ));
           }
         }
       `
@@ -240,12 +245,12 @@
         x,
         y,
         radius,
-        color,
         radiance,
+        color,
         width,
         height
       ) {
-
+console.log(radius)
         // update the uniform buffer
         await stagingBuffer.mapAsync(GPUMapMode.WRITE)
         let uboData = new Int32Array(stagingBuffer.getMappedRange())
@@ -301,11 +306,12 @@
       pos: [0, 0],
       down: false
     },
-    brush: {
+    params: {
+      erase: false,
+      radiance: 0,
       radius: 16,
-      radiance: 0
     },
-    params: {},
+    dirty: true,
   }
   state.gpu = await InitGPU(state.ctx)
 
@@ -316,6 +322,7 @@
       let ratioY = canvas.height / canvas.clientHeight
       state.mouse.pos[0] = x * ratioX
       state.mouse.pos[1] = y * ratioY
+      state.dirty = true;
     }
 
     window.addEventListener("mouseup", e => {
@@ -413,20 +420,64 @@
     state.gpu.device.queue.submit([commandEncoder.finish()])
   }
 
+  const Param = (name, value) => {
+    if (state.params[name] != value) {
+      state.params[name] = value;
+      return true;
+    }
+    return false;
+  }
+
+  const ColorParam = (name, value) => {
+    let v = parseInt(value.replace("#", ""), 16)
+
+    let r = (v >> 16) & 0xFF
+    let g = (v >> 8) & 0xFF
+    let b = (v >> 0) & 0xFF
+    let color = r | (g << 8) | (b << 16)
+
+    return Param(name, color)
+  }
+
   const RenderFrame = async () => {
     window.requestAnimationFrame(RenderFrame)
+    state.dirty = state.dirty || Param(
+      'erase',
+      !!document.getElementById('probe-ray-dda-2d-erase').checked
+    )
+
+    state.dirty = state.dirty || Param(
+      'radiance',
+      parseFloat(document.getElementById('probe-ray-dda-2d-radiance-slider').value) / 256.0
+    )
+
+    state.dirty = state.dirty || Param(
+      'radius',
+      parseFloat(document.getElementById('probe-ray-dda-2d-radius-slider').value)
+    )
+
+    state.dirty = state.dirty || ColorParam(
+      'color',
+      document.getElementById('probe-ray-dda-2d-color').value
+    )
+
+    if (!state.dirty) {
+      return;
+    }
+    state.dirty = false
 
     let commandEncoder = state.gpu.device.createCommandEncoder()
 
     // Paint Into World
     if (state.mouse.down) {
+
       await state.gpu.programs.worldPaint(
         commandEncoder,
         state.mouse.pos[0],
         canvas.height - state.mouse.pos[1],
-        state.brush.radius,
-        state.brush.radiance,
-        0x00FFFFFF,
+        state.params.radius,
+        state.params.radiance,
+        state.params.erase ? 0 : state.params.color,
         canvas.width,
         canvas.height
       )
