@@ -2,7 +2,7 @@
 
   const shaders = {
     DebugWorldBlit(device, presentationFormat, texture, sampler) {
-      const uboFields = ["width", "height", ]
+      const uboFields = ["width", "height",]
       const uboData = new Uint32Array(uboFields.length)
       const ubo = device.createBuffer({
         size: uboData.byteLength,
@@ -135,6 +135,130 @@
         pass.setScissorRect(0, 0, width, height);
         pass.draw(3);
         pass.end();
+      }
+    },
+
+    ProbeAtlasBuild(device, probeBuffer, workgroupSize) {
+      const uboFields = [
+        "totalRays",
+        "level0.probeRayCount",
+        "level0.probeRadius",
+        "width",
+        "height"
+      ]
+
+      let uboData = new Int32Array(uboFields.length)
+
+      const ubo = device.createBuffer({
+        size: uboData.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        label: "ProbeAtlasBuild/ubo",
+      })
+
+
+      const source =  /* wgsl */`
+        struct UBOParams {
+          totalRays: i32,
+          level0Rays: i32,
+          level0Radius: i32,
+          width: i32,
+          height: i32,
+        };
+
+        struct ProbeRay {
+          rgba: u32,
+        };
+
+        @group(0) @binding(0) var<storage> probes: array<ProbeRay>;
+        @group(0) @binding(1) var<uniform> ubo: UBOParams;
+
+        @compute @workgroup_size(${workgroupSize.join(',')})
+        fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
+          if (id.x >= ubo.totalRays) {
+            return;
+          }
+
+          // textureStore(texture, id.xy, vec4<u32>(0xFFFF00FF, 0, 0, 0));
+        }
+      `
+
+      const shaderModule = device.createShaderModule({
+        code: source
+      })
+
+      const bindGroupLayout = device.createBindGroupLayout({
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'storage'
+            },
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'uniform'
+            }
+          }
+        ]
+      })
+
+      const pipeline = device.createComputePipeline({
+        compute: {
+          module: shaderModule,
+          entryPoint: 'ComputeMain',
+        },
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout
+          ]
+        }),
+      })
+
+      const bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: {
+              buffer: probeBuffer
+            }
+          },
+          {
+            binding: 1,
+            resource: {
+              buffer: ubo
+            }
+          }
+        ]
+      })
+
+      return function ProbeAtlasBuild(
+        queue,
+        computePass,
+        totalRays,
+        level0Rays,
+        level0Radius,
+        width,
+        height
+      ) {
+        // update the uniform buffer
+        uboData[1] = totalRays
+        uboData[1] = level0Rays
+        uboData[2] = level0Radius
+        uboData[3] = width
+        uboData[4] = height
+        queue.writeBuffer(ubo, 0, uboData)
+
+        computePass.setPipeline(pipeline)
+        computePass.setBindGroup(0, bindGroup)
+        computePass.dispatchWorkgroups(
+          Math.floor(totalRays / workgroupSize[0] + 1),
+          1,
+          1
+        )
       }
     },
 
@@ -345,11 +469,50 @@
     params: {
       erase: false,
       radiance: 0,
-      radius: 16,
+      brushRadius: 16,
+      probeRadius: 4,
+      probeRayCount: 2,
     },
     dirty: true,
   }
   state.gpu = await InitGPU(state.ctx)
+
+  // Create the probe atlas
+  {
+    let probeRayCount = Math.pow(2, parseFloat(document.getElementById('probe-ray-dda-2d-probe-rayCount-slider').max))
+    let minProbeRadius = Math.pow(2, parseFloat(document.getElementById('probe-ray-dda-2d-probe-radius-slider').min))
+    let probeDiameter = minProbeRadius * 2
+    let maxProbeCount = (canvas.width / probeDiameter) * (canvas.height / probeDiameter)
+
+    let diameter = probeDiameter
+    let level = 0
+    let totalRays = 0
+    while (1) {
+      if (diameter > canvas.width || diameter > canvas.height) {
+        break;
+      }
+
+      const levelProbeCount = (canvas.width / diameter) * (canvas.height / diameter)
+      const levelProbeRayCount = probeRayCount << level;
+      const levelRayCount = levelProbeRayCount * levelProbeCount
+
+      totalRays += levelRayCount
+      diameter <<= 1;
+      level++;
+    }
+
+    const raySize = ([
+      'rgba',
+      // TODO: radiance?
+    ]).length * 4;
+
+    state.probeBuffer = state.gpu.device.createBuffer({
+      label: 'ProbeBuffer',
+      size: totalRays * raySize,
+      usage: GPUBufferUsage.STORAGE
+    })
+  }
+
 
   // Wire up mouse
   {
@@ -428,6 +591,11 @@
         state.worldTexture,
         state.worldTextureSampler
       ),
+      probeAtlasBuild: shaders.ProbeAtlasBuild(
+        state.gpu.device,
+        state.probeBuffer,
+        [256, 1, 1]
+      ),
       worldClear: shaders.WorldClear(
         state.gpu.device,
         state.worldTexture,
@@ -470,64 +638,50 @@
     return Param(name, color)
   }
 
+  const ReadParams = () => {
+    // probe params
+    {
+      state.dirty = state.dirty || Param(
+        'probeRadius',
+        parseFloat(document.getElementById('probe-ray-dda-2d-probe-radius-slider').value)
+      )
+      state.dirty = state.dirty || Param(
+        'probeRayCount',
+        parseFloat(document.getElementById('probe-ray-dda-2d-probe-rayCount-slider').value)
+      )
+    }
+
+    // brush params
+    {
+      state.dirty = state.dirty || Param(
+        'erase',
+        !!document.getElementById('probe-ray-dda-2d-erase').checked
+      )
+
+      state.dirty = state.dirty || Param(
+        'brushRadiance',
+        parseFloat(document.getElementById('probe-ray-dda-2d-brush-radiance-slider').value) / 256.0
+      )
+
+      state.dirty = state.dirty || Param(
+        'brushRadius',
+        parseFloat(document.getElementById('probe-ray-dda-2d-brush-radius-slider').value)
+      )
+
+      state.dirty = state.dirty || ColorParam(
+        'color',
+        document.getElementById('probe-ray-dda-2d-color').value
+      )
+    }
+  }
+
   const RenderFrame = async () => {
-    state.dirty = state.dirty || Param(
-      'erase',
-      !!document.getElementById('probe-ray-dda-2d-erase').checked
-    )
-
-    state.dirty = state.dirty || Param(
-      'brushRadiance',
-      parseFloat(document.getElementById('probe-ray-dda-2d-brush-radiance-slider').value) / 256.0
-    )
-
-    state.dirty = state.dirty || Param(
-      'brushRadius',
-      parseFloat(document.getElementById('probe-ray-dda-2d-brush-radius-slider').value)
-    )
-
-    state.dirty = state.dirty || Param(
-      'probeRadius',
-      parseFloat(document.getElementById('probe-ray-dda-2d-probe-radius-slider').value)
-    )
-
-    state.dirty = state.dirty || ColorParam(
-      'color',
-      document.getElementById('probe-ray-dda-2d-color').value
-    )
-
+    ReadParams()
     if (!state.dirty) {
       window.requestAnimationFrame(RenderFrame)
       return;
     }
     state.dirty = false
-
-    // // Create the probe atlas
-    // {
-    //   const probeRadius = Math.pow(2, state.params.probeRadius);
-    //   if (!state.probeAtlas || probeRadius != state.probeAtlas.probeRadius) {
-
-    //     if (state.probeAtlas) {
-    //       state.probeAtlas.texture.destroy()
-    //     } else {
-    //       state.probeAtlas = {}
-    //     }
-
-    //     state.probeAtlas.probeRadius = probeRadius
-    //     state.probeAtlas.texture = state.gpu.device.createTexture({
-    //       size: [canvas.width, canvas.height, 1],
-    //       dimension: '2d',
-    //       // rgb, a=emission
-    //       format: 'rgba8unorm',
-    //       usage: (
-    //         GPUTextureUsage.RENDER_ATTACHMENT |
-    //         GPUTextureUsage.COPY_SRC |
-    //         GPUTextureUsage.TEXTURE_BINDING |
-    //         GPUTextureUsage.STORAGE_BINDING
-    //       )
-    //     })
-    //   }
-    // }
 
     let commandEncoder = state.gpu.device.createCommandEncoder()
 
@@ -544,6 +698,48 @@
         canvas.width,
         canvas.height
       )
+    }
+
+    // Fill the probe atlas via ray casting
+    {
+      console.log("----")
+      let totalRays = 0
+      let probeRayCount = Math.pow(2.0, state.params.probeRayCount)
+      let probeRadius = Math.pow(2.0, state.params.probeRadius)
+      // compute the total rays
+      {
+        let probeDiameter = probeRadius * 2.0
+        let maxProbeCount = (canvas.width / probeDiameter) * (canvas.height / probeDiameter)
+
+        let diameter = probeDiameter
+        let level = 0
+        while (1) {
+          if (diameter > canvas.width || diameter > canvas.height) {
+            break;
+          }
+
+          const levelProbeCount = (canvas.width / diameter) * (canvas.height / diameter)
+          const levelProbeRayCount = probeRayCount << level;
+          const levelRayCount = levelProbeRayCount * levelProbeCount
+          totalRays += levelRayCount
+          console.log(level, 'total:', totalRays, levelRayCount)
+          diameter <<= 1;
+          level++;
+        }
+      }
+
+      let pass = commandEncoder.beginComputePass()
+      state.gpu.programs.probeAtlasBuild(
+        state.gpu.device.queue,
+        pass,
+        totalRays,
+        probeRayCount,
+        probeRadius,
+        canvas.width,
+        canvas.height
+      );
+
+      pass.end()
     }
 
     // Debug Render World Texture
