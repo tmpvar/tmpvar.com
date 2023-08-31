@@ -138,13 +138,12 @@
       }
     },
 
-    ProbeAtlasBuild(device, probeBuffer, workgroupSize) {
+    ProbeAtlasBuild(device, probeBuffer, worldTexture, workgroupSize) {
       const uboFields = [
         "totalRays",
-        "level0.probeRayCount",
         "level0.probeRadius",
-        "width",
-        "height"
+        "level0.probeRayCount",
+        "level0.cascadeWidth",
       ]
 
       let uboData = new Int32Array(uboFields.length)
@@ -155,30 +154,112 @@
         label: "ProbeAtlasBuild/ubo",
       })
 
-
       const source =  /* wgsl */`
         struct UBOParams {
-          totalRays: i32,
-          level0Rays: i32,
-          level0Radius: i32,
-          width: i32,
-          height: i32,
+          totalRays: u32,
+          probeRadius: i32,
+          probeRayCount: i32,
+          cascadeWidth: i32,
         };
 
-        struct ProbeRay {
+        struct ProbeRayResult {
           rgba: u32,
         };
 
-        @group(0) @binding(0) var<storage> probes: array<ProbeRay>;
+        struct DDACursor2D {
+          mapPos: vec2<f32>,
+          rayStep: vec2<f32>,
+          sideDist: vec2<f32>,
+          deltaDist: vec2<f32>,
+        };
+
+        fn DDACursorInit(cursor: ptr<function, DDACursor2D>, rayOrigin: vec2<f32>, rayDir: vec2<f32>) {
+          (*cursor).mapPos = floor(rayOrigin);
+
+          // 1.0 / rayDir as per https://lodev.org/cgtutor/raycasting.html
+          if (rayDir.x == 0.0f) {
+            (*cursor).deltaDist.x = 1e+17f;
+          } else {
+            (*cursor).deltaDist.x = abs(1.0f / rayDir.x);
+          }
+
+          if (rayDir.y == 0.0f) {
+            (*cursor).deltaDist.y = 1e+17f;
+          } else {
+            (*cursor).deltaDist.y = abs(1.0f / rayDir.y);
+          }
+
+          (*cursor).rayStep = sign(rayDir);
+          var p: vec2<f32> = (*cursor).mapPos - rayOrigin;
+          (*cursor).sideDist = (*cursor).rayStep * p + (((*cursor).rayStep * 0.5f) + 0.5f) *
+                               (*cursor).deltaDist;
+        }
+
+        fn DDACursorStep(cursor: ptr<function, DDACursor2D>) {
+          var mask: vec2<f32> = step((*cursor).sideDist, (*cursor).sideDist.yx);
+          (*cursor).sideDist += mask * (*cursor).deltaDist;
+          (*cursor).mapPos += mask * (*cursor).rayStep;
+        }
+
+        const PI: f32 = 3.141592653589793;
+        const TAU: f32 = PI * 2;
+
+        @group(0) @binding(0) var<storage,read_write> probes: array<ProbeRayResult>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
+        @group(0) @binding(2) var worldTexture: texture_2d<u32>;
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           if (id.x >= ubo.totalRays) {
             return;
           }
+          let globalThreadIndex: i32 = i32(id.x);
+          let probeIndex = globalThreadIndex / ubo.probeRayCount;
+          let probeRayIndex = globalThreadIndex % ubo.probeRayCount;
 
-          // textureStore(texture, id.xy, vec4<u32>(0xFFFF00FF, 0, 0, 0));
+          let col = probeIndex % ubo.cascadeWidth;
+          let row = probeIndex / ubo.cascadeWidth;
+
+          let diameter: f32 = f32(ubo.probeRadius * 2);
+
+
+          var result: ProbeRayResult;
+          var cursor: DDACursor2D;
+
+          var anglePerProbeRay: f32 = TAU / f32(ubo.probeRayCount);
+
+          var rayOrigin: vec2<f32> = vec2<f32>(
+            f32(col) * diameter + f32(ubo.probeRadius),
+            f32(row) * diameter + f32(ubo.probeRadius),
+          );
+
+          var rayDirection: vec2<f32> = normalize(vec2<f32>(
+            sin(f32(probeRayIndex) * anglePerProbeRay),
+            cos(f32(probeRayIndex) * anglePerProbeRay)
+          ));
+          var radiusLengthSquared: f32 = f32(ubo.probeRadius * ubo.probeRadius);
+
+          DDACursorInit(&cursor, rayOrigin, rayDirection);
+
+          var hit: bool = false;
+          while(!hit) {
+            var diff: vec2<f32> = cursor.mapPos - rayOrigin;
+            var d: f32 = diff.x * diff.x + diff.y * diff.y;
+            if (radiusLengthSquared < d) {
+              break;
+            }
+
+            var color: u32 = textureLoad(worldTexture, vec2<u32>(cursor.mapPos), 0).r;
+            if (color != 0) {
+              hit = true;
+              // TODO: accumulate instead of hard stopping
+              result.rgba = 0xFFFF00FF;
+              break;
+            }
+            DDACursorStep(&cursor);
+          }
+
+          probes[probeIndex + probeRayIndex] = result;
         }
       `
 
@@ -201,7 +282,14 @@
             buffer: {
               type: 'uniform'
             }
-          }
+          },
+          {
+            binding: 2,
+            visibility: GPUShaderStage.COMPUTE,
+            texture: {
+              sampleType: 'uint'
+            },
+          },
         ]
       })
 
@@ -231,25 +319,32 @@
             resource: {
               buffer: ubo
             }
-          }
+          },
+          {
+            binding: 2,
+            resource: worldTexture.createView()
+          },
         ]
       })
+
+      // TODO: build more than level 0
 
       return function ProbeAtlasBuild(
         queue,
         computePass,
-        totalRays,
-        level0Rays,
-        level0Radius,
         width,
-        height
+        height,
+        probeRadius,
+        probeRayCount,
       ) {
-        // update the uniform buffer
-        uboData[1] = totalRays
-        uboData[1] = level0Rays
-        uboData[2] = level0Radius
-        uboData[3] = width
-        uboData[4] = height
+
+        let probeDiameter = probeRadius * 2.0
+        let totalRays = (width / probeDiameter) * (height / probeDiameter)
+
+        uboData[0] = totalRays
+        uboData[1] = probeRadius
+        uboData[2] = probeRayCount
+        uboData[3] = (width / probeDiameter)
         queue.writeBuffer(ubo, 0, uboData)
 
         computePass.setPipeline(pipeline)
@@ -504,6 +599,7 @@
     const raySize = ([
       'rgba',
       // TODO: radiance?
+      // TODO: occlusion?
     ]).length * 4;
 
     state.probeBuffer = state.gpu.device.createBuffer({
@@ -594,6 +690,7 @@
       probeAtlasBuild: shaders.ProbeAtlasBuild(
         state.gpu.device,
         state.probeBuffer,
+        state.worldTexture,
         [256, 1, 1]
       ),
       worldClear: shaders.WorldClear(
@@ -702,7 +799,7 @@
 
     // Fill the probe atlas via ray casting
     {
-      console.log("----")
+      // console.log("----")
       let totalRays = 0
       let probeRayCount = Math.pow(2.0, state.params.probeRayCount)
       let probeRadius = Math.pow(2.0, state.params.probeRadius)
@@ -722,7 +819,7 @@
           const levelProbeRayCount = probeRayCount << level;
           const levelRayCount = levelProbeRayCount * levelProbeCount
           totalRays += levelRayCount
-          console.log(level, 'total:', totalRays, levelRayCount)
+          // console.log(level, 'total:', totalRays, levelRayCount)
           diameter <<= 1;
           level++;
         }

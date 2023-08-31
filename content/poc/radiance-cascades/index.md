@@ -807,7 +807,7 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 
 ### Probe Ray DDA (2D)
 <p>
-probe radius (2^n) (level = 0): <input type="range" min="2" max="6" value="5" id="probe-ray-dda-2d-probe-radius-slider">
+probe radius (2^n) (level = 0): <input type="range" min="2" max="6" value="4" id="probe-ray-dda-2d-probe-radius-slider">
 </p>
 <p>
 probe ray count (2^n) (level = 0): <input type="range" min="2" max="6" value="2" id="probe-ray-dda-2d-probe-rayCount-slider">
@@ -846,9 +846,10 @@ color: <input type="color" id="probe-ray-dda-2d-color" value="#ff0000">
 ## Devlog
 
 ### Pending
-- `probe-ray-dda-2d`: for each cascade level & each probe: cast rays via dda and store result in probe atlas
+- `probe-ray-dda-2d`: level0: each probe: cast rays via dda and store result in probe atlas
 - `probe-ray-dda-2d`: debug render probe atlas
 - `probe-ray-dda-2d`: render final gather
+- `probe-ray-dda-2d`: compute mips for world texture and move to hdda
 - `probe-ray-dda-2d`: add timing information
 - `probe-ray-dda-2d`: use a line segment for drawing to avoid disconnected dots
 
