@@ -7,6 +7,7 @@
         "height",
         "probeRadius",
         "probeRayCount",
+        "probeInterpolation",
       ]
 
       const uboData = new Uint32Array(uboFields.length)
@@ -29,6 +30,7 @@
           // Probes
           probeRadius: i32,
           probeRayCount: i32,
+          probeInterpolation: i32,
         };
 
         struct ProbeRayResult {
@@ -96,15 +98,21 @@
             // return vec3f((f32(probeIndex) + angleIndex) / totalRays);
           }
 
+          // if (ubo.probeInterpolation == 0) {
+            // if (probes[probeIndex + i32(angleIndex)].rgba != 0) {
+            //   return vec3f(diff * 0.5 + 0.5, 1.0);
+            // }
+          // }
 
           return unpack4x8unorm(probes[probeIndex + i32(angleIndex)].rgba).rgb;
 
+
           // TODO: sample between the two closest angles
 
-          var lo = unpack4x8unorm(probes[probeIndex + i32(floor(angle))].rgba).rgb;
-          var hi = unpack4x8unorm(probes[probeIndex + i32(ceil(angle))].rgba).rgb;
+          var lo = unpack4x8unorm(probes[probeIndex + i32(floor(angle / anglePerProbeRay))].rgba).rgb;
+          var hi = unpack4x8unorm(probes[probeIndex + i32(ceil(angle / anglePerProbeRay))].rgba).rgb;
           var t = fract(angle);
-          return lo;
+          // return lo;
           return mix(
             lo,
             hi,
@@ -113,39 +121,95 @@
           // return vec3f(diff.x, diff.y, 0.0);
         }
 
-        fn SampleProbes(pos: vec2<f32>) -> vec3<f32> {
+        fn SampleProbes(samplePos: vec2<f32>) -> vec3<f32> {
           var probeRadius: f32 = f32(ubo.probeRadius);
           var probeDiameter: f32 = probeRadius * 2.0;
           var cascadeWidth = i32(floor(f32(ubo.width)/probeDiameter));
-          var posInProbeSpace = floor(pos / probeDiameter);
-          var probeCenter = posInProbeSpace * probeDiameter + probeRadius;
-          var probeIndex = (
-            i32(posInProbeSpace.x) + i32(posInProbeSpace.y) * cascadeWidth
-          ) * ubo.probeRayCount;
-          // var samples = array<vec3f, 4>(
-          //   SampleProbe(
-          //     (posInProbeSpace + vec2f(-1.0, -1.0)) * probeDiameter + probeRadius,
-          //     pos
-          //   ),
-          //   SampleProbe(
-          //     (posInProbeSpace + vec2f( 1.0, -1.0)) * probeDiameter + probeRadius,
-          //     pos
-          //   ),
-          //   SampleProbe(
-          //     (posInProbeSpace + vec2f( 1.0,  1.0)) * probeDiameter + probeRadius,
-          //     pos
-          //   ),
-          //   SampleProbe(
-          //     (posInProbeSpace + vec2f(-1.0,  1.0)) * probeDiameter + probeRadius,
-          //     pos
-          //   ),
-          // );
+          var posInProbeSpace = floor(samplePos / probeDiameter);
+          var posInProbeSpacePartial = fract(samplePos / probeDiameter);
+
+          var samples = array<vec3f, 5>(vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0));
+
+          // center probe
+          {
+            var pos = posInProbeSpace * probeDiameter + probeRadius;
+            var probeIndex = (
+              i32(posInProbeSpace.x) + i32(posInProbeSpace.y) * cascadeWidth
+            ) * ubo.probeRayCount;
+
+            samples[0] = SampleProbe(pos, samplePos, probeIndex);
+          }
+
+          if (ubo.probeInterpolation == 0) {
+            return samples[0];
+          }
+
+          // var probePositions = array<
+
+
+          // left probe
+          {
+            var pos = posInProbeSpace + vec2f(-1.0, 0.0);
+            var probeIndex = (
+              i32(pos.x) + i32(pos.y) * cascadeWidth
+            ) * ubo.probeRayCount;
+
+            samples[1] = SampleProbe(
+              pos * probeDiameter + probeRadius,
+              samplePos,
+              probeIndex
+            );
+          }
+
+          // right probe
+          {
+            var pos = posInProbeSpace + vec2f(1.0, 0.0);
+            var probeIndex = (
+              i32(pos.x) + i32(pos.y) * cascadeWidth
+            ) * ubo.probeRayCount;
+
+            samples[3] = SampleProbe(
+              pos * probeDiameter + probeRadius,
+              samplePos,
+              probeIndex
+            );
+          }
+
+          // bottom probe
+          {
+            var pos = posInProbeSpace + vec2f(0.0, -1.0);
+            var probeIndex = (
+              i32(pos.x) + i32(pos.y) * cascadeWidth
+            ) * ubo.probeRayCount;
+
+            samples[2] = SampleProbe(
+              pos * probeDiameter + probeRadius,
+              samplePos,
+              probeIndex
+            );
+          }
+
+          // top probe
+          {
+            var pos = posInProbeSpace + vec2f(0.0, 1.0);
+            var probeIndex = (
+              i32(pos.x) + i32(pos.y) * cascadeWidth
+            ) * ubo.probeRayCount;
+
+            samples[4] = SampleProbe(
+              pos * probeDiameter + probeRadius,
+              samplePos,
+              probeIndex
+            );
+          }
 
           // unpack4x8unorm(color).rgb
           // return vec3(1.0, 0.0, 1.0);
-          // return samples[0];
-
-          return SampleProbe(probeCenter, pos, probeIndex);
+          return (
+            samples[0] +
+            mix(samples[1], samples[2], posInProbeSpacePartial.x) +
+            mix(samples[3], samples[4], posInProbeSpacePartial.y)
+          ) / 3.0;
         }
 
         @fragment
@@ -250,17 +314,17 @@
         width,
         height,
         probeRadius,
-        probeRayCount
+        probeRayCount,
+        probeInterpolation
       ) {
-
-        console.log('BLIT: probeRadius', probeRadius, 'probeRayCount', probeRayCount, width, height)
 
         // update uniform buffer
         uboData[0] = width
         uboData[1] = height
         // Probes
-        uboData[2] = probeRadius;
-        uboData[3] = probeRayCount;
+        uboData[2] = probeRadius
+        uboData[3] = probeRayCount
+        uboData[4] = probeInterpolation
         queue.writeBuffer(ubo, 0, uboData)
 
         // Note: apparently mapping the staging buffer can take multiple frames?
@@ -383,7 +447,9 @@
           //   return;
           // }
 
-          let diameter: f32 = f32(ubo.probeRadius * 2);
+          let probeRadius = f32(ubo.probeRadius);
+          let nextProbeRadius = f32(ubo.probeRadius << 1);
+          let probeDiameter = probeRadius * 2.0;
           var cascadeWidth = ubo.width / (ubo.probeRadius * 2);
 
           let col = probeIndex % cascadeWidth;
@@ -393,19 +459,21 @@
 
 
           var rayOrigin = vec2<f32>(
-            f32(col) * diameter + f32(ubo.probeRadius),
-            f32(row) * diameter + f32(ubo.probeRadius),
+            f32(col) * probeDiameter + f32(ubo.probeRadius),
+            f32(row) * probeDiameter + f32(ubo.probeRadius),
           );
 
-          var rayDirection = vec2<f32>(
+          var rayDirection = normalize(vec2<f32>(
             sin(f32(probeRayIndex) * anglePerProbeRay),
             cos(f32(probeRayIndex) * anglePerProbeRay)
-          );
+          ));
+
+          rayOrigin += rayDirection * probeRadius;
 
           var cursor = DDACursorInit(rayOrigin, rayDirection);
           var hit: bool = false;
           while(!hit) {
-            if (distance((cursor.mapPos + 0.5), rayOrigin) > f32(ubo.probeRadius)) {
+            if (distance(cursor.mapPos, rayOrigin) > nextProbeRadius) {
               break;
             }
 
@@ -418,13 +486,13 @@
               hit = true;
               // TODO: accumulate instead of hard stopping
               // probes[globalThreadIndex].rgba = 0xFFFFFFFF;
-              // probes[globalThreadIndex].rgba = color;
+              probes[globalThreadIndex].rgba = color;
 
-              var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-              col = col % vec3<i32>(255, 253, 127);
-              probes[globalThreadIndex].rgba = pack4x8unorm(
-                vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
-              );
+              // var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+              // col = col % vec3<i32>(255, 253, 127);
+              // probes[globalThreadIndex].rgba = pack4x8unorm(
+              //   vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
+              // );
               break;
             }
 
@@ -512,7 +580,6 @@
         probeRadius,
         probeRayCount,
       ) {
-console.log('probeRadius', probeRadius, 'probeRayCount', probeRayCount)
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
 
@@ -922,6 +989,14 @@ console.log('probeRadius', probeRadius, 'probeRayCount', probeRayCount)
         'probeRayCount',
         parseFloat(document.getElementById('probe-ray-dda-2d-probe-rayCount-slider').value)
       )
+      state.dirty = state.dirty || Param(
+        'probeLevel',
+        parseFloat(document.getElementById('probe-ray-dda-2d-probe-level').value)
+      )
+      state.dirty = state.dirty || Param(
+        'probeInterpolation',
+        !!document.getElementById('probe-ray-dda-2d-probe-interpolation').checked
+      )
     }
 
     // brush params
@@ -1021,7 +1096,8 @@ console.log('probeRadius', probeRadius, 'probeRayCount', probeRayCount)
         canvas.width,
         canvas.height,
         probeRadius,
-        probeRayCount
+        probeRayCount,
+        state.params.probeInterpolation
       )
     }
 

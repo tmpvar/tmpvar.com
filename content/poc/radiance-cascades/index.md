@@ -812,6 +812,13 @@ probe radius (2^n) (level = 0): <input type="range" min="1" max="6" value="1" id
 <p>
 probe ray count (2^n) (level = 0): <input type="range" min="2" max="8" value="2" id="probe-ray-dda-2d-probe-rayCount-slider">
 </p>
+<p>
+probe level: <input type="range" min="0" max="6" value="2" id="probe-ray-dda-2d-probe-level">
+</p>
+
+<p>
+probe interpolation <input type="checkbox" value="1" id="probe-ray-dda-2d-probe-interpolation" />
+</p>
 
 <p>
 erase <input type="checkbox" value="1" id="probe-ray-dda-2d-erase" />
@@ -846,16 +853,16 @@ color: <input type="color" id="probe-ray-dda-2d-color" value="#ff0000">
 ## Devlog
 
 ### Pending
-- `probe-ray-dda-2d`: level0: each probe: cast rays via dda and store result in probe atlas
-- `probe-ray-dda-2d`: debug render probe atlas
 - `probe-ray-dda-2d`: render final gather
 - `probe-ray-dda-2d`: compute mips for world texture and move to hdda
 - `probe-ray-dda-2d`: add timing information
 - `probe-ray-dda-2d`: use a line segment for drawing to avoid disconnected dots
 
 
-### 2023-06-30
+### 2023-06-31
 - `probe-ray-dda-2d`: create probe atlas texture
+- `probe-ray-dda-2d`: level0: each probe: cast rays via dda and store result in probe atlas
+- `probe-ray-dda-2d`: level0: debug render probe atlas
 
 ### 2023-06-28
 - `probe-ray-dda-2d` : controls for: add/remove, wall/light, color selector
