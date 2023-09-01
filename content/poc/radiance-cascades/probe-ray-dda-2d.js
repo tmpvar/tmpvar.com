@@ -158,13 +158,8 @@
 
           var worldSamplePos: vec2<u32> = vec2<u32>(pixelPos);
           var packedWorldColor: u32 = textureLoad(worldTexture, worldSamplePos, 0).r;
-          var color: vec3f;
-          if (packedWorldColor != 0) {
-            color = vec3f(1.0);//unpack4x8unorm(packedWorldColor).rgb;
-          } else {
-            color = SampleProbes(pixelPos);
-            // color = vec3<f32>(0.0, 0.0, 1.0);
-          }
+          var color = unpack4x8unorm(packedWorldColor).rgb;
+          color = (color + SampleProbes(pixelPos)) * 0.5;
 
           return vec4f(
             color,
@@ -410,7 +405,7 @@
           var cursor = DDACursorInit(rayOrigin, rayDirection);
           var hit: bool = false;
           while(!hit) {
-            if (distance(cursor.mapPos, rayOrigin) > f32(ubo.probeRadius) * 1.7) {
+            if (distance((cursor.mapPos + 0.5), rayOrigin) > f32(ubo.probeRadius)) {
               break;
             }
 
@@ -423,7 +418,13 @@
               hit = true;
               // TODO: accumulate instead of hard stopping
               // probes[globalThreadIndex].rgba = 0xFFFFFFFF;
-              probes[globalThreadIndex].rgba = color;
+              // probes[globalThreadIndex].rgba = color;
+
+              var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+              col = col % vec3<i32>(255, 253, 127);
+              probes[globalThreadIndex].rgba = pack4x8unorm(
+                vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
+              );
               break;
             }
 
