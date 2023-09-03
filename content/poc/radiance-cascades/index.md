@@ -807,17 +807,17 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 
 ### Probe Ray DDA (2D)
 <p>
-probe radius (2^n) (level = 0): <input type="range" min="1" max="6" value="1" id="probe-ray-dda-2d-probe-radius-slider">
+probe radius (2^n) (level = 0): <input type="range" min="1" max="6" value="5" id="probe-ray-dda-2d-probe-radius-slider">
 </p>
 <p>
-probe ray count (2^n) (level = 0): <input type="range" min="2" max="8" value="2" id="probe-ray-dda-2d-probe-rayCount-slider">
+probe ray count (2^n) (level = 0): <input type="range" min="2" max="8" value="7" id="probe-ray-dda-2d-probe-rayCount-slider">
 </p>
 <p>
 probe level: <input type="range" min="0" max="6" value="2" id="probe-ray-dda-2d-probe-level">
 </p>
 
 <p>
-probe interpolation <input type="checkbox" value="1" id="probe-ray-dda-2d-probe-interpolation" />
+probe interpolation <input type="checkbox" value="1" id="probe-ray-dda-2d-probe-interpolation" checked />
 </p>
 
 <p>
