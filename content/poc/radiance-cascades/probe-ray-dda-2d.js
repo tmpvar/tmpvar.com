@@ -60,7 +60,7 @@
         @group(0) @binding(2) var<storage,read> probes: array<ProbeRayResult>;
 
         fn AngleTo(a: vec2f, b: vec2f) -> f32 {
-          var diff = normalize(a - b);
+          var diff = normalize(b - a);
 
           var angle = atan2(diff.x, diff.y);
           if (angle < 0) {
@@ -69,56 +69,26 @@
           return angle;
         }
 
-
         fn SampleProbe(probeCenter: vec2f, samplePos: vec2f, probeIndex: i32) -> vec3f {
           var diff = normalize(samplePos - probeCenter);
           // return vec3f(diff * 0.5 + 0.5, 1.0);
 
-          var anglePerProbeRay = TAU / f32(ubo.probeRayCount);
-          var angle = AngleTo(samplePos, probeCenter);
-          var angleIndex = floor((angle) / anglePerProbeRay);
+          var d = distance(samplePos, probeCenter);
 
-          // return vec3(angleIndex / f32(ubo.probeRayCount), 0.0, 0.0);
-
-          {
-            var col: vec3<i32> = i32(angleIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+          if (d < f32(ubo.probeRadius>>2)) {
+            var col: vec3<i32> = i32(probeIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
             col = col % vec3<i32>(255, 253, 127);
-            // return vec3f(col) / 255.0;
+            return vec3f(col) / 255.0;
           }
 
-          {
-            var col: vec3<i32> = i32(probeIndex + i32(angleIndex) + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-            col = col % vec3<i32>(255, 253, 127);
-            // return vec3f(col) / 255.0;
-          }
-
-          {
-            var diameter = f32(ubo.probeRadius) * 2.0;
-            var totalRays = (f32(ubo.width) / diameter * f32(ubo.height) / diameter) * f32(ubo.probeRayCount);
-            // return vec3f((f32(probeIndex) + angleIndex) / totalRays);
-          }
-
-          // if (ubo.probeInterpolation == 0) {
-            // if (probes[probeIndex + i32(angleIndex)].rgba != 0) {
-            //   return vec3f(diff * 0.5 + 0.5, 1.0);
-            // }
+          var angle = AngleTo(probeCenter, samplePos);
+          var angleIndex = floor(f32(ubo.probeRayCount) * angle / TAU);
+          // if (probes[probeIndex + i32(angleIndex)].rgba > 0) {
+          //   var col: vec3<i32> = i32(angleIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+          //   col = col % vec3<i32>(255, 253, 127);
+          //   return vec3f(col) / 255.0;
           // }
-
           return unpack4x8unorm(probes[probeIndex + i32(angleIndex)].rgba).rgb;
-
-
-          // TODO: sample between the two closest angles
-
-          var lo = unpack4x8unorm(probes[probeIndex + i32(floor(angle / anglePerProbeRay))].rgba).rgb;
-          var hi = unpack4x8unorm(probes[probeIndex + i32(ceil(angle / anglePerProbeRay))].rgba).rgb;
-          var t = fract(angle);
-          // return lo;
-          return mix(
-            lo,
-            hi,
-            t
-          );
-          // return vec3f(diff.x, diff.y, 0.0);
         }
 
         fn SampleProbes(samplePos: vec2<f32>) -> vec3<f32> {
@@ -132,19 +102,17 @@
 
           // center probe
           {
-            var pos = posInProbeSpace * probeDiameter + probeRadius;
             var probeIndex = (
               i32(posInProbeSpace.x) + i32(posInProbeSpace.y) * cascadeWidth
             ) * ubo.probeRayCount;
 
+            var pos = posInProbeSpace * probeDiameter + probeRadius;
             samples[0] = SampleProbe(pos, samplePos, probeIndex);
           }
 
           if (ubo.probeInterpolation == 0) {
             return samples[0];
           }
-
-          // var probePositions = array<
 
 
           // left probe
@@ -203,20 +171,50 @@
             );
           }
 
-          // unpack4x8unorm(color).rgb
-          // return vec3(1.0, 0.0, 1.0);
-          return (
-            samples[0] +
-            mix(samples[1], samples[2], posInProbeSpacePartial.x) +
-            mix(samples[3], samples[4], posInProbeSpacePartial.y)
-          ) / 3.0;
+          var lateralX = mix(samples[1], samples[3], posInProbeSpacePartial.x);
+          var lateralY = mix(samples[2], samples[4], posInProbeSpacePartial.y);
+
+          // if (posInProbeSpacePartial.x <= 0.5) {
+          //   var t = posInProbeSpacePartial.x * 2.0;
+          //   if (false) {
+          //     lateralX = mix(samples[0], lateralX, t);
+          //   } else {
+          //     lateralX = mix(samples[0], lateralX, 1.0 - t);
+          //   }
+          // } else {
+          //   var t = (posInProbeSpacePartial.x - 0.5) * 2.0;
+          //   if (true) {
+          //     lateralX = mix(samples[0], lateralX, t);
+          //   } else {
+          //     lateralX = mix(samples[0], lateralX, 1.0 - t);
+          //   }
+          // }
+
+          // if (posInProbeSpacePartial.y <= 0.5) {
+          //   var t = posInProbeSpacePartial.y * 2.0;
+          //   lateralY = mix(samples[0], lateralY, t);
+          // } else {
+          //   var t = (posInProbeSpacePartial.y - 0.5) * 2.0;
+          //   lateralY = mix(lateralY, samples[0], t);
+          // }
+
+          // return lateralX;
+          // return (lateralX + lateralY) * 0.5;
+          return mix(samples[0], (lateralX + lateralY) * 0.5, length(posInProbeSpacePartial));
+
+          // // unpack4x8unorm(color).rgb
+          // // return vec3(1.0, 0.0, 1.0);
+          // return (
+          //   lateralX// + lateralY
+          // ) / 2.0;
         }
 
         @fragment
         fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
+          var scale = 1.0;
           var pixelPos: vec2<f32> = vec2<f32>(
-            fragData.uv.x * f32(ubo.width),
-            fragData.uv.y * f32(ubo.height)
+            fragData.uv.x * f32(ubo.width) / scale,
+            fragData.uv.y * f32(ubo.height) / scale
           );
           // return vec4f(fragData.uv.x, fragData.uv.y, 0.0, 1.0);
 
@@ -350,7 +348,7 @@
       }
     },
 
-    ProbeAtlasBuild(device, probeBuffer, worldTexture, workgroupSize) {
+    ProbeAtlasRaycast(device, probeBuffer, worldTexture, workgroupSize) {
       const uboFields = [
         "totalRays",
         "level0.probeRadius",
@@ -364,7 +362,7 @@
       const ubo = device.createBuffer({
         size: uboData.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        label: "ProbeAtlasBuild/ubo",
+        label: "ProbeAtlasRaycast/ubo",
       })
 
       const source =  /* wgsl */`
@@ -473,7 +471,7 @@
           var cursor = DDACursorInit(rayOrigin, rayDirection);
           var hit: bool = false;
           while(!hit) {
-            if (distance(cursor.mapPos, rayOrigin) > nextProbeRadius) {
+            if (distance(cursor.mapPos, rayOrigin) > probeRadius) {
               break;
             }
 
@@ -572,7 +570,7 @@
 
       // TODO: build more than level 0
 
-      return function ProbeAtlasBuild(
+      return function ProbeAtlasRaycast(
         queue,
         computePass,
         width,
@@ -930,7 +928,7 @@
         state.worldTexture,
         state.probeBuffer
       ),
-      probeAtlasBuild: shaders.ProbeAtlasBuild(
+      probeAtlastRaycast: shaders.ProbeAtlasRaycast(
         state.gpu.device,
         state.probeBuffer,
         state.worldTexture,
@@ -956,6 +954,22 @@
     let pass = commandEncoder.beginComputePass()
     state.gpu.programs.worldClear(pass, canvas.width, canvas.height)
     pass.end()
+    state.gpu.device.queue.submit([commandEncoder.finish()])
+  }
+
+  {
+    let commandEncoder = state.gpu.device.createCommandEncoder()
+    state.gpu.programs.worldPaint(
+      commandEncoder,
+      state.gpu.device.queue,
+      canvas.width * 0.5,
+      canvas.height * 0.5,
+      50,
+      state.params.brushRadiance,
+      0xFFFFFFFF,
+      canvas.width,
+      canvas.height
+    )
     state.gpu.device.queue.submit([commandEncoder.finish()])
   }
 
@@ -1075,7 +1089,7 @@
       }
 
       let pass = commandEncoder.beginComputePass()
-      state.gpu.programs.probeAtlasBuild(
+      state.gpu.programs.probeAtlastRaycast(
         state.gpu.device.queue,
         pass,
         canvas.width,
