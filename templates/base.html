@@ -3,7 +3,14 @@
 
 <head>
   <meta charset="utf-8">
+
+  {% block meta_content %}
   <title>tmpvar</title>
+  <meta property="og:title" content="tmpvar.com" />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://tmpvar.com" />
+  <meta property="og:image" content="https://tmpvar.com/img/wrench.png" />
+  {% endblock meta_content%}
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +18,8 @@
 
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico">
   <link rel="stylesheet" href="/font/hack/hack.css">
+
+
   <style>
     @font-face {
       font-family: PanicSans;
