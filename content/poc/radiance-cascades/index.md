@@ -10,8 +10,8 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
 - [Exilecon talk](https://www.youtube.com/watch?v=B-ODrtmtpzM)
 
 - implementations:
- - shadertoy: [Radiance Cascades](https://www.shadertoy.com/view/mtlBzX) implementation by fad - includes some temporal latency due to shadertoy/webgl deficiencies
- - shadertoy: [Radiance Cascades 2d Smooth WIP
+  - shadertoy: [Radiance Cascades](https://www.shadertoy.com/view/mtlBzX) implementation by fad - includes some temporal latency due to shadertoy/webgl deficiencies
+  - shadertoy: [Radiance Cascades 2d Smooth WIP
  ](https://www.shadertoy.com/view/mlSfRD) - Suslik's fork of fad's work
 
 ## Radiance Intervals

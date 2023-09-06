@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block meta_content %}
-  <title>{{ config.extra.base_title | safe }} - {{ page.title | safe | lower }}</title>
+  <title>{{ page.title | safe }} - {{ config.extra.base_title | safe }}</title>
   <meta property="og:title" content="{{ page.title | safe }}" />
   <meta property="og:type" content="article" />
   <meta property="og:description" content="{{ page.description }}">
@@ -11,6 +11,7 @@
   <meta property="og:image" content="{{config.base_url | safe}}/{{current_path | safe}}/preview-image.png" />
   {% endif %}
 {% endblock meta_content %}
+
 {% block content %}
   <section id="poc">
     <h1 class="title">
