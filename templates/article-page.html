@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 
 {% block meta_content %}
-<title>tmasdfasdfsadfasdfpvar</title>
-<meta property="og:title" content="tmpvar.com" />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="https://tmpvar.com" />
-<meta property="og:description"
-  content="CNC Machining, Graphics/System Programming, Tutorials, Standalone Libraries, Research, handmade">
-<meta property="og:image" content="https://tmpvar.com/img/wrench.png" />
+  <title>{{ page.title | safe }} - {{ config.extra.base_title | safe }}</title>
+  <meta property="og:title" content="{{ page.title | safe }}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:description" content="{{ page.description }}">
+  {% if page.extra.image %}
+  <meta property="og:image" content="{{ page.extra.image | safe }}" />
+  {% else %}
+  <meta property="og:image" content="{{config.base_url | safe}}/{{current_path | safe}}/preview-image.png" />
+  {% endif %}
 {% endblock meta_content %}
-
 
 {% block content %}
 <h1 class="title">
