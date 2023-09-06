@@ -4,7 +4,13 @@
   <title>{{ page.title | safe }} - {{ config.extra.base_title | safe }}</title>
   <meta property="og:title" content="{{ page.title | safe }}" />
   <meta property="og:type" content="article" />
-  <meta property="og:description" content="{{ page.description }}">
+
+  {% if page.description %}
+  <meta property="og:description" content="{{ page.description | safe }}">
+  {% else %}
+  <meta property="og:description" content="{{ page.summary }}">
+  {% endif %}
+
   {% if page.extra.image %}
   <meta property="og:image" content="{{ page.extra.image | safe }}" />
   {% else %}
