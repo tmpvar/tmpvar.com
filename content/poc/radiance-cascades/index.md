@@ -1,6 +1,10 @@
 +++
 title = "Radiance Cascades"
 date = 2020-04-01
+description = "Building intuition around a Radiance Cascades, a global illumination approach developed for Path of Exile 2 by Suslik (Alexander Sannikov)"
+
+[extra]
+image = "/img/dot.png"
 +++
 
 Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
@@ -8,6 +12,10 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
 - [demo](https://www.youtube.com/watch?v=xkJ6i2N32Pc)
 - [Exilecon talk](https://www.youtube.com/watch?v=B-ODrtmtpzM)
 
+- implementations:
+ - shadertoy: [Radiance Cascades](https://www.shadertoy.com/view/mtlBzX) implementation by fad - includes some temporal latency due to shadertoy/webgl deficiencies
+ - shadertoy: [Radiance Cascades 2d Smooth WIP
+ ](https://www.shadertoy.com/view/mlSfRD) - Suslik's fork of fad's work
 
 ## Radiance Intervals
 In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where relative to the previous level, each cascade level:

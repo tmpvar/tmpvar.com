@@ -1,10 +1,19 @@
 {% extends "base.html" %}
 
+{% block meta_content %}
+  <title>{{ config.extra.base_title | safe }} - {{ page.title | safe | lower }}</title>
+  <meta property="og:title" content="{{ page.title | safe }}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:description" content="{{ page.description }}">
+  <meta property="og:image" content="{{ page.extra.image | safe }}" />
+{% endblock meta_content %}
+
+
 {% block content %}
-<section id="poc">
-  <h1 class="title">
-    <a href="/poc">POC</a> / {{ page.title }}
-  </h1>
-  {{ page.content | safe }}
-</section>
+  <section id="poc">
+    <h1 class="title">
+      <a href="/poc">POC</a> / {{ page.title }}
+    </h1>
+    {{ page.content | safe }}
+  </section>
 {% endblock content %}
