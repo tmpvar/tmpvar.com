@@ -2,9 +2,6 @@
 title = "Radiance Cascades"
 date = 2020-04-01
 description = "Building intuition around a Radiance Cascades, a global illumination approach developed for Path of Exile 2 by Suslik (Alexander Sannikov)"
-
-[extra]
-image = "/img/dot.png"
 +++
 
 Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
