@@ -1,6 +1,7 @@
 +++
 title = "Rendering Interactive Graphics in Kitty"
 date = 2020-04-01
+description = "Using the graphics protocol of modern terminal emulators, one can quickly build visualizations and interactive demos."
 +++
 
 Using [kitty](https://sw.kovidgoyal.net/kitty/)'s graphics protocol, one can quickly build visualizations and interactive demos.
