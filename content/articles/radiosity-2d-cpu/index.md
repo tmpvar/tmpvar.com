@@ -1,6 +1,9 @@
 +++
 title = "Blur Based 2D Realtime Radiosity (CPU)"
 date = 2019-11-27
+description = "An attempt to find a simple and parallel algorithm for lighting a scene with low-frequency light"
+[extra]
+enableSampleImage = true
 +++
 
 
