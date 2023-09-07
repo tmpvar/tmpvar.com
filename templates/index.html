@@ -10,6 +10,13 @@
 {% for post in posts %}
 <section class="article-entry">
   <h3><a href="{{ post.permalink }}">{{ post.title }}</h3></a></h3>
+  <!-- {% if post.extra.enableSampleImage %}
+  <section class="center-align">
+    <img
+      src="{{ post.permalink }}/sample-image.png"
+      alt="sample image" />
+  </section>
+  {% endif %} -->
   <p>
     {{ post.summary | safe }}
   </p>
