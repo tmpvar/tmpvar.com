@@ -5,19 +5,20 @@
   <meta charset="utf-8">
 
   <meta property="og:url" content="{{config.base_url | safe}}/{{current_path | safe}}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="tmpvar" />
 
-  <meta name="twitter:card" content="summary">
   <meta name="twitter:site" content="@tmpvar">
   <meta name="twitter:creator" content="@tmpvar">
+  <meta name="twitter:url" content="{{config.base_url | safe}}/{{current_path | safe}}" />
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="twitter:domain" content="tmpvar.com">
 
   <meta name="theme-color" content="#ff0062">
 
   {% block meta_content %}
   <title>tmpvar</title>
-  <meta property="og:site_name" content="tmpvar" />
   <meta property="og:title" content="tmpvar.com" />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://tmpvar.com" />
   <meta property="og:description" content="CNC Machining, Graphics/System Programming, Tutorials, Standalone Libraries, Research, handmade">
   <meta property="og:image" content="https://tmpvar.com/img/wrench.png" />
   {% endblock meta_content %}
