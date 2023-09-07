@@ -2,12 +2,27 @@
 
 {% block meta_content %}
   <title>{{ page.title | safe }} - {{ config.extra.base_title | safe }}</title>
+
+  <meta name="twitter:title" content="{{ page.title | safe }}">
+
   <meta property="og:title" content="{{ page.title | safe }}" />
-  <meta property="og:description" content="{{ page.description }}">
-  {% if page.extra.image %}
-  <meta property="og:image" content="{{ page.extra.image | safe }}" />
+
+  {% if page.description %}
+  <meta name="twitter:description" content="{{ page.description | safe }}">
+  <meta property="og:description" content="{{ page.description | safe }}">
   {% else %}
-  <meta property="og:image" content="{{config.base_url | safe}}{{current_path | safe}}preview-image.png" />
+  <meta name="twitter:description" content="{{ page.summary }}">
+  <meta property="og:description" content="{{ page.summary }}">
+  {% endif %}
+
+  <meta name="twitter:card" content="summary_large_image">
+  {% if page.extra.image %}
+  <meta name="twitter:image" content="{{ page.extra.image | safe }}">
+  <meta property="og:image" content="{{ page.extra.image | safe }}">
+
+  {% else %}
+  <meta name="twitter:image" content="{{config.base_url | safe}}{{current_path | safe}}sample-image.png">
+  <meta property="og:image" content="{{config.base_url | safe}}{{current_path | safe}}sample-image.png" />
   {% endif %}
 {% endblock meta_content %}
 
