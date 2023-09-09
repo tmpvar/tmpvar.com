@@ -353,6 +353,7 @@
         "totalRays",
         "level0.probeRadius",
         "level0.probeRayCount",
+        "cascadeLevelCount",
         "width",
         "height",
       ]
@@ -370,6 +371,7 @@
           totalRays: u32,
           probeRadius: i32,
           probeRayCount: i32,
+          cascadeLevelCount: i32,
           width: i32,
           height: i32,
         };
@@ -416,6 +418,49 @@
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
         @group(0) @binding(2) var worldTexture: texture_2d<u32>;
 
+        fn RayMarch(rayOrigin: vec2f, rayDirection: vec2f, probeRadius: f32) -> ProbeRayResult {
+
+          var cursor = DDACursorInit(rayOrigin, rayDirection);
+          var hit: bool = false;
+          var result: ProbeRayResult;
+          result.rgba = 0;
+
+          while(!hit) {
+            if (distance(cursor.mapPos, rayOrigin) > probeRadius) {
+              break;
+            }
+
+            if (cursor.mapPos.x < 0 || cursor.mapPos.y < 0) {
+              break;
+            }
+
+            var color: u32 = textureLoad(worldTexture, vec2<u32>(cursor.mapPos), 0).r;
+            if (color != 0) {
+              hit = true;
+              result.rgba = color;
+              // // TODO: accumulate instead of hard stopping
+              // // probes[globalThreadIndex].rgba = 0xFFFFFFFF;
+              // probes[globalThreadIndex].rgba = color;
+
+              // var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+              // col = col % vec3<i32>(255, 253, 127);
+              // probes[globalThreadIndex].rgba = pack4x8unorm(
+              //   vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
+              // );
+              break;
+            }
+
+            // Step the ray
+            {
+              var mask: vec2<f32> = step(cursor.sideDist, cursor.sideDist.yx);
+              cursor.sideDist += mask * cursor.deltaDist;
+              cursor.mapPos += mask * cursor.rayStep;
+            }
+          }
+
+          return result;
+        }
+
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           if (id.x >= ubo.totalRays) {
@@ -423,14 +468,6 @@
           }
           let globalThreadIndex: i32 = i32(id.x);
 
-          // {
-          //   var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-          //   col = col % vec3<i32>(255, 253, 127);
-          //   probes[globalThreadIndex].rgba = pack4x8unorm(
-          //     vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
-          //   );
-          //   return;
-          // }
 
           let probeIndex = globalThreadIndex / ubo.probeRayCount;
           let probeRayIndex = globalThreadIndex % ubo.probeRayCount;
@@ -445,8 +482,8 @@
           //   return;
           // }
 
+
           let probeRadius = f32(ubo.probeRadius);
-          let nextProbeRadius = f32(ubo.probeRadius << 1);
           let probeDiameter = probeRadius * 2.0;
           var cascadeWidth = ubo.width / (ubo.probeRadius * 2);
 
@@ -467,40 +504,20 @@
           ));
 
           rayOrigin += rayDirection * probeRadius;
+          var result = RayMarch(rayOrigin, rayDirection, probeRadius);
 
-          var cursor = DDACursorInit(rayOrigin, rayDirection);
-          var hit: bool = false;
-          while(!hit) {
-            if (distance(cursor.mapPos, rayOrigin) > probeRadius) {
-              break;
-            }
+          probes[globalThreadIndex] = result;
 
-            // if (cursor.mapPos.x < 0 || cursor.mapPos.y < 0) {
-            //   break;
-            // }
+          // {
+          //   var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+          //   col = col % vec3<i32>(255, 253, 127);
+          //   probes[globalThreadIndex].rgba = pack4x8unorm(
+          //     vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
+          //   );
+          //   return;
+          // }
 
-            var color: u32 = textureLoad(worldTexture, vec2<u32>(cursor.mapPos), 0).r;
-            if (color != 0) {
-              hit = true;
-              // TODO: accumulate instead of hard stopping
-              // probes[globalThreadIndex].rgba = 0xFFFFFFFF;
-              probes[globalThreadIndex].rgba = color;
 
-              // var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-              // col = col % vec3<i32>(255, 253, 127);
-              // probes[globalThreadIndex].rgba = pack4x8unorm(
-              //   vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
-              // );
-              break;
-            }
-
-            // Step the ray
-            {
-              var mask: vec2<f32> = step(cursor.sideDist, cursor.sideDist.yx);
-              cursor.sideDist += mask * cursor.deltaDist;
-              cursor.mapPos += mask * cursor.rayStep;
-            }
-          }
         }
       `
 
@@ -577,6 +594,7 @@
         height,
         probeRadius,
         probeRayCount,
+        cascadeLevelCount
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
@@ -584,8 +602,9 @@
         uboData[0] = totalRays
         uboData[1] = probeRadius
         uboData[2] = probeRayCount
-        uboData[3] = width
-        uboData[4] = height
+        uboData[3] = cascadeLevelCount
+        uboData[4] = width
+        uboData[5] = height
         queue.writeBuffer(ubo, 0, uboData)
 
         computePass.setPipeline(pipeline)
