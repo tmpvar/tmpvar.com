@@ -523,6 +523,128 @@
       }
     },
 
+    BuildIrradianceTexture(device, probeBuffer, irradianceTexture, workgroupSize) {
+      const uboFields = [
+        "probeRayCount",
+        "cascadeWidth",
+      ]
+
+      const uboData = new Uint32Array(uboFields.length)
+      const ubo = device.createBuffer({
+        size: uboData.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        label: "DebugWorldBlit/ubo",
+      })
+
+      const source =  /* wgsl */`
+        struct UBOParams {
+          probeRayCount: i32,
+          cascadeWidth: i32,
+        };
+
+        struct ProbeRayResult {
+          rgba: u32,
+        };
+
+        @group(0) @binding(0) var irradianceTexture: texture_storage_2d<rgba8unorm, write>;
+        @group(0) @binding(1) var<storage,read_write> probes: array<ProbeRayResult>;
+        @group(0) @binding(2) var<uniform> ubo: UBOParams;
+        @compute @workgroup_size(${workgroupSize.join(',')})
+        fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
+          // TODO: convert id into probe offset
+          let startIndex = i32(id.x) * ubo.probeRayCount + i32(id.y) * ubo.probeRayCount * ubo.cascadeWidth;
+          var acc = vec4f(0.0);
+          for (var rayIndex = 0; rayIndex < ubo.probeRayCount; rayIndex++) {
+            let value = unpack4x8unorm(probes[startIndex + rayIndex].rgba);
+            acc = max(acc, value);
+          }
+          textureStore(irradianceTexture, id.xy, acc);
+        }
+      `
+
+      const shaderModule = device.createShaderModule({
+        code: source
+      })
+
+      const bindGroupLayout = device.createBindGroupLayout({
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+            storageTexture: {
+              format: "rgba8unorm"
+            },
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'storage'
+            },
+          },
+          {
+            binding: 2,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'uniform'
+            }
+          },
+        ]
+      })
+
+      const pipeline = device.createComputePipeline({
+        compute: {
+          module: shaderModule,
+          entryPoint: 'ComputeMain',
+        },
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout
+          ]
+        }),
+      })
+
+      const bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0, resource: irradianceTexture.createView()
+          },
+          {
+            binding: 1,
+            resource: {
+              buffer: probeBuffer
+            }
+          },
+          {
+            binding: 2,
+            resource: {
+              buffer: ubo
+            }
+          },
+        ]
+      })
+
+      return function BuildIrradianceTexture(computePass, probeRayCount, width, height, probeRadius) {
+        let probeDiameter = probeRadius * 2.0
+        let cascadeWidth = width / probeDiameter;
+        let cascadeHeight = width / probeDiameter;
+        uboData[0] = probeRayCount
+        uboData[1] = cascadeWidth
+
+        queue.writeBuffer(ubo, 0, uboData)
+
+        computePass.setPipeline(pipeline)
+        computePass.setBindGroup(0, bindGroup)
+        computePass.dispatchWorkgroups(
+          Math.floor(cascadeWidth / workgroupSize[0] + 1),
+          Math.floor(cascadeHeight / workgroupSize[1] + 1),
+          1
+        )
+      }
+    },
+
+
     WorldClear(device, texture, color, workgroupSize) {
       const source =  /* wgsl */`
         @group(0) @binding(0) var texture: texture_storage_2d<rg32uint, write>;
@@ -859,6 +981,12 @@
         state.worldTexture,
         [256, 1, 1],
         state.maxLevel0Rays
+      ),
+      buildIrradianceTexture: shaders.BuildIrradianceTexture(
+        state.gpu.device,
+        state.probeBuffer,
+        state.irradianceTexture,
+        [256, 1, 1],
       ),
       worldClear: shaders.WorldClear(
         state.gpu.device,
