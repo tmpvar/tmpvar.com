@@ -1,7 +1,7 @@
 (async function () {
 
   const shaders = {
-    DebugWorldBlit(device, presentationFormat, texture, probeBuffer) {
+    DebugWorldBlit(device, presentationFormat, worldTexture, irradianceTexture) {
       const uboFields = [
         "width",
         "height",
@@ -56,158 +56,8 @@
         const TAU: f32 = PI * 2;
 
         @group(0) @binding(0) var worldTexture: texture_2d<u32>;
-        @group(0) @binding(1) var<uniform> ubo: UBOParams;
-        @group(0) @binding(2) var<storage,read> probes: array<ProbeRayResult>;
-
-        fn AngleTo(a: vec2f, b: vec2f) -> f32 {
-          var diff = normalize(b - a);
-
-          var angle = atan2(diff.x, diff.y);
-          if (angle < 0) {
-            angle = TAU + angle;
-          }
-          return angle;
-        }
-
-        fn SampleProbe(probeCenter: vec2f, samplePos: vec2f, probeIndex: i32) -> vec3f {
-          var diff = normalize(samplePos - probeCenter);
-          // return vec3f(diff * 0.5 + 0.5, 1.0);
-
-          var d = distance(samplePos, probeCenter);
-
-          if (d < f32(ubo.probeRadius>>2)) {
-            var col: vec3<i32> = i32(probeIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-            col = col % vec3<i32>(255, 253, 127);
-            return vec3f(col) / 255.0;
-          }
-
-          var angle = AngleTo(probeCenter, samplePos);
-          var angleIndex = floor(f32(ubo.probeRayCount) * angle / TAU);
-          // if (probes[probeIndex + i32(angleIndex)].rgba > 0) {
-          //   var col: vec3<i32> = i32(angleIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-          //   col = col % vec3<i32>(255, 253, 127);
-          //   return vec3f(col) / 255.0;
-          // }
-          return unpack4x8unorm(probes[probeIndex + i32(angleIndex)].rgba).rgb;
-        }
-
-        fn SampleProbes(samplePos: vec2<f32>) -> vec3<f32> {
-          var probeRadius: f32 = f32(ubo.probeRadius);
-          var probeDiameter: f32 = probeRadius * 2.0;
-          var cascadeWidth = i32(floor(f32(ubo.width)/probeDiameter));
-          var posInProbeSpace = floor(samplePos / probeDiameter);
-          var posInProbeSpacePartial = fract(samplePos / probeDiameter);
-
-          var samples = array<vec3f, 5>(vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0));
-
-          // center probe
-          {
-            var probeIndex = (
-              i32(posInProbeSpace.x) + i32(posInProbeSpace.y) * cascadeWidth
-            ) * ubo.probeRayCount;
-
-            var pos = posInProbeSpace * probeDiameter + probeRadius;
-            samples[0] = SampleProbe(pos, samplePos, probeIndex);
-          }
-
-          if (ubo.probeInterpolation == 0) {
-            return samples[0];
-          }
-
-
-          // left probe
-          {
-            var pos = posInProbeSpace + vec2f(-1.0, 0.0);
-            var probeIndex = (
-              i32(pos.x) + i32(pos.y) * cascadeWidth
-            ) * ubo.probeRayCount;
-
-            samples[1] = SampleProbe(
-              pos * probeDiameter + probeRadius,
-              samplePos,
-              probeIndex
-            );
-          }
-
-          // right probe
-          {
-            var pos = posInProbeSpace + vec2f(1.0, 0.0);
-            var probeIndex = (
-              i32(pos.x) + i32(pos.y) * cascadeWidth
-            ) * ubo.probeRayCount;
-
-            samples[3] = SampleProbe(
-              pos * probeDiameter + probeRadius,
-              samplePos,
-              probeIndex
-            );
-          }
-
-          // bottom probe
-          {
-            var pos = posInProbeSpace + vec2f(0.0, -1.0);
-            var probeIndex = (
-              i32(pos.x) + i32(pos.y) * cascadeWidth
-            ) * ubo.probeRayCount;
-
-            samples[2] = SampleProbe(
-              pos * probeDiameter + probeRadius,
-              samplePos,
-              probeIndex
-            );
-          }
-
-          // top probe
-          {
-            var pos = posInProbeSpace + vec2f(0.0, 1.0);
-            var probeIndex = (
-              i32(pos.x) + i32(pos.y) * cascadeWidth
-            ) * ubo.probeRayCount;
-
-            samples[4] = SampleProbe(
-              pos * probeDiameter + probeRadius,
-              samplePos,
-              probeIndex
-            );
-          }
-
-          var lateralX = mix(samples[1], samples[3], posInProbeSpacePartial.x);
-          var lateralY = mix(samples[2], samples[4], posInProbeSpacePartial.y);
-
-          // if (posInProbeSpacePartial.x <= 0.5) {
-          //   var t = posInProbeSpacePartial.x * 2.0;
-          //   if (false) {
-          //     lateralX = mix(samples[0], lateralX, t);
-          //   } else {
-          //     lateralX = mix(samples[0], lateralX, 1.0 - t);
-          //   }
-          // } else {
-          //   var t = (posInProbeSpacePartial.x - 0.5) * 2.0;
-          //   if (true) {
-          //     lateralX = mix(samples[0], lateralX, t);
-          //   } else {
-          //     lateralX = mix(samples[0], lateralX, 1.0 - t);
-          //   }
-          // }
-
-          // if (posInProbeSpacePartial.y <= 0.5) {
-          //   var t = posInProbeSpacePartial.y * 2.0;
-          //   lateralY = mix(samples[0], lateralY, t);
-          // } else {
-          //   var t = (posInProbeSpacePartial.y - 0.5) * 2.0;
-          //   lateralY = mix(lateralY, samples[0], t);
-          // }
-
-          // return lateralX;
-          // return (lateralX + lateralY) * 0.5;
-          return mix(samples[0], (lateralX + lateralY) * 0.5, length(posInProbeSpacePartial));
-
-          // // unpack4x8unorm(color).rgb
-          // // return vec3(1.0, 0.0, 1.0);
-          // return (
-          //   lateralX// + lateralY
-          // ) / 2.0;
-        }
+        @group(0) @binding(1) var irradianceTexture: texture_2d<f32>;
+        @group(0) @binding(2) var<uniform> ubo: UBOParams;
 
         @fragment
         fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
@@ -216,12 +66,10 @@
             fragData.uv.x * f32(ubo.width) / scale,
             fragData.uv.y * f32(ubo.height) / scale
           );
-          // return vec4f(fragData.uv.x, fragData.uv.y, 0.0, 1.0);
 
           var worldSamplePos: vec2<u32> = vec2<u32>(pixelPos);
           var packedWorldColor: u32 = textureLoad(worldTexture, worldSamplePos, 0).r;
           var color = unpack4x8unorm(packedWorldColor).rgb;
-          color = (color + SampleProbes(pixelPos)) * 0.5;
 
           return vec4f(
             color,
@@ -247,18 +95,17 @@
           {
             binding: 1,
             visibility: GPUShaderStage.FRAGMENT,
-            buffer: {
-              type: 'uniform',
-            }
+            texture: {
+              sampleType: 'float',
+            },
           },
           {
             binding: 2,
             visibility: GPUShaderStage.FRAGMENT,
             buffer: {
-              type: 'read-only-storage',
-
+              type: 'uniform',
             }
-          }
+          },
         ]
       })
 
@@ -289,17 +136,15 @@
         entries: [
           {
             binding: 0,
-            resource: texture.createView()
+            resource: worldTexture.createView()
           },
           {
-            binding: 1, resource: {
+            binding: 1,
+            resource: irradianceTexture.createView()
+          },
+          {
+            binding: 2, resource: {
               buffer: ubo
-            }
-          },
-          {
-            binding: 2,
-            resource: {
-              buffer: probeBuffer
             }
           },
         ]
@@ -312,8 +157,6 @@
         width,
         height,
         probeRadius,
-        probeRayCount,
-        probeInterpolation
       ) {
 
         // update uniform buffer
@@ -321,8 +164,6 @@
         uboData[1] = height
         // Probes
         uboData[2] = probeRadius
-        uboData[3] = probeRayCount
-        uboData[4] = probeInterpolation
         queue.writeBuffer(ubo, 0, uboData)
 
         // Note: apparently mapping the staging buffer can take multiple frames?
@@ -348,12 +189,13 @@
       }
     },
 
-    ProbeAtlasRaycast(device, probeBuffer, worldTexture, workgroupSize) {
+    ProbeAtlasRaycast(device, probeBuffer, worldTexture, workgroupSize, maxLevelRayCount) {
       const uboFields = [
         "totalRays",
         "level0.probeRadius",
         "level0.probeRayCount",
-        "cascadeLevelCount",
+        "level",
+        "levelCount",
         "width",
         "height",
       ]
@@ -367,11 +209,15 @@
       })
 
       const source =  /* wgsl */`
+
+        const maxLevelRayCount : u32 = ${maxLevelRayCount};
+
         struct UBOParams {
           totalRays: u32,
           probeRadius: i32,
           probeRayCount: i32,
-          cascadeLevelCount: i32,
+          level: i32,
+          levelCount: i32,
           width: i32,
           height: i32,
         };
@@ -437,16 +283,8 @@
             var color: u32 = textureLoad(worldTexture, vec2<u32>(cursor.mapPos), 0).r;
             if (color != 0) {
               hit = true;
+              // TODO: accumulate instead of hard stopping
               result.rgba = color;
-              // // TODO: accumulate instead of hard stopping
-              // // probes[globalThreadIndex].rgba = 0xFFFFFFFF;
-              // probes[globalThreadIndex].rgba = color;
-
-              // var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-              // col = col % vec3<i32>(255, 253, 127);
-              // probes[globalThreadIndex].rgba = pack4x8unorm(
-              //   vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
-              // );
               break;
             }
 
@@ -461,6 +299,17 @@
           return result;
         }
 
+        // given: level, angle, world space sample pos
+        // - sample each probe in the neighborhood (4)
+        // - interpolate
+        fn SampleUpperProbes(pos: vec2f, dir: vec2f, level: i32) -> vec3f {
+          if (level >= ubo.levelCount) {
+            return vec3f(0.0);
+          }
+
+          return vec3f(0.0);
+        }
+
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           if (id.x >= ubo.totalRays) {
@@ -473,24 +322,12 @@
           let probeRayIndex = globalThreadIndex % ubo.probeRayCount;
           var anglePerProbeRay = TAU / f32(ubo.probeRayCount);
 
-          // {
-          //   var col: vec3<i32> = i32(probeIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-          //   col = col % vec3<i32>(255, 253, 127);
-          //   probes[globalThreadIndex].rgba = pack4x8unorm(
-          //     vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
-          //   );
-          //   return;
-          // }
-
-
           let probeRadius = f32(ubo.probeRadius);
           let probeDiameter = probeRadius * 2.0;
           var cascadeWidth = ubo.width / (ubo.probeRadius * 2);
 
           let col = probeIndex % cascadeWidth;
           let row = probeIndex / cascadeWidth;
-
-          probes[globalThreadIndex].rgba = 0;
 
 
           var rayOrigin = vec2<f32>(
@@ -506,16 +343,19 @@
           rayOrigin += rayDirection * probeRadius;
           var result = RayMarch(rayOrigin, rayDirection, probeRadius);
 
+
+          var upperResult = SampleUpperProbes(rayOrigin, rayDirection, ubo.level + 1);
+
           probes[globalThreadIndex] = result;
 
-          // {
-          //   var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-          //   col = col % vec3<i32>(255, 253, 127);
-          //   probes[globalThreadIndex].rgba = pack4x8unorm(
-          //     vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
-          //   );
-          //   return;
-          // }
+          {
+            var col: vec3<i32> = i32(globalThreadIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+            col = col % vec3<i32>(255, 253, 127);
+            probes[globalThreadIndex].rgba = pack4x8unorm(
+              vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0)
+            );
+            return;
+          }
 
 
         }
@@ -594,7 +434,8 @@
         height,
         probeRadius,
         probeRayCount,
-        cascadeLevelCount
+        level,
+        levelCount
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
@@ -602,9 +443,10 @@
         uboData[0] = totalRays
         uboData[1] = probeRadius
         uboData[2] = probeRayCount
-        uboData[3] = cascadeLevelCount
-        uboData[4] = width
-        uboData[5] = height
+        uboData[3] = level
+        uboData[4] = levelCount
+        uboData[5] = width
+        uboData[6] = height
         queue.writeBuffer(ubo, 0, uboData)
 
         computePass.setPipeline(pipeline)
@@ -838,24 +680,7 @@
     let minProbeRadius = Math.pow(2, parseFloat(document.getElementById('probe-ray-dda-2d-probe-radius-slider').min))
     let probeDiameter = minProbeRadius * 2
     let maxProbeCount = (canvas.width / probeDiameter) * (canvas.height / probeDiameter)
-
-    let diameter = probeDiameter
-    let level = 0
-    let totalRays = 0
-    while (1) {
-      if (diameter > canvas.width || diameter > canvas.height) {
-        break;
-      }
-
-      const levelProbeCount = (canvas.width / diameter) * (canvas.height / diameter)
-      const levelProbeRayCount = probeRayCount << level;
-      const levelRayCount = levelProbeRayCount * levelProbeCount
-
-      totalRays += levelRayCount
-      diameter <<= 1;
-      level++;
-    }
-
+    state.maxLevel0Rays = maxProbeCount * probeRayCount;
     const raySize = ([
       'rgba',
       // TODO: radiance?
@@ -864,7 +689,8 @@
 
     state.probeBuffer = state.gpu.device.createBuffer({
       label: 'ProbeBuffer',
-      size: totalRays * raySize,
+      // Note: we need to ping-pong so the buffer needs to be doubled in size
+      size: state.maxLevel0Rays * raySize * 2,
       usage: GPUBufferUsage.STORAGE
     })
   }
@@ -935,6 +761,20 @@
     })
   }
 
+  // Create the irradiance texture
+  {
+    state.irradianceTexture = state.gpu.device.createTexture({
+      size: [canvas.width, canvas.height, 1],
+      dimension: '2d',
+      format: 'rgba8unorm',
+      usage: (
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING
+      ),
+      label: 'IrradianceTexture'
+    })
+  }
+
   // Create the gpu programs
   {
     const WorldClearWorkgroupSize = 16
@@ -945,13 +785,14 @@
         state.gpu.device,
         state.gpu.presentationFormat,
         state.worldTexture,
-        state.probeBuffer
+        state.irradianceTexture
       ),
       probeAtlastRaycast: shaders.ProbeAtlasRaycast(
         state.gpu.device,
         state.probeBuffer,
         state.worldTexture,
-        [256, 1, 1]
+        [256, 1, 1],
+        state.maxLevel0Rays
       ),
       worldClear: shaders.WorldClear(
         state.gpu.device,
@@ -1082,55 +923,39 @@
     }
 
     // Fill the probe atlas via ray casting
-    let totalRays = 0
-    let probeRayCount = Math.pow(2.0, state.params.probeRayCount)
-    let probeRadius = Math.pow(2.0, state.params.probeRadius)
     {
-      // compute the total rays
-      {
-        let probeDiameter = probeRadius * 2.0
-        let diameter = probeDiameter
-        let level = 0
-        while (1) {
-          if (diameter > canvas.width || diameter > canvas.height) {
-            break;
-          }
-
-          const levelProbeCount = (canvas.width / diameter) * (canvas.height / diameter)
-          const levelProbeRayCount = probeRayCount << level;
-          const levelRayCount = levelProbeRayCount * levelProbeCount
-          totalRays += levelRayCount
-          diameter <<= 1;
-          level++;
-          // TODO: handle levels > 0
-          break;
-        }
-      }
-
       let pass = commandEncoder.beginComputePass()
-      state.gpu.programs.probeAtlastRaycast(
-        state.gpu.device.queue,
-        pass,
-        canvas.width,
-        canvas.height,
-        probeRadius,
-        probeRayCount
-      );
+      const levelCount = Math.log2(state.canvas.width >> state.params.probeRadius)
+      for (let level = levelCount - 1; level >= 0; level--) {
+        let probeRayCount = Math.pow(2.0, state.params.probeRayCount << level)
+        let probeRadius = Math.pow(2.0, state.params.probeRadius << level)
+
+        state.gpu.programs.probeAtlastRaycast(
+          state.gpu.device.queue,
+          pass,
+          canvas.width,
+          canvas.height,
+          probeRadius,
+          probeRayCount,
+          level,
+          levelCount
+        );
+      }
 
       pass.end()
     }
 
     // Debug Render World Texture
     {
+      let probeRadius = Math.pow(2.0, state.params.probeRadius)
+
       await state.gpu.programs.debugWorldBlit(
         commandEncoder,
         state.gpu.device.queue,
         state.ctx,
         canvas.width,
         canvas.height,
-        probeRadius,
-        probeRayCount,
-        state.params.probeInterpolation
+        probeRadius
       )
     }
 
