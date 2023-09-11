@@ -847,29 +847,18 @@ color: <input type="color" id="probe-ray-dda-2d-color" value="#ff0000">
 </section>
 <script src="probe-ray-dda-2d.js" defer></script>
 
+<!--
+  TODO:
+  - for each level, cast rays and merge with upper level, storing the result
+    in the other side of the buffer
+  - add an irradiance texture
+  - add final irradiance pass that takes all of the ray values from a level 0
+    probe and merges them, storing in the irradiance texture
+  - world blit: sample from irradiance texture
+-->
+
 <hr />
 
 ## Feedback / Notes
 - I wanted to visualize a ray going from the current mouse position to some arbitrary position, but
-  generating the bent rays seems like a PITA, or I guess I could just blindly overlay upper cascades on every level 0 cascade... I don't think it really helps with intuition
-
-<hr />
-
-## Devlog
-
-### Pending
-- `probe-ray-dda-2d`: render final gather
-- `probe-ray-dda-2d`: compute mips for world texture and move to hdda
-- `probe-ray-dda-2d`: add timing information
-- `probe-ray-dda-2d`: use a line segment for drawing to avoid disconnected dots
-
-
-### 2023-06-31
-- `probe-ray-dda-2d`: create probe atlas texture
-- `probe-ray-dda-2d`: level0: each probe: cast rays via dda and store result in probe atlas
-- `probe-ray-dda-2d`: level0: debug render probe atlas
-
-### 2023-06-28
-- `probe-ray-dda-2d` : controls for: add/remove, wall/light, color selector
-- `probe-ray-dda-2d` : render world texture
-- `probe-ray-dda-2d` : draw into world texture using the current mouse position and touch/left mouse
+  generating the bent rays seems like a PITA, or I guess I could just blindly overlay upper cascades on every level 0 cascade... I don't think it helps with intuition
