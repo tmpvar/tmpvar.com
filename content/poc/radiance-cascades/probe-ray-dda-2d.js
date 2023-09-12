@@ -28,9 +28,7 @@
           height: u32,
 
           // Probes
-          probeRadius: i32,
-          probeRayCount: i32,
-          probeInterpolation: i32,
+          probeRadius: i32
         };
 
         struct ProbeRayResult {
@@ -69,10 +67,19 @@
 
           var worldSamplePos: vec2<u32> = vec2<u32>(pixelPos);
           var packedWorldColor: u32 = textureLoad(worldTexture, worldSamplePos, 0).r;
-          var color = unpack4x8unorm(packedWorldColor).rgb;
+          var color: vec4f;
+          // if (packedWorldColor != 0) {
+          //   color = unpack4x8unorm(packedWorldColor);
+          //   color = vec4(0.0, 1.0, 0.0, 0.0);
+          // } else {
+
+            let probeDiameter = ubo.probeRadius * 2;
+            let irradianceSamplePos = vec2<i32>(pixelPos / f32(probeDiameter));
+            color = textureLoad(irradianceTexture, irradianceSamplePos, 0);
+          // }
 
           return vec4f(
-            color,
+            color.rgb,
             1.0
           );
 
@@ -189,7 +196,8 @@
       }
     },
 
-    ProbeAtlasRaycast(device, probeBuffer, worldTexture, workgroupSize, maxLevelRayCount) {
+    ProbeAtlasRaycast(gpu, probeBuffer, worldTexture, workgroupSize, maxLevelRayCount) {
+      const device = gpu.device
       const uboFields = [
         "totalRays",
         "probeRadius",
@@ -199,12 +207,15 @@
         "width",
         "height",
         "maxLevel0Rays",
-        "probeRayBranchingFactor"
       ]
 
-      let uboData = new Int32Array(uboFields.length)
+      // TODO: if we go over 256 bytes then this needs to be updated
+      const alignedSize = gpu.adapter.limits.minUniformBufferOffsetAlignment;
+      const alignedIndices = alignedSize / 4
+      const maxCascadeLevels = 10;
+      let uboData = new Int32Array(alignedIndices * maxCascadeLevels)
 
-      const ubo = device.createBuffer({
+      const ubo = gpu.device.createBuffer({
         size: uboData.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         label: "ProbeAtlasRaycast/ubo",
@@ -223,9 +234,6 @@
           width: i32,
           height: i32,
           maxLevel0Rays: i32,
-          // how many more rays does level N+1 have than N
-          // e.g., N+1 = N * probeRayBranchingFactor
-          probeRayBranchingFactor: i32,
         };
 
         struct ProbeRayResult {
@@ -310,6 +318,10 @@
         }
 
         fn SampleUpperProbe(pos: vec2<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> vec4f {
+          if (pos.x < 0 || pos.y < 0 || pos.x >= cascadeWidth || pos.y >= cascadeWidth) {
+            return vec4f(0.0);
+          }
+
           let index = raysPerProbe * pos.x + raysPerProbe * pos.y * cascadeWidth;
           return unpack4x8unorm(
             probes[bufferStartIndex + index].rgba
@@ -324,24 +336,25 @@
             return currentValue;
           }
 
-          let CurrentLevel = ubo.level;
           let UpperLevel = ubo.level + 1;
 
           if (UpperLevel >= ubo.levelCount) {
             return currentValue;
           }
 
-          let UpperRaysPerProbe = ubo.probeRayCount * ubo.probeRayBranchingFactor;
+          let UpperRaysPerProbe = ubo.probeRayCount << 1;
           let UpperAnglePerProbeRay = TAU / f32(UpperRaysPerProbe);
           let UpperLevelRayIndex = i32(angle / UpperAnglePerProbeRay);
           let UpperLevelBufferOffset = ubo.maxLevel0Rays * (UpperLevel % 2);
-          let UpperProbeDiameter = 2 * (ubo.probeRadius * ubo.probeRayBranchingFactor);
+          let UpperProbeDiameter = 2 * (ubo.probeRadius << 1);
           let UpperCascadeWidth = ubo.width / UpperProbeDiameter;
-          let sampleDir = vec2<i32>(step(
-            vec2f(0.5),
-            fract(pos / f32(ubo.probeRadius * ubo.probeRayBranchingFactor))
-          )) * 2 - 1;
-          let basePos = vec2<i32>(pos / f32(UpperCascadeWidth));
+          // let sampleDir = vec2<i32>(step(
+          //   vec2f(0.5),
+          //   fract(pos / f32(UpperProbeDiameter))
+          // )) * 2 - 1;
+          let sampleDir = vec2<i32>(round(fract(pos / f32(UpperProbeDiameter)))) * 2 - 1;
+          let basePos = vec2<i32>(pos / f32(UpperProbeDiameter));
+
 
           let bufferStartIndex = UpperLevelBufferOffset + UpperLevelRayIndex;
           let samples = array(
@@ -371,14 +384,26 @@
             ),
           );
 
+          // TODO: bilinear interpolation
           let upperSampleAverage = (samples[0] + samples[1] + samples[2] + samples[3]) * 0.25;
+          // let upperSampleAverage = max(
+          //   max(samples[0], samples[1]),
+          //   max(samples[2], samples[3])
+          // );
+          if (upperSampleAverage.w > 0.0) {
+            return upperSampleAverage;
+          } else {
+            return vec4f(0.0);
+          }
+          // return currentValue;
 
+          // return max(currentValue, upperSampleAverage);
           // TODO:
           // - sample the 4 closest upper probes
           // - merge the upper results
           // - merge the upper with the current and return
-
-          return (currentValue + upperSampleAverage) * 0.5;
+          // return (currentValue + upperSampleAverage) * 0.5;
+          // return currentValue;
         }
 
         @compute @workgroup_size(${workgroupSize.join(',')})
@@ -387,8 +412,6 @@
             return;
           }
           let RayIndex: i32 = i32(id.x);
-
-
           let probeIndex = RayIndex / ubo.probeRayCount;
           let probeRayIndex = RayIndex % ubo.probeRayCount;
           var anglePerProbeRay = TAU / f32(ubo.probeRayCount);
@@ -412,11 +435,32 @@
           ));
 
           rayOrigin += rayDirection * probeRadius;
-          var result: vec4f = RayMarch(rayOrigin, rayDirection, probeRadius);
+          var result = RayMarch(rayOrigin, rayDirection, probeRadius);
 
           var outputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
+          // if (result.w > 0.0) {
+          //   {
+          //     var col: vec3<i32> = i32(ubo.level + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+          //     col = col % vec3<i32>(255, 253, 127);
+          //     result = vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0);
+          //   }
+          // }
           var upperResult = SampleUpperProbes(rayOrigin, rayAngle, result);
-          probes[outputIndex].rgba = pack4x8unorm(result);
+          // upperResult = vec4(result.rgb, 1.0);
+          // if (ubo.level == 4) {
+          //   upperResult = vec4(0.0, 1.0, 1.0, 1.0);
+          // }
+          // else {
+          //   upperResult = vec4(1.0, 0.0, 1.0, 1.0);
+          // }
+
+          // {
+          //   var col: vec3<i32> = i32(ubo.level + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+          //   col = col % vec3<i32>(255, 253, 127);
+          //   upperResult = vec4f(f32(col.x)/255.0, f32(col.y)/255.0, f32(col.z)/255.0, 1.0);
+          // }
+
+          probes[outputIndex].rgba = pack4x8unorm(upperResult);
         }
       `
 
@@ -437,7 +481,8 @@
             binding: 1,
             visibility: GPUShaderStage.COMPUTE,
             buffer: {
-              type: 'uniform'
+              type: 'uniform',
+              hasDynamicOffset: true,
             }
           },
           {
@@ -474,7 +519,8 @@
           {
             binding: 1,
             resource: {
-              buffer: ubo
+              buffer: ubo,
+              size: alignedSize,
             }
           },
           {
@@ -496,25 +542,26 @@
         level,
         levelCount,
         maxLevel0Rays,
-        probeRayBranchingFactor
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
 
-        uboData[0] = totalRays
-        uboData[1] = probeRadius
-        uboData[2] = probeRayCount
-        uboData[3] = level
-        uboData[4] = levelCount
-        uboData[5] = width
-        uboData[6] = height
-        uboData[7] = maxLevel0Rays
-        uboData[8] = probeRayBranchingFactor
+        let levelIndexOffset = level * alignedIndices;
+        uboData[levelIndexOffset + 0] = totalRays
+        uboData[levelIndexOffset + 1] = probeRadius
+        uboData[levelIndexOffset + 2] = probeRayCount
+        uboData[levelIndexOffset + 3] = level
+        uboData[levelIndexOffset + 4] = levelCount
+        uboData[levelIndexOffset + 5] = width
+        uboData[levelIndexOffset + 6] = height
+        uboData[levelIndexOffset + 7] = maxLevel0Rays
 
-        queue.writeBuffer(ubo, 0, uboData)
+        const byteOffset = level * alignedSize
+        queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
 
         computePass.setPipeline(pipeline)
-        computePass.setBindGroup(0, bindGroup)
+        computePass.setBindGroup(0, bindGroup, [byteOffset])
+
         computePass.dispatchWorkgroups(
           Math.floor(totalRays / workgroupSize[0] + 1),
           1,
@@ -625,15 +672,14 @@
         ]
       })
 
-      return function BuildIrradianceTexture(computePass, probeRayCount, width, height, probeRadius) {
+      return function BuildIrradianceTexture(queue, computePass, probeRayCount, width, height, probeRadius) {
         let probeDiameter = probeRadius * 2.0
         let cascadeWidth = width / probeDiameter;
-        let cascadeHeight = width / probeDiameter;
+        let cascadeHeight = height / probeDiameter;
         uboData[0] = probeRayCount
         uboData[1] = cascadeWidth
-
         queue.writeBuffer(ubo, 0, uboData)
-
+console.log('probeRayCount: %s cascadeWidth: %s', probeRayCount, cascadeWidth)
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup)
         computePass.dispatchWorkgroups(
@@ -860,12 +906,10 @@
   }
   state.gpu = await InitGPU(state.ctx)
 
-  state.params.probeRayBranchingFactor = 2
-
   // Create the probe atlas
   {
-    let probeRayCount = Math.pow(state.params.probeRayBranchingFactor, parseFloat(document.getElementById('probe-ray-dda-2d-probe-rayCount-slider').max))
-    let minProbeRadius = Math.pow(state.params.probeRayBranchingFactor, parseFloat(document.getElementById('probe-ray-dda-2d-probe-radius-slider').min))
+    let probeRayCount = parseFloat(document.getElementById('probe-ray-dda-2d-probe-rayCount-slider').max)
+    let minProbeRadius = parseFloat(document.getElementById('probe-ray-dda-2d-probe-radius-slider').min)
     let probeDiameter = minProbeRadius * 2
     let maxProbeCount = (canvas.width / probeDiameter) * (canvas.height / probeDiameter)
     state.maxLevel0Rays = maxProbeCount * probeRayCount;
@@ -976,7 +1020,7 @@
         state.irradianceTexture
       ),
       probeAtlasRaycast: shaders.ProbeAtlasRaycast(
-        state.gpu.device,
+        state.gpu,
         state.probeBuffer,
         state.worldTexture,
         [256, 1, 1],
@@ -986,7 +1030,7 @@
         state.gpu.device,
         state.probeBuffer,
         state.irradianceTexture,
-        [256, 1, 1],
+        [16, 16, 1],
       ),
       worldClear: shaders.WorldClear(
         state.gpu.device,
@@ -1018,7 +1062,7 @@
       state.gpu.device.queue,
       canvas.width * 0.5,
       canvas.height * 0.5,
-      50,
+      150,
       state.params.brushRadiance,
       0xFFFFFFFF,
       canvas.width,
@@ -1118,12 +1162,14 @@
 
     // Fill the probe atlas via ray casting
     {
-      let pass = commandEncoder.beginComputePass()
-      const levelCount = Math.log2(state.canvas.width >> state.params.probeRadius)
-      for (let level = levelCount - 1; level >= 0; level--) {
-        let probeRayCount = Math.pow(state.params.probeRayBranchingFactor, state.params.probeRayCount << level)
-        let probeRadius = Math.pow(state.params.probeRayBranchingFactor, state.params.probeRadius << level)
+      const probeDiameter = Math.pow(2, state.params.probeRadius) * 2.0
+      // const levelCount = Math.log2(state.canvas.width / probeDiameter)
+      const levelCount = 7
 
+      let pass = commandEncoder.beginComputePass()
+      for (let level = levelCount; level >= 0; level--) {
+        let probeRayCount = Math.pow(2, state.params.probeRayCount) << level;
+        let probeRadius = Math.pow(2, state.params.probeRadius) << level;
         state.gpu.programs.probeAtlasRaycast(
           state.gpu.device.queue,
           pass,
@@ -1134,16 +1180,32 @@
           level,
           levelCount,
           state.maxLevel0Rays,
-          state.params.probeRayBranchingFactor
         );
       }
-
       pass.end()
+
+    }
+
+    // Populate the irradiance texture
+    {
+      let probeRayCount = Math.pow(2, state.params.probeRayCount)
+      let probeRadius = Math.pow(2, state.params.probeRadius)
+
+      let pass = commandEncoder.beginComputePass()
+      state.gpu.programs.buildIrradianceTexture(
+        state.gpu.device.queue,
+        pass,
+        probeRayCount,
+        canvas.width,
+        canvas.height,
+        probeRadius
+      );
+      pass.end();
     }
 
     // Debug Render World Texture
     {
-      let probeRadius = Math.pow(state.params.probeRayBranchingFactor, state.params.probeRadius)
+      let probeRadius = Math.pow(2, state.params.probeRadius)
 
       await state.gpu.programs.debugWorldBlit(
         commandEncoder,

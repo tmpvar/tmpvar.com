@@ -812,10 +812,10 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 
 ### Probe Ray DDA (2D)
 <p>
-probe radius (2^n) (level = 0): <input type="range" min="1" max="6" value="5" id="probe-ray-dda-2d-probe-radius-slider">
+probe radius (2^n) (level = 0): <input type="range" min="1" max="6" value="1" id="probe-ray-dda-2d-probe-radius-slider">
 </p>
 <p>
-probe ray count (2^n) (level = 0): <input type="range" min="2" max="8" value="7" id="probe-ray-dda-2d-probe-rayCount-slider">
+probe ray count (2^n) (level = 0): <input type="range" min="2" max="4" value="4" id="probe-ray-dda-2d-probe-rayCount-slider">
 </p>
 <p>
 probe level: <input type="range" min="0" max="6" value="2" id="probe-ray-dda-2d-probe-level">
@@ -848,13 +848,15 @@ color: <input type="color" id="probe-ray-dda-2d-color" value="#ff0000">
 <script src="probe-ray-dda-2d.js" defer></script>
 
 <!--
-  TODO:
-  - for each level, cast rays and merge with upper level, storing the result
-    in the other side of the buffer
-  - add an irradiance texture
+  Pending:
   - add final irradiance pass that takes all of the ray values from a level 0
     probe and merges them, storing in the irradiance texture
   - world blit: sample from irradiance texture
+
+  2023-09-11
+  - for each level, cast rays and merge with upper level, storing the result
+    in the other side of the buffer
+  - add an irradiance texture
 -->
 
 <hr />
