@@ -292,14 +292,14 @@
           result.hit = false;
 
           while(true) {
-            // let diff = abs(cursor.mapPos - rayOrigin);
-            // if (max(diff.x, diff.y) > probeRadius) {
-            //   break;
-            // }
-
-            if (distance(cursor.mapPos, rayOrigin) > f32(ubo.probeRadius) * 10.0) {
+            let diff = abs(cursor.mapPos - rayOrigin);
+            if (max(diff.x, diff.y) > probeRadius * 2.0) {
               break;
             }
+
+            // if (distance(cursor.mapPos, rayOrigin) > f32(ubo.probeRadius) * 2.0) {
+            //   break;
+            // }
 
             if (
               cursor.mapPos.x < 0 ||
@@ -444,12 +444,11 @@
           let OutputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
           var Result = RayMarch(RayOrigin, RayDirection, ProbeRadius);
           if (!Result.hit) {
-            probes[OutputIndex].rgba = pack4x8unorm(
-              SampleUpperProbes(RayOrigin, RayAngle)
-            );
+            let c = SampleUpperProbes(RayOrigin, RayAngle);
+            probes[OutputIndex].rgba = pack4x8unorm(vec4(c.rgb * c.a, 1.0));
           } else {
             if (Result.radiance > 0) {
-              probes[OutputIndex].rgba = pack4x8unorm(Result.color);
+              probes[OutputIndex].rgba = pack4x8unorm(vec4(Result.color.rgb * Result.color.a, 1.0));
             } else {
               probes[OutputIndex].rgba = pack4x8unorm(vec4(0.0));
             }
