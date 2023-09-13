@@ -812,13 +812,13 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 
 ### Probe Ray DDA (2D)
 <p>
-probe radius (2^n) (level = 0): <input type="range" min="1" max="6" value="1" id="probe-ray-dda-2d-probe-radius-slider">
+probe radius (2^n) (level = 0): <input type="range" min="1" max="8" value="2" id="probe-ray-dda-2d-probe-radius-slider">
 </p>
 <p>
-probe ray count (2^n) (level = 0): <input type="range" min="2" max="4" value="4" id="probe-ray-dda-2d-probe-rayCount-slider">
+probe ray count (2^n) (level = 0): <input type="range" min="2" max="8" value="5" id="probe-ray-dda-2d-probe-rayCount-slider">
 </p>
 <p>
-probe level: <input type="range" min="0" max="6" value="2" id="probe-ray-dda-2d-probe-level">
+max probe level: <input type="range" min="0" max="10" value="10" id="probe-ray-dda-2d-probe-level">
 </p>
 
 <p>
@@ -830,22 +830,22 @@ erase <input type="checkbox" value="1" id="probe-ray-dda-2d-erase" />
 </p>
 
 <p>
-brush radiance: <input type="range" min="0" max="256" value="0" id="probe-ray-dda-2d-brush-radiance-slider">
+brush radiance: <input type="range" min="0" max="256" value="256" id="probe-ray-dda-2d-brush-radiance-slider">
 </p>
 
 <p>
-brush radius: <input type="range" min="4" max="100" value="16" id="probe-ray-dda-2d-brush-radius-slider">
+brush radius: <input type="range" min="2" max="100" value="2" id="probe-ray-dda-2d-brush-radius-slider">
 </p>
 
 <p>
-color: <input type="color" id="probe-ray-dda-2d-color" value="#ff0000">
+color: <input type="color" id="probe-ray-dda-2d-color" value="#ffffff">
 </p>
 
 
 <section class="center-align">
   <canvas id="probe-ray-dda-2d-canvas" width="1024" height="1024"></canvas>
 </section>
-<script src="probe-ray-dda-2d.js" defer></script>
+<script src="probe-ray-dda-2d.js"></script>
 
 <!--
   Pending:
