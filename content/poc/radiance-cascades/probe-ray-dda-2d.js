@@ -799,8 +799,10 @@
 
     WorldPaint(device, texture, workgroupSize) {
       const uboFields = [
-        "mouse.x",
-        "mouse.y",
+        "segment.start.x",
+        "segment.start.y",
+        "segment.end.x",
+        "segment.end.y",
         "brush.radius",
         "brush.radiance",
         "rgba",
@@ -816,8 +818,10 @@
 
       const source = /* wgsl */`
         struct UBOParams {
-          x: i32,
-          y: i32,
+          ax: i32,
+          ay: i32,
+          bx: i32,
+          by: i32,
           radius: i32,
           radiance: u32,
           color: u32,
@@ -826,14 +830,28 @@
         @group(0) @binding(0) var texture: texture_storage_2d<rg32uint, write>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
 
+        fn SDFSegment(p: vec2f, a: vec2f, b: vec2f) -> f32{
+          let pa = p-a;
+          let ba = b-a;
+          let h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+          return length( pa - ba*h );
+        }
+
         fn Squared(a: i32) -> i32 {
           return a * a;
         }
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
-          var radiusSquared : i32 = ubo.radius * ubo.radius;
-          var distanceSquared : i32 = Squared(i32(id.x) - ubo.x) + Squared(i32(id.y) - ubo.y);
-          if (distanceSquared <= radiusSquared) {
+          let d = SDFSegment(
+            vec2f(f32(id.x), f32(id.y)),
+            vec2f(f32(ubo.ax), f32(ubo.ay)),
+            vec2f(f32(ubo.bx), f32(ubo.by)),
+          ) -  f32(ubo.radius);
+
+          if (d <= 0.0) {
+          // var radiusSquared : i32 = ubo.radius * ubo.radius;
+          // var distanceSquared : i32 = Squared(i32(id.x) - ubo.x) + Squared(i32(id.y) - ubo.y);
+          // if (distanceSquared <= radiusSquared) {
             textureStore(texture, id.xy, vec4<u32>(ubo.color, ubo.radiance, 0, 0));
           }
         }
@@ -887,8 +905,10 @@
       return async function WorldPaint(
         commandEncoder,
         queue,
-        x,
-        y,
+        ax,
+        ay,
+        bx,
+        by,
         radius,
         radiance,
         color,
@@ -896,11 +916,13 @@
         height
       ) {
         // update the uniform buffer
-        uboData[0] = x
-        uboData[1] = y
-        uboData[2] = radius
-        uboData[3] = radiance
-        uboData[4] = color
+        uboData[0] = ax
+        uboData[1] = ay
+        uboData[2] = bx
+        uboData[3] = by
+        uboData[4] = radius
+        uboData[5] = radiance
+        uboData[6] = color
         queue.writeBuffer(ubo, 0, uboData)
 
         let computePass = commandEncoder.beginComputePass()
@@ -944,6 +966,7 @@
     ctx: canvas.getContext('webgpu'),
     mouse: {
       pos: [0, 0],
+      lastPos: [0, 0],
       down: false
     },
     params: {
@@ -996,6 +1019,9 @@
 
     canvas.addEventListener("mousedown", (e) => {
       state.mouse.down = true
+      MoveMouse(e.offsetX, e.offsetY);
+      state.mouse.lastPos[0] = state.mouse.pos[0]
+      state.mouse.lastPos[1] = state.mouse.pos[1]
       e.preventDefault()
     }, { passive: false })
 
@@ -1109,17 +1135,34 @@
 
   {
     let commandEncoder = state.gpu.device.createCommandEncoder()
-    state.gpu.programs.worldPaint(
-      commandEncoder,
-      state.gpu.device.queue,
+
+    const DrawLine = (ax, ay, bx, by, color, radiance, radius) => {
+      state.gpu.programs.worldPaint(
+        commandEncoder,
+        state.gpu.device.queue,
+        ax,
+        ay,
+        bx,
+        by,
+        radius,
+        radiance,
+        color,
+        canvas.width,
+        canvas.height
+      )
+
+    }
+
+    DrawLine(
       canvas.width * 0.5,
-      canvas.height * 0.5,
-      10,
-      255, // radiance
+      canvas.height * 0.45,
+      canvas.width * 0.5,
+      canvas.height * 0.55,
       0xFFFFFFFF,
-      canvas.width,
-      canvas.height
-    )
+      255,
+      10
+    );
+
     state.gpu.device.queue.submit([commandEncoder.finish()])
   }
 
@@ -1198,6 +1241,8 @@
       await state.gpu.programs.worldPaint(
         commandEncoder,
         state.gpu.device.queue,
+        state.mouse.lastPos[0],
+        canvas.height - state.mouse.lastPos[1],
         state.mouse.pos[0],
         canvas.height - state.mouse.pos[1],
         state.params.brushRadius,
@@ -1206,6 +1251,9 @@
         canvas.width,
         canvas.height
       )
+
+      state.mouse.lastPos[0] = state.mouse.pos[0]
+      state.mouse.lastPos[1] = state.mouse.pos[1]
     }
 
     // Fill the probe atlas via ray casting
