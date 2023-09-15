@@ -853,20 +853,15 @@ color: <input type="color" id="probe-ray-dda-2d-color" value="#080808">
 </section>
 <script src="probe-ray-dda-2d.js"></script>
 
-<!--
-  Pending:
-  - add final irradiance pass that takes all of the ray values from a level 0
-    probe and merges them, storing in the irradiance texture
-  - world blit: sample from irradiance texture
+#### approach
 
-  2023-09-11
-  - for each level, cast rays and merge with upper level, storing the result
-    in the other side of the buffer
-  - add an irradiance texture
--->
+- __storage__: create an 'SSBO' for probes that has enough space to cover level 0 (e.g., `probeCount * raysPerProbe`). Double this size so we can ping pong cascade levels
+- __raymarch__: for level=max..0
+  - cast rays from the probe center offset by the level's interval start
+  - dda through the world texture (emitters / occluders)
+  - if ray hits an emitter write store radiance in SSBO
+  - if ray hits occluder write 0 into SSBO
+  - if ray hits nothing (and level < max)
+    - fetch upper level by bilinear interpolation and store value in SSBO
+- __irradiance__: compute irradiance per probe by accumulating the max over probe values stored in SSBO (e.g., component-wise max of all rays for the associated level 0 probe)
 
-<hr />
-
-## Feedback / Notes
-- I wanted to visualize a ray going from the current mouse position to some arbitrary position, but
-  generating the bent rays seems like a PITA, or I guess I could just blindly overlay upper cascades on every level 0 cascade... I don't think it helps with intuition
