@@ -400,15 +400,9 @@
 
           let factor = fract(index);
           let invFactor = 1.0 - factor;
-
-          // let r1 = samples[0] * invFactor.x + samples[1] * factor.x;
-          // let r2 = samples[2] * invFactor.x + samples[3] * factor.x;
-          // return r1 * invFactor.y + r2 * factor.y;
-          return mix(
-            mix(samples[0], samples[1], factor.x),
-            mix(samples[2], samples[3], factor.x),
-            factor.y
-          );
+          let r1 = samples[0] * invFactor.x + samples[1] * factor.x;
+          let r2 = samples[2] * invFactor.x + samples[3] * factor.x;
+          return r1 * invFactor.y + r2 * factor.y;
         }
 
         @compute @workgroup_size(${workgroupSize.join(',')})
@@ -439,7 +433,7 @@
           let RayOrigin = vec2<f32>(
             f32(col) * ProbeDiameter + ProbeRadius,
             f32(row) * ProbeDiameter + ProbeRadius,
-          );// + RayDirection * LowerProbeRadius;
+          ) + RayDirection * LowerProbeRadius;
 
           let OutputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
           var Result = RayMarch(RayOrigin, RayDirection, ProbeRadius);
@@ -639,7 +633,7 @@
 
             if (probes[StartIndex + rayIndex].rgba != 0) {
               let d = distance(probeUV, vec2f(0.0));
-              if (d < f32(ubo.probeRadius) / probePixelDiameter) {
+              if (d < f32(ubo.probeRadius) / probePixelDiameter * 0.5) {
                 return;
               }
               if (d > f32(ubo.probeRadius<<1) / probePixelDiameter) {
@@ -965,15 +959,12 @@
 
   // Create the probe atlas
   {
-    let probeRayCount = Math.pow(
+    let minProbeDiameter = Math.pow(
       2,
-      parseFloat(document.getElementById('probe-ray-dda-2d-probe-rayCount-slider').max)
+      parseFloat(document.getElementById('probe-ray-dda-2d-i-slider').min)
     )
-
-    let minProbeRadius = parseFloat(document.getElementById('probe-ray-dda-2d-probe-radius-slider').min)
-    const probeDiameter = Math.pow(2, minProbeRadius) * 2.0
-    let maxProbeCount = (canvas.width / probeDiameter) * (canvas.height / probeDiameter)
-    state.maxLevel0Rays = maxProbeCount * probeRayCount;
+    let maxProbeCount = (canvas.width / minProbeDiameter) * (canvas.height / minProbeDiameter)
+    state.maxLevel0Rays = 8 * canvas.width * canvas.height;
     const raySize = ([
       'rgba',
       // TODO: radiance?
@@ -1155,20 +1146,16 @@
     // probe params
     {
       state.dirty = state.dirty || Param(
-        'probeRadius',
-        parseFloat(document.getElementById('probe-ray-dda-2d-probe-radius-slider').value)
+        'i',
+        parseFloat(document.getElementById('probe-ray-dda-2d-i-slider').value)
       )
-      state.dirty = state.dirty || Param(
-        'probeRayCount',
-        parseFloat(document.getElementById('probe-ray-dda-2d-probe-rayCount-slider').value)
-      )
+
+      state.params.probeRadius = Math.pow(2, state.params.i) * 0.5
+      state.params.probeRayCount = Math.pow(2, state.params.i)
+
       state.dirty = state.dirty || Param(
         'probeLevel',
         parseFloat(document.getElementById('probe-ray-dda-2d-probe-level').value)
-      )
-      state.dirty = state.dirty || Param(
-        'probeInterpolation',
-        !!document.getElementById('probe-ray-dda-2d-probe-interpolation').checked
       )
     }
 
@@ -1223,7 +1210,7 @@
 
     // Fill the probe atlas via ray casting
     {
-      const probeDiameter = Math.pow(2, state.params.probeRadius) * 2.0
+      const probeDiameter = Math.pow(2, state.params.i)
       const levelCount = Math.min(
         Math.log2(state.canvas.width / probeDiameter),
         state.params.probeLevel
@@ -1231,14 +1218,14 @@
 
       let pass = commandEncoder.beginComputePass()
       for (let level = levelCount - 1; level >= 0; level--) {
-        let probeRayCount = Math.pow(2, state.params.probeRayCount) << level;
-        let probeRadius = Math.pow(2, state.params.probeRadius) << level;
+        let probeDiameter = Math.pow(2, state.params.i + level);
+        let probeRayCount = probeDiameter;
         state.gpu.programs.probeAtlasRaycast(
           state.gpu.device.queue,
           pass,
           canvas.width,
           canvas.height,
-          probeRadius,
+          probeDiameter * 0.5,
           probeRayCount,
           level,
           levelCount,
@@ -1251,17 +1238,14 @@
 
     // Populate the irradiance texture
     {
-      let probeRayCount = Math.pow(2, state.params.probeRayCount)
-      let probeRadius = Math.pow(2, state.params.probeRadius)
-
       let pass = commandEncoder.beginComputePass()
       state.gpu.programs.buildIrradianceTexture(
         state.gpu.device.queue,
         pass,
-        probeRayCount,
+        state.params.probeRayCount,
         canvas.width,
         canvas.height,
-        probeRadius
+        state.params.probeRadius
       );
       pass.end();
     }

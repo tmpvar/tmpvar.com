@@ -131,11 +131,11 @@ level: <input type="range" min="0" max="6" value="0" id="ray-distributions-2d-ca
 </p>
 
 <p>
-level 0 ray count: <input type="range" min="1" max="32" value="4" id="ray-distributions-2d-canvas-level-0-ray-count">
+2<sup>i</sup> spacing (level 0): <input type="range" min="0" max="6" value="4" id="ray-distributions-2d-canvas-i-slider">
 </p>
 
 <p>
-color lower levels: <input type="checkbox" value="1" id="ray-distributions-2d-canvas-color-lower-levels">
+color lower levels: <input type="checkbox" value="1" checked id="ray-distributions-2d-canvas-color-lower-levels">
 </p>
 <p>
 show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-2d-canvas-show-cascade-ray-counts">
@@ -155,9 +155,9 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
       ctx: canvas.getContext('2d'),
       params: {
         levelSlider: -1,
-        level0RayCountSlider: -1,
         colorLowerLevels: -1,
         showCascadeRayCounts: -1,
+        i: 4,
       }
     }
 
@@ -182,9 +182,10 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
       )
 
       dirty = dirty || Param(
-        'level0RayCountSlider',
-        parseFloat(document.getElementById('ray-distributions-2d-canvas-level-0-ray-count').value)
+        'i',
+        parseFloat(document.getElementById('ray-distributions-2d-canvas-i-slider').value)
       )
+
 
       dirty = dirty || Param(
         'colorLowerLevels',
@@ -222,11 +223,15 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
 
       // Draw the actual cascades
       let levels = 6;
-      let startingProbeRadius = 16;
-      let baseAngularSteps = state.params.level0RayCountSlider
+      let i = state.params.i;
+      let startingProbeRadius = Math.pow(2, i);
+      let baseAngularSteps = Math.pow(2, i);
       let TAU = Math.PI * 2.0
-      let angleOffset = Math.PI * 0.25
-
+      let angleOffset = 0.0;//Math.PI * 0.25
+      state.ctx.save()
+      let scale = 4.0;
+      state.ctx.scale(scale, scale);
+      state.ctx.lineWidth = 1.0 / scale * 2.0;
       let radianceIntervalStart = 0;
       let cascadeRayCounts = [];
       for (let level=0; level<=state.params.levelSlider; level++) {
@@ -260,7 +265,7 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
         cascadeRayCounts.push(cascadeRayCount);
         radianceIntervalStart = radius;
       }
-
+      state.ctx.restore()
       if (state.params.showCascadeRayCounts) {
         let totalRays = 0;
         state.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)'
@@ -811,18 +816,19 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 </script>
 
 ### Probe Ray DDA (2D)
+
+<p>
+2<sup>i</sup> spacing (level 0): <input type="range" min="2" max="9" value="3" id="probe-ray-dda-2d-i-slider">
+</p>
+<!--
 <p>
 probe radius (2^n) (level = 0): <input type="range" min="1" max="8" value="2" id="probe-ray-dda-2d-probe-radius-slider">
 </p>
 <p>
 probe ray count (2^n) (level = 0): <input type="range" min="2" max="8" value="5" id="probe-ray-dda-2d-probe-rayCount-slider">
-</p>
+</p> -->
 <p>
-max probe level: <input type="range" min="0" max="10" value="10" id="probe-ray-dda-2d-probe-level">
-</p>
-
-<p>
-probe interpolation <input type="checkbox" value="1" id="probe-ray-dda-2d-probe-interpolation" checked />
+max probe level: <input type="range" min="0" max="10" value="0" id="probe-ray-dda-2d-probe-level">
 </p>
 
 <p>
