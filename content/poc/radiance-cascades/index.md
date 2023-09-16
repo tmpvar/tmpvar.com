@@ -21,9 +21,15 @@ In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where rel
 - doubles the number of rays per probe
 - halves the total number of rays
 
-<p>
-level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-intervals-2d-canvas-level-0-ray-count">
-</p>
+<section id="radiance-intervals-2d-controls">
+  <p>
+  level 0 ray count: <input type="range" min="4" max="8" value="4" name="level-0-ray-count">
+  </p>
+
+  <p>
+  branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="branching-factor">
+  </p>
+</section>
 
 <section class="center-align">
   <canvas id="radiance-intervals-2d-canvas" width="1024" height="1024"></canvas>
@@ -71,9 +77,15 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-i
     const DrawRadianceIntervals = () => {
       window.requestAnimationFrame(DrawRadianceIntervals)
       let dirty = false;
+      let controlEl = document.getElementById('radiance-intervals-2d-controls')
+
       dirty = dirty || Param(
         'level0RayCountSlider',
-        parseFloat(document.getElementById('radiance-intervals-2d-canvas-level-0-ray-count').value)
+        parseFloat(controlEl.querySelector('input[name="level-0-ray-count"]').value)
+      )
+      dirty = dirty || Param(
+        'branchingFactor',
+        parseFloat(controlEl.querySelector('input[name="branching-factor"]').value)
       )
 
 
@@ -98,15 +110,21 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-i
       for (var level=0; level <= levelCount; level++) {
         state.ctx.strokeStyle = levelColors[level];
 
-        let radius = (startingProbeRadius << level) - levelPadding;
-        let prevRadius = level > 0 ? (startingProbeRadius << (level - 1)) - levelPadding : 0;
+        let radius = (startingProbeRadius << (level * state.params.branchingFactor)) - levelPadding;
+        let prevRadius = level > 0
+          ? (startingProbeRadius << ((level - 1) * state.params.branchingFactor)) - levelPadding
+          : 0;
+
+        if (prevRadius * 2.0 > canvas.width) {
+          break
+        }
 
         state.ctx.beginPath()
         state.ctx.moveTo(centerX + radius, centerY)
         state.ctx.arc(centerX, centerY, radius, 0, Math.PI*2.0)
         state.ctx.stroke();
 
-        let angularSteps = baseAngularSteps << level
+        let angularSteps = baseAngularSteps << (level * state.params.branchingFactor)
         state.ctx.beginPath()
         for (let step = 0; step<angularSteps; step++) {
           let angle = TAU * (step + 0.5) / angularSteps;
@@ -126,20 +144,26 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-i
 
 ### Ray Distributions
 
-<p>
-level: <input type="range" min="0" max="6" value="0" id="ray-distributions-2d-canvas-level-slider">
-</p>
+<section id="ray-distributions-2d-controls">
+  <p>
+  level: <input type="range" min="0" max="6" value="0" name="level-slider">
+  </p>
 
-<p>
-2<sup>i</sup> spacing (level 0): <input type="range" min="0" max="6" value="4" id="ray-distributions-2d-canvas-i-slider">
-</p>
+  <p>
+  2<sup>level</sup> spacing (level 0): <input type="range" min="0" max="6" value="4" name="i-slider">
+  </p>
 
-<p>
-color lower levels: <input type="checkbox" value="1" checked id="ray-distributions-2d-canvas-color-lower-levels">
-</p>
-<p>
-show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-2d-canvas-show-cascade-ray-counts">
-</p>
+  <p>
+  branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="level-branching-factor">
+  </p>
+
+  <p>
+  color lower levels: <input type="checkbox" value="1" checked name="color-lower-levels">
+  </p>
+  <p>
+  show cascade ray counts: <input type="checkbox" value="1" name="show-cascade-ray-counts">
+  </p>
+</section>
 
 <section class="center-align">
   <canvas id="ray-distributions-2d-canvas" width="1024" height="1024"></canvas>
@@ -174,27 +198,33 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
     const DrawRayDistributions2D = () => {
       window.requestAnimationFrame(DrawRayDistributions2D)
 
+      let controlEl = document.getElementById('ray-distributions-2d-controls')
+
       // html sliders/checkboxes
       let dirty = false;
       dirty = dirty || Param(
         'levelSlider',
-        parseFloat(document.getElementById('ray-distributions-2d-canvas-level-slider').value)
+        parseFloat(controlEl.querySelector('input[name="level-slider"]').value)
       )
 
       dirty = dirty || Param(
         'i',
-        parseFloat(document.getElementById('ray-distributions-2d-canvas-i-slider').value)
+        parseFloat(controlEl.querySelector('input[name="i-slider"]').value)
       )
 
+      dirty = dirty || Param(
+        'branchingFactor',
+        parseFloat(controlEl.querySelector('input[name="level-branching-factor"]').value)
+      )
 
       dirty = dirty || Param(
         'colorLowerLevels',
-        !!document.getElementById('ray-distributions-2d-canvas-color-lower-levels').checked
+        !!controlEl.querySelector('input[name="color-lower-levels"]').checked
       )
 
       dirty = dirty || Param(
         'showCascadeRayCounts',
-        !!document.getElementById('ray-distributions-2d-canvas-show-cascade-ray-counts').checked
+        !!controlEl.querySelector('input[name="show-cascade-ray-counts"]').checked
       )
 
       if (!dirty) {
@@ -225,9 +255,8 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
       let levels = 6;
       let i = state.params.i;
       let startingProbeRadius = Math.pow(2, i);
-      let baseAngularSteps = Math.pow(2, i);
+      let baseAngularSteps = Math.max(4, Math.pow(2, i));
       let TAU = Math.PI * 2.0
-      let angleOffset = 0.0;//Math.PI * 0.25
       state.ctx.save()
       let scale = 4.0;
       state.ctx.scale(scale, scale);
@@ -235,8 +264,8 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
       let radianceIntervalStart = 0;
       let cascadeRayCounts = [];
       for (let level=0; level<=state.params.levelSlider; level++) {
-        let angularSteps = baseAngularSteps << level
-        let radius = startingProbeRadius << level
+        let angularSteps = baseAngularSteps << (level * state.params.branchingFactor)
+        let radius = startingProbeRadius << (level * state.params.branchingFactor)
         let diameter = radius * 2
         let prevRadius = level > 0 ? (startingProbeRadius << (level - 1)) : 0;
 
@@ -286,16 +315,22 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
 
 ### Probe Ray Interpolation
 
-<p>
-min level: <input type="range" min="0" max="6" value="1" id="probe-interpolation-2d-canvas-minLevel-slider">
-</p>
-<p>
-max level: <input type="range" min="0" max="6" value="2" id="probe-interpolation-2d-canvas-maxLevel-slider">
-</p>
+<section id="probe-interpolation-2d-controls">
+  <p>
+  min level: <input type="range" min="0" max="6" value="1" name="minLevel-slider">
+  </p>
+  <p>
+  max level: <input type="range" min="0" max="6" value="2" name="maxLevel-slider">
+  </p>
 
-<p>
-level 0 ray count: <input type="range" min="1" max="32" value="4" id="probe-interpolation-2d-canvas-level-0-ray-count">
-</p>
+  <p>
+  branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="1" name="level-branching-factor">
+  </p>
+
+  <p>
+  level 0 ray count: <input type="range" min="1" max="32" value="4" name="level-0-ray-count">
+  </p>
+</section>
 
 <section class="center-align">
   <canvas id="probe-interpolation-2d-canvas" width="1024" height="1024"></canvas>
@@ -328,21 +363,26 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="probe-inte
 
     const DrawRayDistributions2D = () => {
       window.requestAnimationFrame(DrawRayDistributions2D)
-
+      let controlEl = document.getElementById('probe-interpolation-2d-controls');
       // html sliders/checkboxes
       let dirty = false;
       dirty = dirty || Param(
         'minLevel',
-        parseFloat(document.getElementById('probe-interpolation-2d-canvas-minLevel-slider').value)
+        parseFloat(controlEl.querySelector('input[name="minLevel-slider"]').value)
       )
       dirty = dirty || Param(
         'maxLevel',
-        parseFloat(document.getElementById('probe-interpolation-2d-canvas-maxLevel-slider').value)
+        parseFloat(controlEl.querySelector('input[name="maxLevel-slider"]').value)
+      )
+
+      dirty = dirty || Param(
+        'branchingFactor',
+        parseFloat(controlEl.querySelector('input[name="level-branching-factor"]').value)
       )
 
       dirty = dirty || Param(
         'level0RayCountSlider',
-        parseFloat(document.getElementById('probe-interpolation-2d-canvas-level-0-ray-count').value)
+        parseFloat(controlEl.querySelector('input[name="level-0-ray-count"]').value)
       )
 
       if (!dirty) {
@@ -374,9 +414,11 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="probe-inte
       let diameter = startingProbeRadius * 2
       let levelPadding = 0
       for (let level=state.params.minLevel; level<=state.params.maxLevel; level++) {
-        let angularSteps = baseAngularSteps << level
-        let radius = (startingProbeRadius << level) - levelPadding
-        let prevRadius = level > 0 ? (startingProbeRadius << (level - 1))  - levelPadding : 0;
+        let angularSteps = baseAngularSteps << (level * state.params.branchingFactor)
+        let radius = (startingProbeRadius << (level * state.params.branchingFactor)) - levelPadding
+        let prevRadius = level > 0
+          ? (startingProbeRadius << ((level - 1) * state.params.branchingFactor))  - levelPadding
+          : 0;
 
         state.ctx.strokeStyle = levelColors[level]
         state.ctx.fillStyle = '#f0f'
@@ -411,23 +453,27 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="probe-inte
 Visualize the radiance intervals that have a light in their bounds by drawing the quantized angle to the light
 
 click/drag to move the light
+<section id="probe-rays-vs-light-controls">
+  <p>
+  min level: <input type="range" min="0" max="6" value="0" name="minLevel-slider">
+  </p>
+  <p>
+  max level: <input type="range" min="0" max="6" value="6" name="maxLevel-slider">
+  </p>
+  <p>
+  light radius: <input type="range" min="16" max="500" value="1" name="lightRadius-slider">
+  </p>
 
-<p>
-min level: <input type="range" min="0" max="6" value="0" id="probe-storage-2d-minLevel-slider">
-</p>
-<p>
-max level: <input type="range" min="0" max="6" value="6" id="probe-storage-2d-maxLevel-slider">
-</p>
-<p>
-light radius: <input type="range" min="16" max="500" value="1" id="probe-storage-2d-lightRadius-slider">
-</p>
+  <p>
+  show light/probe overlap <input type="checkbox" value="1" name="showProbeOverlapCheckbox" />
+  </p>
 
-<p>
-show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-showProbeOverlapCheckbox" />
-</p>
-
+  <p>
+    branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="level-branching-factor">
+  </p>
+</section>
 <section class="center-align">
-  <canvas id="probe-storage-2d-canvas" width="1024" height="1024"></canvas>
+  <canvas id="probe-rays-vs-light-canvas" width="1024" height="1024"></canvas>
 </section>
 
 
@@ -435,7 +481,7 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
   // tuck this into a scope so we can have multiple interactive context2ds on this page
   {
     // Setup
-    let canvas = document.getElementById('probe-storage-2d-canvas');
+    let canvas = document.getElementById('probe-rays-vs-light-canvas');
     let state = {
       canvas: canvas,
       ctx: canvas.getContext('2d'),
@@ -598,31 +644,35 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
       ]
     }
 
-    const DrawProbeStorage = () => {
-      window.requestAnimationFrame(DrawProbeStorage)
+    const DrawRaysVsLight = () => {
+      window.requestAnimationFrame(DrawRaysVsLight)
+
+      let controlEl = document.getElementById('probe-rays-vs-light-controls');
 
       state.dirty = state.dirty || Param(
         'minLevel',
-        parseFloat(document.getElementById('probe-storage-2d-minLevel-slider').value)
+        parseFloat(controlEl.querySelector('input[name="minLevel-slider"]').value)
       )
       state.dirty = state.dirty || Param(
         'maxLevel',
-        parseFloat(document.getElementById('probe-storage-2d-maxLevel-slider').value)
+        parseFloat(controlEl.querySelector('input[name="maxLevel-slider"]').value)
       )
 
       state.dirty = state.dirty || Param(
         'lightRadius',
-        parseFloat(document.getElementById('probe-storage-2d-lightRadius-slider').value)
+        parseFloat(controlEl.querySelector('input[name="lightRadius-slider"]').value)
       )
 
       state.dirty = state.dirty || Param(
         'showProbeOverlap',
-        !!document.getElementById('probe-storage-2d-showProbeOverlapCheckbox').checked
+        !!controlEl.querySelector('input[name="showProbeOverlapCheckbox"]').checked
       )
 
-      // if (!state.positionedWithMouse) {
-      //   state.dirty = true;
-      // }
+      state.dirty = state.dirty || Param(
+        'branchingFactor',
+        parseFloat(controlEl.querySelector('input[name="level-branching-factor"]').value)
+      )
+
 
       if (!state.dirty) {
         return
@@ -664,9 +714,9 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
       if (state.params.showProbeOverlap) {
         for (let level=state.params.minLevel; level<=state.params.maxLevel; level++) {
 
-          let angularSteps = baseAngularSteps << level
+          let angularSteps = baseAngularSteps << (level * state.params.branchingFactor)
           let stepAngle = TAU / angularSteps
-          let radius = startingProbeRadius << level
+          let radius = startingProbeRadius << (level * state.params.branchingFactor)
           let diameter = radius * 2
           let prevRadius = level > 0 ? (startingProbeRadius << (level - 1)) : 0;
           // let bandSize = radius - radianceIntervalStart
@@ -726,12 +776,14 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 
       for (let level=state.params.minLevel; level<=state.params.maxLevel; level++) {
 
-        let angularSteps = baseAngularSteps << level
+        let angularSteps = baseAngularSteps << (level * state.params.branchingFactor)
         let stepAngle = TAU / angularSteps
 
-        let radius = startingProbeRadius << level
+        let radius = startingProbeRadius << (level * state.params.branchingFactor)
         let diameter = radius * 2
-        let prevRadius = level > 0 ? (startingProbeRadius << (level - 1)) : 0;
+        let prevRadius = level > 0
+          ? (startingProbeRadius << ((level - 1) * state.params.branchingFactor))
+          : 0;
 
         for (let x = 0; x<state.canvas.width; x+=diameter) {
           for (let y = 0; y<state.canvas.height; y+=diameter) {
@@ -805,7 +857,7 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
       }
     }
 
-    DrawProbeStorage()
+    DrawRaysVsLight()
 
   }
 </script>
