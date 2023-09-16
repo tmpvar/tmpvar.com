@@ -1194,6 +1194,7 @@
   }
 
   const ReadParams = () => {
+    const wasDirty = state.dirty;
     // probe params
     {
       state.dirty = state.dirty || Param(
@@ -1201,7 +1202,6 @@
         parseFloat(document.getElementById('probe-ray-dda-2d-i-slider').value)
       )
 
-      // will this update???
       state.dirty = state.dirty || Param(
         'intervalRadius',
         parseFloat(document.getElementById('probe-ray-dda-2d-interval-radius-slider').value)
@@ -1237,6 +1237,11 @@
         'color',
         document.getElementById('probe-ray-dda-2d-color').value
       )
+    }
+
+    if (state.dirty && !wasDirty) {
+      console.clear()
+      console.log(JSON.stringify(state.params, 2, '  '))
     }
   }
 
