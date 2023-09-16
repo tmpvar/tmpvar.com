@@ -4,6 +4,7 @@
   - number of directions per probe in cascade 0
   - interval range of cascade 0
 
+
 - poc: dual-marching-squares
 - article: generating marching cubes lookup tables
 - article: sand sim w/ box2d
