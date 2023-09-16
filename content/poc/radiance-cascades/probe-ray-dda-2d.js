@@ -297,11 +297,6 @@
           result.hit = false;
 
           while(true) {
-            // let diff = abs(cursor.mapPos - rayOrigin);
-            // if (max(diff.x, diff.y) > probeRadius * 2.0) {
-            //   break;
-            // }
-
             if (distance(cursor.mapPos, probeCenter) > maxDistance) {
               break;
             }
@@ -346,14 +341,16 @@
           }
 
           let index = raysPerProbe * pos.x + pos.y * cascadeWidth * raysPerProbe;
-          let a = unpack4x8unorm(
-            probes[bufferStartIndex + index].rgba
-          );
-          let b = unpack4x8unorm(
-            probes[bufferStartIndex + index - 1].rgba
-          );
-          // return max(a, b);
-          return (a + b) * 0.5;
+          let rayCount = 1<<ubo.branchingFactor;
+          let halfRayCount = rayCount / 2;
+          var acc = vec4(0.0);
+          for (var offset=0; offset<rayCount; offset++) {
+            let value = unpack4x8unorm(
+              probes[bufferStartIndex + index + offset].rgba
+            );
+            acc += value;
+          }
+          return acc / f32(rayCount);
         }
 
         // given: world space sample pos, angle
@@ -366,10 +363,10 @@
             return vec4(0.0);
           }
 
-          let UpperRaysPerProbe = ubo.probeRayCount << 1;
-          let UpperLevelRayIndex = (rayIndex << 1);
+          let UpperRaysPerProbe = ubo.probeRayCount << ubo.branchingFactor;
+          let UpperLevelRayIndex = (rayIndex << ubo.branchingFactor);
           let UpperLevelBufferOffset = ubo.maxLevel0Rays * (UpperLevel % 2);
-          let UpperProbeDiameter = 2 * (ubo.probeRadius << 1);
+          let UpperProbeDiameter = 2 * (ubo.probeRadius << ubo.branchingFactor);
           let UpperCascadeWidth = ubo.width / UpperProbeDiameter;
 
           let uv = (lowerProbeCenter/f32(UpperProbeDiameter)) / f32(UpperCascadeWidth);
@@ -423,10 +420,10 @@
           let ProbeRayIndex = RayIndex % ubo.probeRayCount;
 
           let ProbeRadius = f32(ubo.probeRadius);
-          let LowerProbeRadius = f32(ubo.probeRadius>>1);
+          let LowerProbeRadius = f32(ubo.probeRadius >> ubo.branchingFactor);
 
           let IntervalRadius = f32(ubo.intervalRadius);
-          let LowerIntervalRadius = f32(ubo.intervalRadius>>1);
+          let LowerIntervalRadius = f32(ubo.intervalRadius >> ubo.branchingFactor);
 
           let ProbeDiameter = ProbeRadius * 2.0;
           let CascadeWidth = ubo.width / i32(ProbeDiameter);
@@ -659,7 +656,7 @@
               if (d < f32(ubo.probeRadius) / probePixelDiameter * 0.5) {
                 return;
               }
-              if (d > f32(ubo.probeRadius<<1) / probePixelDiameter) {
+              if (d > f32(ubo.probeRadius << ubo.branchingFactor) / probePixelDiameter) {
                 return;
               }
 
@@ -669,8 +666,6 @@
             return;
           }
 
-          // let startIndex = i32(id.x) + i32(id.y) * ubo.cascadeWidth;
-          // let startIndex = 4 * ubo.probeRayCount;
           var acc = vec4f(0.0);
           for (var rayIndex = 0; rayIndex < ubo.probeRayCount; rayIndex++) {
             let value = unpack4x8unorm(probes[StartIndex + rayIndex].rgba);
@@ -1022,7 +1017,7 @@
       parseFloat(document.querySelector('#probe-ray-dda-2d-controls input[name="i-slider"]').min)
     )
     let maxProbeCount = (canvas.width / minProbeDiameter) * (canvas.height / minProbeDiameter)
-    state.maxLevel0Rays = 8 * canvas.width * canvas.height;
+    state.maxLevel0Rays = 16 * canvas.width * canvas.height;
     const raySize = ([
       'rgba',
       // TODO: radiance?
@@ -1239,10 +1234,8 @@
         parseFloat(controlEl.querySelector('input[name="interval-radius-slider"]').value)
       )
 
-
-      const branchingFactorExpanded = Math.pow(2, state.params.branchingFactor)
       state.params.probeRadius = Math.pow(2, state.params.i) * 0.5
-      state.params.probeRayCount = Math.pow(2, state.params.i)
+      state.params.probeRayCount = Math.max(4, Math.pow(2, state.params.i))
 
       state.dirty = state.dirty || Param(
         'probeLevel',
@@ -1284,7 +1277,6 @@
     }
 
     if (state.dirty && !wasDirty) {
-      console.clear()
       console.log(JSON.stringify(state.params, 2, '  '))
     }
   }
@@ -1323,28 +1315,28 @@
     {
       const probeDiameter = Math.pow(2, state.params.i)
       const levelCount = Math.min(
-        Math.log2(state.canvas.width / probeDiameter),
+        Math.round(Math.log(state.canvas.width / probeDiameter) / Math.log(Math.pow(2, state.params.branchingFactor))),
         state.params.probeLevel
       );
 
       let pass = commandEncoder.beginComputePass()
       for (let level = levelCount; level >= 0; level--) {
-        let probeDiameter = Math.pow(2, state.params.i + level);
-        let probeRayCount = probeDiameter;
-
-        let intervalRadius = state.params.intervalRadius << level
+        let currentProbeDiameter = probeDiameter << (level * state.params.branchingFactor);
+        let currentProbeRayCount = state.params.probeRayCount << (level * state.params.branchingFactor);
+        let intervalRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
 
         state.gpu.programs.probeAtlasRaycast(
           state.gpu.device.queue,
           pass,
           canvas.width,
           canvas.height,
-          probeDiameter * 0.5,
-          probeRayCount,
+          currentProbeDiameter * 0.5,
+          currentProbeRayCount,
           intervalRadius,
           level,
           levelCount,
           state.maxLevel0Rays,
+          state.params.branchingFactor
         );
       }
       pass.end()
@@ -1361,7 +1353,8 @@
         canvas.width,
         canvas.height,
         state.params.probeRadius,
-        state.params.debugProbeDirections
+        state.params.debugProbeDirections,
+        state.params.branchingFactor
       );
       pass.end();
     }

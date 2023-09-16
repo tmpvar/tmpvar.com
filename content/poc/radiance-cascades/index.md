@@ -867,15 +867,15 @@ click/drag to move the light
 <section id="probe-ray-dda-2d-controls">
 
   <p>
-  2<sup>i</sup> spacing (level 0): <input type="range" min="2" max="9" value="3" name="i-slider">
+  2<sup>i</sup> spacing (level 0): <input type="range" min="1" max="9" value="3" name="i-slider">
   </p>
 
   <p>
-  branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="level-branching-factor">
+  branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="1" name="level-branching-factor">
   </p>
 
   <p>
-  interval radius (level 0): <input type="range" min="2" max="1024" value="8" name="interval-radius-slider">
+  interval radius (level 0): <input type="range" min="0" max="1024" value="8" name="interval-radius-slider">
   </p>
 
   <p>
