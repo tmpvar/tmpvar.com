@@ -205,6 +205,7 @@
         "width",
         "height",
         "maxLevel0Rays",
+        "intervalRadius",
       ]
 
       // TODO: if we go over 256 bytes then this needs to be updated
@@ -232,6 +233,7 @@
           width: i32,
           height: i32,
           maxLevel0Rays: i32,
+          intervalRadius: i32,
         };
 
         struct ProbeRayResult {
@@ -282,7 +284,7 @@
           hit: bool,
         };
 
-        fn RayMarch(rayOrigin: vec2f, rayDirection: vec2f, probeRadius: f32) -> RayMarchResult {
+        fn RayMarch(rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> RayMarchResult {
           // return vec4(rayDirection * 0.5 + 0.5, 0.0, 1.0);
           var cursor = DDACursorInit(rayOrigin, rayDirection);
           // a=hit something
@@ -292,14 +294,14 @@
           result.hit = false;
 
           while(true) {
-            let diff = abs(cursor.mapPos - rayOrigin);
-            if (max(diff.x, diff.y) > probeRadius * 2.0) {
-              break;
-            }
-
-            // if (distance(cursor.mapPos, rayOrigin) > f32(ubo.probeRadius) * 2.0) {
+            // let diff = abs(cursor.mapPos - rayOrigin);
+            // if (max(diff.x, diff.y) > probeRadius * 2.0) {
             //   break;
             // }
+
+            if (distance(cursor.mapPos, rayOrigin) > maxDistance) {
+              break;
+            }
 
             if (
               cursor.mapPos.x < 0 ||
@@ -418,6 +420,10 @@
 
           let ProbeRadius = f32(ubo.probeRadius);
           let LowerProbeRadius = f32(ubo.probeRadius>>1);
+
+          let IntervalRadius = f32(ubo.intervalRadius);
+          let LowerIntervalRadius = f32(ubo.intervalRadius>>1);
+
           let ProbeDiameter = ProbeRadius * 2.0;
           let CascadeWidth = ubo.width / i32(ProbeDiameter);
 
@@ -433,16 +439,16 @@
           let RayOrigin = vec2<f32>(
             f32(col) * ProbeDiameter + ProbeRadius,
             f32(row) * ProbeDiameter + ProbeRadius,
-          ) + RayDirection * LowerProbeRadius;
+          ) + RayDirection * IntervalRadius;
 
           let OutputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
-          var Result = RayMarch(RayOrigin, RayDirection, ProbeRadius);
+          var Result = RayMarch(RayOrigin, RayDirection, IntervalRadius * 2.0);
           if (!Result.hit) {
             let c = SampleUpperProbes(RayOrigin, RayAngle);
-            probes[OutputIndex].rgba = pack4x8unorm(vec4(c.rgb * c.a, 1.0));
+            probes[OutputIndex].rgba = pack4x8unorm(vec4(c.rgb, 1.0));
           } else {
             if (Result.radiance > 0) {
-              probes[OutputIndex].rgba = pack4x8unorm(vec4(Result.color.rgb * Result.color.a, 1.0));
+              probes[OutputIndex].rgba = pack4x8unorm(vec4(Result.color.rgb , 1.0));
             } else {
               probes[OutputIndex].rgba = pack4x8unorm(vec4(0.0));
             }
@@ -535,6 +541,7 @@
         height,
         probeRadius,
         probeRayCount,
+        intervalRadius,
         level,
         levelCount,
         maxLevel0Rays,
@@ -551,6 +558,7 @@
         uboData[levelIndexOffset + 5] = width
         uboData[levelIndexOffset + 6] = height
         uboData[levelIndexOffset + 7] = maxLevel0Rays
+        uboData[levelIndexOffset + 8] = intervalRadius
 
         const byteOffset = level * alignedSize
         queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
@@ -1193,6 +1201,11 @@
         parseFloat(document.getElementById('probe-ray-dda-2d-i-slider').value)
       )
 
+      state.dirty = state.dirty || Param(
+        'intervalRadius',
+        parseFloat(document.getElementById('probe-ray-dda-2d-interval-radius-slider').value)
+      )
+
       state.params.probeRadius = Math.pow(2, state.params.i) * 0.5
       state.params.probeRayCount = Math.pow(2, state.params.i)
 
@@ -1265,9 +1278,12 @@
       );
 
       let pass = commandEncoder.beginComputePass()
-      for (let level = levelCount - 1; level >= 0; level--) {
+      for (let level = levelCount; level >= 0; level--) {
         let probeDiameter = Math.pow(2, state.params.i + level);
         let probeRayCount = probeDiameter;
+
+        let intervalRadius = state.params.intervalRadius << level
+
         state.gpu.programs.probeAtlasRaycast(
           state.gpu.device.queue,
           pass,
@@ -1275,6 +1291,7 @@
           canvas.height,
           probeDiameter * 0.5,
           probeRayCount,
+          intervalRadius,
           level,
           levelCount,
           state.maxLevel0Rays,
