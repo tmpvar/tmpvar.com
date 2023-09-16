@@ -343,9 +343,13 @@
           }
 
           let index = raysPerProbe * pos.x + pos.y * cascadeWidth * raysPerProbe;
-          return unpack4x8unorm(
+          let a = unpack4x8unorm(
             probes[bufferStartIndex + index].rgba
           );
+          let b = unpack4x8unorm(
+            probes[bufferStartIndex + index + 1].rgba
+          );
+          return (a + b) * 0.5;
         }
 
         // given: world space sample pos, angle
