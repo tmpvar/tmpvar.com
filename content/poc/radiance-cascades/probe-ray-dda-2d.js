@@ -265,7 +265,7 @@
           }
 
           cursor.rayStep = sign(rayDir);
-          var p: vec2<f32> = cursor.mapPos - rayOrigin;
+          let p = cursor.mapPos - rayOrigin;
           cursor.sideDist = cursor.rayStep * p + ((cursor.rayStep * 0.5f) + 0.5f) *
                             cursor.deltaDist;
           return cursor;
@@ -312,7 +312,7 @@
               break;
             }
 
-            var value = textureLoad(worldTexture, vec2<u32>(cursor.mapPos), 0).rg;
+            var value = textureLoad(worldTexture, vec2<i32>(cursor.mapPos), 0).rg;
             if (value.r != 0) {
               result.hit = true;
               result.color = unpack4x8unorm(value.r);
@@ -349,13 +349,14 @@
           let b = unpack4x8unorm(
             probes[bufferStartIndex + index + 1].rgba
           );
+          // return max(a, b);
           return (a + b) * 0.5;
         }
 
         // given: world space sample pos, angle
         // - sample each probe in the neighborhood (4)
         // - interpolate
-        fn SampleUpperProbes(lowerProbeCenter: vec2f, angle: f32) -> vec4f {
+        fn SampleUpperProbes(lowerProbeCenter: vec2f, rayIndex: i32) -> vec4f {
           let UpperLevel = ubo.level + 1;
 
           if (UpperLevel >= ubo.levelCount) {
@@ -363,13 +364,10 @@
           }
 
           let UpperRaysPerProbe = ubo.probeRayCount << 1;
-          let UpperAnglePerProbeRay = TAU / f32(UpperRaysPerProbe);
-          let UpperLevelRayIndex = i32(angle / UpperAnglePerProbeRay);
+          let UpperLevelRayIndex = (rayIndex << 1);
           let UpperLevelBufferOffset = ubo.maxLevel0Rays * (UpperLevel % 2);
           let UpperProbeDiameter = 2 * (ubo.probeRadius << 1);
           let UpperCascadeWidth = ubo.width / UpperProbeDiameter;
-
-          let sampleDir = vec2<i32>(1, 1);
 
           let uv = (lowerProbeCenter/f32(UpperProbeDiameter)) / f32(UpperCascadeWidth);
           let index = uv * f32(UpperCascadeWidth) - 0.5;
@@ -385,19 +383,19 @@
               UpperCascadeWidth
             ),
             SampleUpperProbe(
-              basePos + vec2<i32>(sampleDir.x, 0),
+              basePos + vec2<i32>(1, 0),
               UpperRaysPerProbe,
               bufferStartIndex,
               UpperCascadeWidth
             ),
             SampleUpperProbe(
-              basePos + vec2<i32>(0, sampleDir.y),
+              basePos + vec2<i32>(0, 1),
               UpperRaysPerProbe,
               bufferStartIndex,
               UpperCascadeWidth
             ),
             SampleUpperProbe(
-              basePos + vec2<i32>(sampleDir.x, sampleDir.y),
+              basePos + vec2<i32>(1, 1),
               UpperRaysPerProbe,
               bufferStartIndex,
               UpperCascadeWidth
@@ -420,7 +418,6 @@
           let RayIndex = i32(id.x);
           let ProbeIndex = RayIndex / ubo.probeRayCount;
           let ProbeRayIndex = RayIndex % ubo.probeRayCount;
-          var AnglePerProbeRay = TAU / f32(ubo.probeRayCount);
 
           let ProbeRadius = f32(ubo.probeRadius);
           let LowerProbeRadius = f32(ubo.probeRadius>>1);
@@ -446,11 +443,12 @@
           ) + RayDirection * IntervalRadius;
 
           let OutputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
-          var Result = RayMarch(RayOrigin, RayDirection, IntervalRadius * 2.0);
+          var Result = RayMarch(RayOrigin, RayDirection, IntervalRadius);
           if (!Result.hit) {
-            let c = SampleUpperProbes(RayOrigin, RayAngle);
+            let c = SampleUpperProbes(RayOrigin, ProbeRayIndex);
             probes[OutputIndex].rgba = pack4x8unorm(vec4(c.rgb, 1.0));
           } else {
+
             if (Result.radiance > 0) {
               probes[OutputIndex].rgba = pack4x8unorm(vec4(Result.color.rgb , 1.0));
             } else {
@@ -458,15 +456,13 @@
             }
           }
 
-          // if (Result.hit == 0.0) {
-          //   probes[OutputIndex].rgba = pack4x8unorm(vec4(0.0));
-          // } else {
-          // }
-          // // color based on the angle
+          // color based on the angle
           // {
-          //   var col = i32(RayIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+          //   var col = i32(OutputIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
           //   col = col % vec3<i32>(255, 253, 127);
-          //   Result = vec4(vec3f(col) / 255.0, 1.0);
+          //   probes[OutputIndex].rgba = pack4x8unorm(
+          //     vec4(vec3f(f32(ProbeRayIndex) / f32(ubo.probeRayCount)), 1.0)
+          //   );
           // }
 
         }
@@ -584,6 +580,7 @@
         "cascadeWidth",
         "width",
         "probeRadius",
+        "debugProbeDirections",
       ]
 
       const uboData = new Uint32Array(uboFields.length)
@@ -602,6 +599,7 @@
           cascadeWidth: i32,
           width: i32,
           probeRadius: i32,
+          debugProbeDirections: i32,
         };
 
         struct ProbeRayResult {
@@ -622,8 +620,8 @@
           let Index = uv * f32(ubo.cascadeWidth);
           let StartIndex = i32(Index.x) * ubo.probeRayCount + i32(Index.y) * ubo.probeRayCount * ubo.cascadeWidth;
 
-          let debugProbeDirections = true;
-          if (debugProbeDirections) {
+
+          if (ubo.debugProbeDirections != 0) {
             let probePixelDiameter = f32(ubo.width) / f32(ubo.cascadeWidth);
             let probeUV = fract(vec2f(id.xy) / probePixelDiameter) * 2.0 - 1.0;
 
@@ -732,7 +730,7 @@
         ]
       })
 
-      return function BuildIrradianceTexture(queue, computePass, probeRayCount, width, height, probeRadius) {
+      return function BuildIrradianceTexture(queue, computePass, probeRayCount, width, height, probeRadius, debugProbeDirections) {
         let probeDiameter = probeRadius * 2.0
         let cascadeWidth = width / probeDiameter;
         let cascadeHeight = height / probeDiameter;
@@ -740,6 +738,7 @@
         uboData[1] = cascadeWidth
         uboData[2] = width
         uboData[3] = probeRadius
+        uboData[4] = debugProbeDirections
 
         queue.writeBuffer(ubo, 0, uboData)
         // console.log('probeRayCount: %s cascadeWidth: %s', probeRayCount, cascadeWidth)
@@ -1166,12 +1165,12 @@
 
     DrawLine(
       canvas.width * 0.5,
-      canvas.height * 0.45,
+      canvas.height * 0.5,
       canvas.width * 0.5,
-      canvas.height * 0.55,
+      canvas.height * 0.5,
       0xFFFFFFFF,
       255,
-      10
+      20
     );
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
@@ -1221,10 +1220,6 @@
 
     // brush params
     {
-      state.dirty = state.dirty || Param(
-        'erase',
-        !!document.getElementById('probe-ray-dda-2d-erase').checked
-      )
 
       state.dirty = state.dirty || Param(
         'brushRadiance',
@@ -1240,6 +1235,15 @@
         'color',
         document.getElementById('probe-ray-dda-2d-color').value
       )
+    }
+
+    // debug params
+    {
+      state.dirty = state.dirty || Param(
+        'debugProbeDirections',
+        !!document.getElementById('probe-ray-dda-2d-debug-probe-directions').checked
+      )
+
     }
 
     if (state.dirty && !wasDirty) {
@@ -1319,7 +1323,8 @@
         state.params.probeRayCount,
         canvas.width,
         canvas.height,
-        state.params.probeRadius
+        state.params.probeRadius,
+        state.params.debugProbeDirections
       );
       pass.end();
     }
