@@ -840,6 +840,11 @@ brush radius: <input type="range" min="2" max="100" value="2" id="probe-ray-dda-
 color: <input type="color" id="probe-ray-dda-2d-color" value="#080808">
 </p>
 
+<p>
+debug probe directions <input type="checkbox" value="1"  id="probe-ray-dda-2d-debug-probe-directions" checked />
+</p>
+
+
 
 <section class="center-align">
   <canvas id="probe-ray-dda-2d-canvas" width="1024" height="1024"></canvas>
