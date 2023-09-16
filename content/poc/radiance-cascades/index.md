@@ -864,38 +864,44 @@ click/drag to move the light
 
 ### Probe Ray DDA (2D)
 
-<p>
-2<sup>i</sup> spacing (level 0): <input type="range" min="2" max="9" value="3" id="probe-ray-dda-2d-i-slider">
-</p>
+<section id="probe-ray-dda-2d-controls">
 
-<p>
-interval radius (level 0): <input type="range" min="2" max="1024" value="8" id="probe-ray-dda-2d-interval-radius-slider">
-</p>
+  <p>
+  2<sup>i</sup> spacing (level 0): <input type="range" min="2" max="9" value="3" name="i-slider">
+  </p>
 
-<p>
-max probe level: <input type="range" min="0" max="10" value="10" id="probe-ray-dda-2d-probe-level">
-</p>
+  <p>
+  branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="level-branching-factor">
+  </p>
 
-<p>
-erase <input type="checkbox" value="1" id="probe-ray-dda-2d-erase" />
-</p>
+  <p>
+  interval radius (level 0): <input type="range" min="2" max="1024" value="8" name="interval-radius-slider">
+  </p>
 
-<p>
-brush radiance: <input type="range" min="0" max="256" value="0" id="probe-ray-dda-2d-brush-radiance-slider">
-</p>
+  <p>
+  max probe level: <input type="range" min="0" max="10" value="10" name="probe-level">
+  </p>
 
-<p>
-brush radius: <input type="range" min="2" max="100" value="5" id="probe-ray-dda-2d-brush-radius-slider">
-</p>
+  <p>
+  erase <input type="checkbox" value="1" name="brush-erase-mode" />
+  </p>
 
-<p>
-color: <input type="color" id="probe-ray-dda-2d-color" value="#EE3333">
-</p>
+  <p>
+  brush radiance: <input type="range" min="0" max="256" value="0" name="brush-radiance-slider">
+  </p>
 
-<p>
-debug probe directions <input type="checkbox" value="1"  id="probe-ray-dda-2d-debug-probe-directions" checked />
-</p>
+  <p>
+  brush radius: <input type="range" min="2" max="100" value="5" name="brush-radius-slider">
+  </p>
 
+  <p>
+  color: <input type="color" name="brush-color-selector" value="#EE3333">
+  </p>
+
+  <p>
+  debug probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" checked />
+  </p>
+</section>
 
 
 <section class="center-align">

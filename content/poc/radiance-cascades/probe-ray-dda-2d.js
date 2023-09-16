@@ -1002,7 +1002,7 @@
   {
     let minProbeDiameter = Math.pow(
       2,
-      parseFloat(document.getElementById('probe-ray-dda-2d-i-slider').min)
+      parseFloat(document.querySelector('#probe-ray-dda-2d-controls input[name="i-slider"]').min)
     )
     let maxProbeCount = (canvas.width / minProbeDiameter) * (canvas.height / minProbeDiameter)
     state.maxLevel0Rays = 8 * canvas.width * canvas.height;
@@ -1204,24 +1204,32 @@
 
   const ReadParams = () => {
     const wasDirty = state.dirty;
+    const controlEl = document.getElementById('probe-ray-dda-2d-controls')
     // probe params
     {
       state.dirty = state.dirty || Param(
         'i',
-        parseFloat(document.getElementById('probe-ray-dda-2d-i-slider').value)
+        parseFloat(controlEl.querySelector('input[name="i-slider"]').value)
+      )
+
+      state.dirty = state.dirty || Param(
+        'branchingFactor',
+        parseFloat(controlEl.querySelector('input[name="level-branching-factor"]').value)
       )
 
       state.dirty = state.dirty || Param(
         'intervalRadius',
-        parseFloat(document.getElementById('probe-ray-dda-2d-interval-radius-slider').value)
+        parseFloat(controlEl.querySelector('input[name="interval-radius-slider"]').value)
       )
 
+
+      const branchingFactorExpanded = Math.pow(2, state.params.branchingFactor)
       state.params.probeRadius = Math.pow(2, state.params.i) * 0.5
       state.params.probeRayCount = Math.pow(2, state.params.i)
 
       state.dirty = state.dirty || Param(
         'probeLevel',
-        parseFloat(document.getElementById('probe-ray-dda-2d-probe-level').value)
+        parseFloat(controlEl.querySelector('input[name="probe-level"]').value)
       )
     }
 
@@ -1230,22 +1238,22 @@
 
       state.dirty = state.dirty || Param(
         'brushRadiance',
-        parseFloat(document.getElementById('probe-ray-dda-2d-brush-radiance-slider').value)
+        parseFloat(controlEl.querySelector('input[name="brush-radiance-slider"]').value)
       )
 
       state.dirty = state.dirty || Param(
         'brushRadius',
-        parseFloat(document.getElementById('probe-ray-dda-2d-brush-radius-slider').value)
+        parseFloat(controlEl.querySelector('input[name="brush-radius-slider"]').value)
       )
 
       state.dirty = state.dirty || ColorParam(
         'color',
-        document.getElementById('probe-ray-dda-2d-color').value
+        controlEl.querySelector('input[name="brush-color-selector"]').value
       )
 
       state.dirty = state.dirty || Param(
         'erase',
-        !!document.getElementById('probe-ray-dda-2d-erase').checked
+        !!controlEl.querySelector('input[name="brush-erase-mode"]').checked
       )
     }
 
@@ -1253,7 +1261,7 @@
     {
       state.dirty = state.dirty || Param(
         'debugProbeDirections',
-        !!document.getElementById('probe-ray-dda-2d-debug-probe-directions').checked
+        !!controlEl.querySelector('input[name="debug-probe-directions-mode"]').checked
       )
 
     }
