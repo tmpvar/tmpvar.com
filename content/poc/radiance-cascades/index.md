@@ -817,7 +817,7 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 </p>
 
 <p>
-interval radius (level 0): <input type="range" min="0" max="1024" value="4" id="probe-ray-dda-2d-interval-radius-slider">
+interval radius (level 0): <input type="range" min="2" max="1024" value="4" id="probe-ray-dda-2d-interval-radius-slider">
 </p>
 
 <p>
