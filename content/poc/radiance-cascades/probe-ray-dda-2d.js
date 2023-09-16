@@ -1201,6 +1201,7 @@
         parseFloat(document.getElementById('probe-ray-dda-2d-i-slider').value)
       )
 
+      // will this update???
       state.dirty = state.dirty || Param(
         'intervalRadius',
         parseFloat(document.getElementById('probe-ray-dda-2d-interval-radius-slider').value)

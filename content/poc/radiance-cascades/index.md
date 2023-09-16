@@ -849,7 +849,7 @@ color: <input type="color" id="probe-ray-dda-2d-color" value="#080808">
 <section class="center-align">
   <canvas id="probe-ray-dda-2d-canvas" width="1024" height="1024"></canvas>
 </section>
-<script src="probe-ray-dda-2d.js"></script>
+<script src="probe-ray-dda-2d.js" defer></script>
 
 #### approach
 
