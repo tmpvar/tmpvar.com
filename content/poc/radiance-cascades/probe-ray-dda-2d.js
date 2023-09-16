@@ -430,7 +430,7 @@
           let col = ProbeIndex % CascadeWidth;
           let row = ProbeIndex / CascadeWidth;
 
-          let RayAngle = f32(ProbeRayIndex) * AnglePerProbeRay;
+          let RayAngle = TAU * (f32(ProbeRayIndex) + 0.5) /  f32(ubo.probeRayCount);
           let RayDirection = vec2<f32>(
             cos(RayAngle),
             sin(RayAngle)
@@ -1158,7 +1158,6 @@
         canvas.width,
         canvas.height
       )
-
     }
 
     DrawLine(
