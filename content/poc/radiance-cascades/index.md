@@ -820,13 +820,11 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 <p>
 2<sup>i</sup> spacing (level 0): <input type="range" min="2" max="9" value="3" id="probe-ray-dda-2d-i-slider">
 </p>
-<!--
+
 <p>
-probe radius (2^n) (level = 0): <input type="range" min="1" max="8" value="2" id="probe-ray-dda-2d-probe-radius-slider">
+interval radius (level 0): <input type="range" min="0" max="1024" value="4" id="probe-ray-dda-2d-interval-radius-slider">
 </p>
-<p>
-probe ray count (2^n) (level = 0): <input type="range" min="2" max="8" value="5" id="probe-ray-dda-2d-probe-rayCount-slider">
-</p> -->
+
 <p>
 max probe level: <input type="range" min="0" max="10" value="10" id="probe-ray-dda-2d-probe-level">
 </p>
