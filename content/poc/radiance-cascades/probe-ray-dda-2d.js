@@ -206,6 +206,7 @@
         "height",
         "maxLevel0Rays",
         "intervalRadius",
+        "branchingFactor",
       ]
 
       // TODO: if we go over 256 bytes then this needs to be updated
@@ -234,6 +235,8 @@
           height: i32,
           maxLevel0Rays: i32,
           intervalRadius: i32,
+          // WGSL wants this to be unsigned because it is used as a shift
+          branchingFactor: u32,
         };
 
         struct ProbeRayResult {
@@ -551,6 +554,7 @@
         level,
         levelCount,
         maxLevel0Rays,
+        branchingFactor
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
@@ -565,6 +569,7 @@
         uboData[levelIndexOffset + 6] = height
         uboData[levelIndexOffset + 7] = maxLevel0Rays
         uboData[levelIndexOffset + 8] = intervalRadius
+        uboData[levelIndexOffset + 9] = branchingFactor
 
         const byteOffset = level * alignedSize
         queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
@@ -587,6 +592,7 @@
         "width",
         "probeRadius",
         "debugProbeDirections",
+        "branchingFactor",
       ]
 
       const uboData = new Uint32Array(uboFields.length)
@@ -606,6 +612,7 @@
           width: i32,
           probeRadius: i32,
           debugProbeDirections: i32,
+          branchingFactor: u32,
         };
 
         struct ProbeRayResult {
@@ -737,7 +744,16 @@
         ]
       })
 
-      return function BuildIrradianceTexture(queue, computePass, probeRayCount, width, height, probeRadius, debugProbeDirections) {
+      return function BuildIrradianceTexture(
+        queue,
+        computePass,
+        probeRayCount,
+        width,
+        height,
+        probeRadius,
+        debugProbeDirections,
+        branchingFactor
+      ) {
         let probeDiameter = probeRadius * 2.0
         let cascadeWidth = width / probeDiameter;
         let cascadeHeight = height / probeDiameter;
@@ -746,6 +762,7 @@
         uboData[2] = width
         uboData[3] = probeRadius
         uboData[4] = debugProbeDirections
+        uboData[5] = branchingFactor
 
         queue.writeBuffer(ubo, 0, uboData)
         // console.log('probeRayCount: %s cascadeWidth: %s', probeRayCount, cascadeWidth)
