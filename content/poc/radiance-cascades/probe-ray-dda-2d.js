@@ -284,7 +284,7 @@
           hit: bool,
         };
 
-        fn RayMarch(rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> RayMarchResult {
+        fn RayMarch(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> RayMarchResult {
           // return vec4(rayDirection * 0.5 + 0.5, 0.0, 1.0);
           var cursor = DDACursorInit(rayOrigin, rayDirection);
           // a=hit something
@@ -299,7 +299,7 @@
             //   break;
             // }
 
-            if (distance(cursor.mapPos, rayOrigin) > maxDistance) {
+            if (distance(cursor.mapPos, probeCenter) > maxDistance) {
               break;
             }
 
@@ -347,7 +347,7 @@
             probes[bufferStartIndex + index].rgba
           );
           let b = unpack4x8unorm(
-            probes[bufferStartIndex + index + 1].rgba
+            probes[bufferStartIndex + index - 1].rgba
           );
           // return max(a, b);
           return (a + b) * 0.5;
@@ -443,7 +443,13 @@
           );
 
           let OutputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
-          var Result = RayMarch(RayOrigin + RayDirection * LowerIntervalRadius, RayDirection, IntervalRadius);
+          var Result = RayMarch(
+            RayOrigin,
+            RayOrigin + RayDirection * LowerIntervalRadius,
+            RayDirection,
+            IntervalRadius
+          );
+
           if (!Result.hit) {
             let c = SampleUpperProbes(RayOrigin, ProbeRayIndex);
             probes[OutputIndex].rgba = pack4x8unorm(vec4(c.rgb, 1.0));
@@ -661,9 +667,10 @@
           var acc = vec4f(0.0);
           for (var rayIndex = 0; rayIndex < ubo.probeRayCount; rayIndex++) {
             let value = unpack4x8unorm(probes[StartIndex + rayIndex].rgba);
-            acc = max(acc, value);
+            // acc = max(acc, value);
+            acc += value;
           }
-          textureStore(irradianceTexture, id.xy, acc);
+          textureStore(irradianceTexture, id.xy, acc / f32(ubo.probeRayCount));
         }
       `
 
@@ -1234,6 +1241,11 @@
       state.dirty = state.dirty || ColorParam(
         'color',
         document.getElementById('probe-ray-dda-2d-color').value
+      )
+
+      state.dirty = state.dirty || Param(
+        'erase',
+        !!document.getElementById('probe-ray-dda-2d-erase').checked
       )
     }
 

@@ -4,8 +4,6 @@
   - number of directions per probe in cascade 0
   - interval range of cascade 0
 - radiance-cascades: add a toggle for 2^N rays vs 4^N rays and sample 4 upper rays when merging
-- radiance-cascades: fix angle between next cascade
-- radiance-cascades: make intervalRadius start where the previous one left off
 
 - poc: dual-marching-squares
 - article: generating marching cubes lookup tables
@@ -18,4 +16,6 @@
 
 
 ## 2023-09-15
+- radiance-cascades: fix angle between next cascade - was offsetting the upper sample by the ray offset
+- radiance-cascades: make intervalRadius start where the previous one left off
 - radiance-cascades: fix demos to cast rays in the correct directions!
