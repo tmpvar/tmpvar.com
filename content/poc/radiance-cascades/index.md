@@ -817,7 +817,7 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
 </p>
 
 <p>
-interval radius (level 0): <input type="range" min="2" max="1024" value="4" id="probe-ray-dda-2d-interval-radius-slider">
+interval radius (level 0): <input type="range" min="2" max="1024" value="8" id="probe-ray-dda-2d-interval-radius-slider">
 </p>
 
 <p>
@@ -833,11 +833,11 @@ brush radiance: <input type="range" min="0" max="256" value="0" id="probe-ray-dd
 </p>
 
 <p>
-brush radius: <input type="range" min="2" max="100" value="2" id="probe-ray-dda-2d-brush-radius-slider">
+brush radius: <input type="range" min="2" max="100" value="5" id="probe-ray-dda-2d-brush-radius-slider">
 </p>
 
 <p>
-color: <input type="color" id="probe-ray-dda-2d-color" value="#080808">
+color: <input type="color" id="probe-ray-dda-2d-color" value="#EE3333">
 </p>
 
 <p>
