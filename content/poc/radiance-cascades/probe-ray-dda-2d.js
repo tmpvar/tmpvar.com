@@ -440,10 +440,10 @@
           let RayOrigin = vec2<f32>(
             f32(col) * ProbeDiameter + ProbeRadius,
             f32(row) * ProbeDiameter + ProbeRadius,
-          ) + RayDirection * LowerIntervalRadius;
+          );
 
           let OutputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
-          var Result = RayMarch(RayOrigin, RayDirection, IntervalRadius);
+          var Result = RayMarch(RayOrigin + RayDirection * LowerIntervalRadius, RayDirection, IntervalRadius);
           if (!Result.hit) {
             let c = SampleUpperProbes(RayOrigin, ProbeRayIndex);
             probes[OutputIndex].rgba = pack4x8unorm(vec4(c.rgb, 1.0));
