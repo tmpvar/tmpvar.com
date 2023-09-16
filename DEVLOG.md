@@ -3,6 +3,7 @@
   - number of probes in cascade 0
   - number of directions per probe in cascade 0
   - interval range of cascade 0
+- radiance-cascades: add a toggle for 2^N rays vs 4^N rays and sample 4 upper rays when merging
 
 
 - poc: dual-marching-squares
