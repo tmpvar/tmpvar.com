@@ -97,6 +97,7 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-i
 
       for (var level=0; level <= levelCount; level++) {
         state.ctx.strokeStyle = levelColors[level];
+
         let radius = (startingProbeRadius << level) - levelPadding;
         let prevRadius = level > 0 ? (startingProbeRadius << (level - 1)) - levelPadding : 0;
 
@@ -106,10 +107,9 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="radiance-i
         state.ctx.stroke();
 
         let angularSteps = baseAngularSteps << level
-        let stepAngle = TAU / angularSteps
         state.ctx.beginPath()
         for (let step = 0; step<angularSteps; step++) {
-          let angle = angleOffset + step * stepAngle;
+          let angle = TAU * (step + 0.5) / angularSteps;
 
           state.ctx.moveTo(centerX + Math.sin(angle) * prevRadius, centerY + Math.cos(angle) * prevRadius)
           state.ctx.lineTo(centerX + Math.sin(angle) * radius, centerY + Math.cos(angle) * radius)
@@ -236,7 +236,6 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
       let cascadeRayCounts = [];
       for (let level=0; level<=state.params.levelSlider; level++) {
         let angularSteps = baseAngularSteps << level
-        let stepAngle = TAU / angularSteps
         let radius = startingProbeRadius << level
         let diameter = radius * 2
         let prevRadius = level > 0 ? (startingProbeRadius << (level - 1)) : 0;
@@ -250,12 +249,11 @@ show cascade ray counts: <input type="checkbox" value="1" id="ray-distributions-
             let centerX = x + radius
             let centerY = y + radius
             for (let step = 0; step<angularSteps; step++) {
-              let angle = angleOffset + step * stepAngle;
+              let angle = TAU * (step + 0.5) / angularSteps;
               let dirX = Math.sin(angle)
               let dirY = Math.cos(angle)
 
               state.ctx.moveTo(centerX + dirX * prevRadius, centerY + dirY * prevRadius);
-
               state.ctx.lineTo(centerX + dirX * radius, centerY + dirY * radius)
               cascadeRayCount++;
             }
@@ -370,7 +368,6 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="probe-inte
       let startingProbeRadius = 64;
       let baseAngularSteps = state.params.level0RayCountSlider
       let TAU = Math.PI * 2.0
-      let angleOffset = Math.PI * 0.25
 
       let radianceIntervalStart = 0;
       let cascadeRayCounts = [];
@@ -378,7 +375,6 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="probe-inte
       let levelPadding = 0
       for (let level=state.params.minLevel; level<=state.params.maxLevel; level++) {
         let angularSteps = baseAngularSteps << level
-        let stepAngle = TAU / angularSteps
         let radius = (startingProbeRadius << level) - levelPadding
         let prevRadius = level > 0 ? (startingProbeRadius << (level - 1))  - levelPadding : 0;
 
@@ -391,7 +387,7 @@ level 0 ray count: <input type="range" min="1" max="32" value="4" id="probe-inte
             let centerX = x + startingProbeRadius
             let centerY = y + startingProbeRadius
             for (let step = 0; step<angularSteps; step++) {
-              let angle = angleOffset + step * stepAngle;
+              let angle = TAU * (step + 0.5) / angularSteps;
               let dirX = Math.sin(angle)
               let dirY = Math.cos(angle)
 
@@ -655,7 +651,6 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
       let startingProbeRadius = 16;
       let baseAngularSteps = 4
       let TAU = Math.PI * 2.0
-      let angleOffset = Math.PI * 0.25
 
 
       // draw a light
@@ -703,8 +698,8 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
               let dy = state.lightPos[1] - probeCenterY
               let lightAngle = AngleTo( state.lightPos[0], state.lightPos[1], probeCenterX, probeCenterY)
               for (let step = 0; step<angularSteps; step++) {
-                let angle = angleOffset + step * stepAngle;
-                let nextAngle = angle + stepAngle;
+                let angle = TAU * (step + 0.5) / angularSteps
+                let nextAngle = TAU * (step + 1 + 0.5) / angularSteps
                 let inAngle = lightAngle >= angle && lightAngle <= nextAngle;
 
 
@@ -760,8 +755,8 @@ show light/probe overlap <input type="checkbox" value="1" id="probe-storage-2d-s
             }
 
             for (let step = 0; step<angularSteps; step++) {
-              let angle = angleOffset + step * stepAngle;
-              let nextAngle = angle + stepAngle;
+              let angle = TAU * (step + 0.5) / angularSteps;
+              let nextAngle = TAU * (step + 1.0 + 0.5) / angularSteps;
 
               state.ctx.beginPath()
 
@@ -849,7 +844,7 @@ color: <input type="color" id="probe-ray-dda-2d-color" value="#080808">
 <section class="center-align">
   <canvas id="probe-ray-dda-2d-canvas" width="1024" height="1024"></canvas>
 </section>
-<script src="probe-ray-dda-2d.js?hash={{get_file_hash(probe-ray-dda-2d.js)}}" defer></script>
+<script src="probe-ray-dda-2d.js" defer></script>
 
 #### approach
 
