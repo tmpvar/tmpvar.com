@@ -433,14 +433,14 @@
 
           let RayAngle = TAU * (f32(ProbeRayIndex) + 0.5) /  f32(ubo.probeRayCount);
           let RayDirection = vec2<f32>(
-            cos(RayAngle),
-            sin(RayAngle)
+            sin(RayAngle),
+            cos(RayAngle)
           );
 
           let RayOrigin = vec2<f32>(
             f32(col) * ProbeDiameter + ProbeRadius,
             f32(row) * ProbeDiameter + ProbeRadius,
-          ) + RayDirection * IntervalRadius;
+          ) + RayDirection * LowerIntervalRadius;
 
           let OutputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
           var Result = RayMarch(RayOrigin, RayDirection, IntervalRadius);
