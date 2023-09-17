@@ -65,7 +65,7 @@
           var value = textureLoad(worldTexture, worldSamplePos, 0);
           var color: vec4f;
           if (value.r != 0) {
-              color = unpack4x8unorm(value.r);
+            color = unpack4x8unorm(value.r);
           } else {
             let probeDiameter = ubo.probeRadius * 2;
             let irradianceSamplePos = pixelPos;//fragData.uv;// * f32(probeDiameter);
@@ -274,13 +274,12 @@
         const PI: f32 = 3.141592653589793;
         const TAU: f32 = PI * 2;
 
-        @group(0) @binding(0) var<storage,read_write> probes: array<ProbeRayResult>;
+        @group(0) @binding(0) var<storage,read_write> probes: array<vec4f>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
         @group(0) @binding(2) var worldTexture: texture_2d<u32>;
 
         struct RayMarchResult {
           color: vec4f,
-          radiance: f32,
           hit: bool,
         };
 
@@ -290,7 +289,6 @@
           // a=hit something
           var result: RayMarchResult;
           result.color = vec4f(0.0, 0.0, 0.0, 0.0);
-          result.radiance = 0;
           result.hit = false;
 
           while(true) {
@@ -311,8 +309,6 @@
             if (value.r != 0) {
               result.hit = true;
               result.color = unpack4x8unorm(value.r);
-              result.radiance = f32(value.g) / 1024;
-
               break;
             }
 
@@ -327,41 +323,31 @@
           return result;
         }
 
-        fn SampleUpperProbe(pos: vec2<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> RayMarchResult {
+        fn SampleUpperProbe(pos: vec2<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> vec4f {
           var result: RayMarchResult;
           if (pos.x < 0 || pos.y < 0 || pos.x >= cascadeWidth || pos.y >= cascadeWidth) {
-            result.color = vec4f(0.0);
-            result.radiance = 0.0;
-            return result;
+            return vec4f(0.0);
           }
 
           let index = raysPerProbe * pos.x + pos.y * cascadeWidth * raysPerProbe;
           let rayCount = 1<<ubo.branchingFactor;
-          let halfRayCount = rayCount / 2;
           var accColor = vec4(0.0);
           var accRadiance = 0.0;
           for (var offset=0; offset<rayCount; offset++) {
             let rayBufferIndex = bufferStartIndex + index + offset;
-            accColor += unpack4x8unorm(probes[rayBufferIndex].rgba);
-            accRadiance += probes[rayBufferIndex].radiance;
+            accColor += probes[rayBufferIndex];
           }
-          result.color = clamp(accColor / f32(rayCount), vec4(0.0), vec4(1.0));
-          result.radiance = accRadiance / f32(rayCount);
-
-          return result;
+          return accColor / f32(rayCount);
         }
 
         // given: world space sample pos, angle
         // - sample each probe in the neighborhood (4)
         // - interpolate
-        fn SampleUpperProbes(lowerProbeCenter: vec2f, rayIndex: i32) -> RayMarchResult {
+        fn SampleUpperProbes(lowerProbeCenter: vec2f, rayIndex: i32) -> vec4f {
           let UpperLevel = ubo.level + 1;
 
           if (UpperLevel >= ubo.levelCount) {
-            var ret: RayMarchResult;
-            ret.color = vec4(0.0);
-            ret.radiance = 0.0;
-            return ret;
+            return vec4f(0.0);
           }
 
           let UpperRaysPerProbe = ubo.probeRayCount << ubo.branchingFactor;
@@ -407,21 +393,9 @@
           let factor = fract(index);
           let invFactor = 1.0 - factor;
 
-          // bilinear interpolation: color
-          {
-            let r1 = samples[0].color * invFactor.x + samples[1].color * factor.x;
-            let r2 = samples[2].color * invFactor.x + samples[3].color * factor.x;
-            ret.color = r1 * invFactor.y + r2 * factor.y;
-          }
-
-          // bilinear interpolation: color
-          {
-            let r1 = samples[0].radiance * invFactor.x + samples[1].radiance * factor.x;
-            let r2 = samples[2].radiance * invFactor.x + samples[3].radiance * factor.x;
-            ret.radiance = r1 * invFactor.y + r2 * factor.y;
-          }
-
-          return ret;
+          let r1 = samples[0] * invFactor.x + samples[1] * factor.x;
+          let r2 = samples[2] * invFactor.x + samples[3] * factor.x;
+          return r1 * invFactor.y + r2 * factor.y;
         }
 
         @compute @workgroup_size(${workgroupSize.join(',')})
@@ -466,12 +440,9 @@
           );
 
           if (!Result.hit) {
-            let c = SampleUpperProbes(RayOrigin, ProbeRayIndex);
-            probes[OutputIndex].rgba = pack4x8unorm(vec4(c.color.rgb, 1.0));
-            probes[OutputIndex].radiance = c.radiance;
+            probes[OutputIndex] = SampleUpperProbes(RayOrigin, ProbeRayIndex);
           } else {
-            probes[OutputIndex].rgba = pack4x8unorm(vec4(Result.color.rgb , 1.0));
-            probes[OutputIndex].radiance = Result.radiance;
+            probes[OutputIndex] = Result.color;
           }
 
           // color based on the angle
@@ -613,7 +584,7 @@
 
       const source =  /* wgsl */`
         const PI: f32 = 3.141592653589793;
-        const TAU: f32 = PI * 2;
+        const TAU: f32 = PI * 2.0;
 
         struct UBOParams {
           probeRayCount: i32,
@@ -630,7 +601,7 @@
         };
 
         @group(0) @binding(0) var irradianceTexture: texture_storage_2d<rgba8unorm, write>;
-        @group(0) @binding(1) var<storage,read_write> probes: array<ProbeRayResult>;
+        @group(0) @binding(1) var<storage,read_write> probes: array<vec4f>;
         @group(0) @binding(2) var<uniform> ubo: UBOParams;
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -653,8 +624,6 @@
               angle += TAU;
             }
 
-            // textureStore(irradianceTexture, id.xy, vec4(angle / TAU, 0, 0, 1.0));
-
             let AnglePerProbeRay = TAU / f32(ubo.probeRayCount);
             let rayIndex = i32(angle / AnglePerProbeRay);
             // color based on the angle
@@ -664,7 +633,7 @@
             //   textureStore(irradianceTexture, id.xy, vec4(vec3f(col) / 255.0, 1.0));
             // }
 
-            if (probes[StartIndex + rayIndex].rgba != 0) {
+            {
               let d = distance(probeUV, vec2f(0.0));
               if (d < f32(ubo.probeRadius) / probePixelDiameter * 0.5) {
                 return;
@@ -673,8 +642,7 @@
                 return;
               }
 
-              let value = unpack4x8unorm(probes[StartIndex + rayIndex].rgba);
-              textureStore(irradianceTexture, id.xy, value * probes[StartIndex + rayIndex].radiance);
+              textureStore(irradianceTexture, id.xy, probes[StartIndex + rayIndex]);
             }
             return;
           }
@@ -682,9 +650,7 @@
           var acc = vec4f(0.0);
           for (var rayIndex = 0; rayIndex < ubo.probeRayCount; rayIndex++) {
             let probeRayIndex = StartIndex + rayIndex;
-            let value = unpack4x8unorm(probes[probeRayIndex].rgba);
-            // acc = max(acc, value);
-            acc += value * probes[probeRayIndex].radiance;
+            acc += probes[probeRayIndex];
           }
           textureStore(irradianceTexture, id.xy, acc / f32(ubo.probeRayCount));
         }
@@ -1031,11 +997,9 @@
       parseFloat(document.querySelector('#probe-ray-dda-2d-controls input[name="i-slider"]').min)
     )
     let maxProbeCount = (canvas.width / minProbeDiameter) * (canvas.height / minProbeDiameter)
-    state.maxLevel0Rays = 8 * canvas.width * canvas.height;
+    state.maxLevel0Rays = 4 * canvas.width * canvas.height;
     const raySize = ([
-      'rgba',
-      'radiance'
-      // TODO: occlusion?
+      'r', 'g', 'b', 'a'
     ]).length * 4;
 
     state.probeBuffer = state.gpu.device.createBuffer({
@@ -1201,9 +1165,9 @@
       canvas.height * 0.5,
       canvas.width * 0.5,
       canvas.height * 0.5,
-      0xFFFFFFFF,
-      1024,
-      20
+      0xFF646464,
+      1024 * 2,
+      30
     );
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
@@ -1291,7 +1255,7 @@
     }
 
     if (state.dirty && !wasDirty) {
-      console.log(JSON.stringify(state.params, 2, '  '))
+      // console.log(JSON.stringify(state.params, 2, '  '))
     }
   }
 

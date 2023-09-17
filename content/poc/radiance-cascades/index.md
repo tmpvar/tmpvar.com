@@ -875,7 +875,7 @@ click/drag to move the light
   </p>
 
   <p>
-  interval radius (level 0): <input type="range" min="0" max="1024" value="8" name="interval-radius-slider">
+  interval radius (level 0): <input type="range" min="0" max="1024" value="100" name="interval-radius-slider">
   </p>
 
   <p>
@@ -887,7 +887,7 @@ click/drag to move the light
   </p>
 
   <p>
-  brush radiance: <input type="range" min="0" max="20" value="0" step="0.1" name="brush-radiance-slider">
+  brush radiance: <input type="range" min="0" max="20" value="1" step="0.1" name="brush-radiance-slider">
   </p>
 
   <p>
@@ -895,7 +895,7 @@ click/drag to move the light
   </p>
 
   <p>
-  color: <input type="color" name="brush-color-selector" value="#EE3333">
+  color: <input type="color" name="brush-color-selector" value="#646464">
   </p>
 
   <p>
