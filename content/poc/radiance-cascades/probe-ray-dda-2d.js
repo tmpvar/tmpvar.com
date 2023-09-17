@@ -308,7 +308,7 @@
             var value = textureLoad(worldTexture, vec2<i32>(cursor.mapPos), 0).rg;
             if (value.r != 0) {
               result.hit = true;
-              result.color = unpack4x8unorm(value.r);
+              result.color = unpack4x8unorm(value.r) * f32(value.g) / 1024.0;
               break;
             }
 
