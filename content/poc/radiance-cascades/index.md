@@ -887,7 +887,7 @@ click/drag to move the light
   </p>
 
   <p>
-  brush radiance: <input type="range" min="0" max="256" value="0" name="brush-radiance-slider">
+  brush radiance: <input type="range" min="0" max="20" value="0" step="0.1" name="brush-radiance-slider">
   </p>
 
   <p>
@@ -899,7 +899,7 @@ click/drag to move the light
   </p>
 
   <p>
-  debug probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" checked />
+  debug probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" />
   </p>
 </section>
 

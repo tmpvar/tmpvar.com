@@ -31,10 +31,6 @@
           probeRadius: i32
         };
 
-        struct ProbeRayResult {
-          rgba: u32,
-        };
-
         @vertex
         fn VertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
           var vertPos = array<vec2<f32>, 3>(
@@ -241,6 +237,7 @@
 
         struct ProbeRayResult {
           rgba: u32,
+          radiance: f32,
         };
 
         struct DDACursor2D {
@@ -283,7 +280,7 @@
 
         struct RayMarchResult {
           color: vec4f,
-          radiance: i32,
+          radiance: f32,
           hit: bool,
         };
 
@@ -314,12 +311,7 @@
             if (value.r != 0) {
               result.hit = true;
               result.color = unpack4x8unorm(value.r);
-
-              if (value.g != 0) {
-                result.radiance = 1;
-              } else {
-                result.radiance = 0;
-              }
+              result.radiance = f32(value.g) / 1024;
 
               break;
             }
@@ -335,32 +327,41 @@
           return result;
         }
 
-        fn SampleUpperProbe(pos: vec2<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> vec4f {
+        fn SampleUpperProbe(pos: vec2<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> RayMarchResult {
+          var result: RayMarchResult;
           if (pos.x < 0 || pos.y < 0 || pos.x >= cascadeWidth || pos.y >= cascadeWidth) {
-            return vec4f(0.0);
+            result.color = vec4f(0.0);
+            result.radiance = 0.0;
+            return result;
           }
 
           let index = raysPerProbe * pos.x + pos.y * cascadeWidth * raysPerProbe;
           let rayCount = 1<<ubo.branchingFactor;
           let halfRayCount = rayCount / 2;
-          var acc = vec4(0.0);
+          var accColor = vec4(0.0);
+          var accRadiance = 0.0;
           for (var offset=0; offset<rayCount; offset++) {
-            let value = unpack4x8unorm(
-              probes[bufferStartIndex + index + offset].rgba
-            );
-            acc += value;
+            let rayBufferIndex = bufferStartIndex + index + offset;
+            accColor += unpack4x8unorm(probes[rayBufferIndex].rgba);
+            accRadiance += probes[rayBufferIndex].radiance;
           }
-          return acc / f32(rayCount);
+          result.color = clamp(accColor / f32(rayCount), vec4(0.0), vec4(1.0));
+          result.radiance = accRadiance / f32(rayCount);
+
+          return result;
         }
 
         // given: world space sample pos, angle
         // - sample each probe in the neighborhood (4)
         // - interpolate
-        fn SampleUpperProbes(lowerProbeCenter: vec2f, rayIndex: i32) -> vec4f {
+        fn SampleUpperProbes(lowerProbeCenter: vec2f, rayIndex: i32) -> RayMarchResult {
           let UpperLevel = ubo.level + 1;
 
           if (UpperLevel >= ubo.levelCount) {
-            return vec4(0.0);
+            var ret: RayMarchResult;
+            ret.color = vec4(0.0);
+            ret.radiance = 0.0;
+            return ret;
           }
 
           let UpperRaysPerProbe = ubo.probeRayCount << ubo.branchingFactor;
@@ -402,11 +403,25 @@
             ),
           );
 
+          var ret: RayMarchResult;
           let factor = fract(index);
           let invFactor = 1.0 - factor;
-          let r1 = samples[0] * invFactor.x + samples[1] * factor.x;
-          let r2 = samples[2] * invFactor.x + samples[3] * factor.x;
-          return r1 * invFactor.y + r2 * factor.y;
+
+          // bilinear interpolation: color
+          {
+            let r1 = samples[0].color * invFactor.x + samples[1].color * factor.x;
+            let r2 = samples[2].color * invFactor.x + samples[3].color * factor.x;
+            ret.color = r1 * invFactor.y + r2 * factor.y;
+          }
+
+          // bilinear interpolation: color
+          {
+            let r1 = samples[0].radiance * invFactor.x + samples[1].radiance * factor.x;
+            let r2 = samples[2].radiance * invFactor.x + samples[3].radiance * factor.x;
+            ret.radiance = r1 * invFactor.y + r2 * factor.y;
+          }
+
+          return ret;
         }
 
         @compute @workgroup_size(${workgroupSize.join(',')})
@@ -452,14 +467,11 @@
 
           if (!Result.hit) {
             let c = SampleUpperProbes(RayOrigin, ProbeRayIndex);
-            probes[OutputIndex].rgba = pack4x8unorm(vec4(c.rgb, 1.0));
+            probes[OutputIndex].rgba = pack4x8unorm(vec4(c.color.rgb, 1.0));
+            probes[OutputIndex].radiance = c.radiance;
           } else {
-
-            if (Result.radiance > 0) {
-              probes[OutputIndex].rgba = pack4x8unorm(vec4(Result.color.rgb , 1.0));
-            } else {
-              probes[OutputIndex].rgba = pack4x8unorm(vec4(0.0));
-            }
+            probes[OutputIndex].rgba = pack4x8unorm(vec4(Result.color.rgb , 1.0));
+            probes[OutputIndex].radiance = Result.radiance;
           }
 
           // color based on the angle
@@ -614,6 +626,7 @@
 
         struct ProbeRayResult {
           rgba: u32,
+          radiance: f32,
         };
 
         @group(0) @binding(0) var irradianceTexture: texture_storage_2d<rgba8unorm, write>;
@@ -661,16 +674,17 @@
               }
 
               let value = unpack4x8unorm(probes[StartIndex + rayIndex].rgba);
-              textureStore(irradianceTexture, id.xy, value);
+              textureStore(irradianceTexture, id.xy, value * probes[StartIndex + rayIndex].radiance);
             }
             return;
           }
 
           var acc = vec4f(0.0);
           for (var rayIndex = 0; rayIndex < ubo.probeRayCount; rayIndex++) {
-            let value = unpack4x8unorm(probes[StartIndex + rayIndex].rgba);
+            let probeRayIndex = StartIndex + rayIndex;
+            let value = unpack4x8unorm(probes[probeRayIndex].rgba);
             // acc = max(acc, value);
-            acc += value;
+            acc += value * probes[probeRayIndex].radiance;
           }
           textureStore(irradianceTexture, id.xy, acc / f32(ubo.probeRayCount));
         }
@@ -1017,10 +1031,10 @@
       parseFloat(document.querySelector('#probe-ray-dda-2d-controls input[name="i-slider"]').min)
     )
     let maxProbeCount = (canvas.width / minProbeDiameter) * (canvas.height / minProbeDiameter)
-    state.maxLevel0Rays = 16 * canvas.width * canvas.height;
+    state.maxLevel0Rays = 8 * canvas.width * canvas.height;
     const raySize = ([
       'rgba',
-      // TODO: radiance?
+      'radiance'
       // TODO: occlusion?
     ]).length * 4;
 
@@ -1188,7 +1202,7 @@
       canvas.width * 0.5,
       canvas.height * 0.5,
       0xFFFFFFFF,
-      255,
+      1024,
       20
     );
 
@@ -1301,7 +1315,8 @@
         state.mouse.pos[0],
         canvas.height - state.mouse.pos[1],
         state.params.brushRadius,
-        state.params.brushRadiance,
+        // 0..1024 maps to 0..1, but it is stored in a u32
+        state.params.brushRadiance * 1024.0,
         state.params.erase ? 0 : state.params.color,
         canvas.width,
         canvas.height
