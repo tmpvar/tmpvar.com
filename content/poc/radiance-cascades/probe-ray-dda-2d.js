@@ -65,7 +65,7 @@
           var value = textureLoad(worldTexture, worldSamplePos, 0);
           var color: vec4f;
           if (value.r != 0) {
-            color = unpack4x8unorm(value.r);
+            color = unpack4x8unorm(value.r) * f32(value.g) / 1024.0;
           } else {
             let probeDiameter = ubo.probeRadius * 2;
             let irradianceSamplePos = pixelPos;//fragData.uv;// * f32(probeDiameter);
@@ -334,8 +334,7 @@
           var accColor = vec4(0.0);
           var accRadiance = 0.0;
           for (var offset=0; offset<rayCount; offset++) {
-            let rayBufferIndex = bufferStartIndex + index + offset;
-            accColor += probes[rayBufferIndex];
+            accColor += probes[bufferStartIndex + index + offset];
           }
           return accColor / f32(rayCount);
         }
@@ -1165,7 +1164,7 @@
       canvas.height * 0.5,
       canvas.width * 0.5,
       canvas.height * 0.5,
-      0xFF646464,
+      0xFFFFFFFF,
       1024 * 2,
       30
     );
