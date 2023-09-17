@@ -983,6 +983,7 @@
       down: false
     },
     params: {
+      shouldClear: false,
       erase: false,
       radiance: 0,
       brushRadius: 16,
@@ -1136,13 +1137,16 @@
   }
 
   // Clear the world Texture
-  {
+  const WorldTextureClear = () => {
     let commandEncoder = state.gpu.device.createCommandEncoder()
     let pass = commandEncoder.beginComputePass()
     state.gpu.programs.worldClear(pass, canvas.width, canvas.height)
     pass.end()
     state.gpu.device.queue.submit([commandEncoder.finish()])
+    state.dirty = true;
   }
+
+  WorldTextureClear();
 
   {
     let commandEncoder = state.gpu.device.createCommandEncoder()
@@ -1194,6 +1198,10 @@
 
     return Param(name, color)
   }
+
+  document.querySelector('#probe-ray-dda-2d-controls button[name="clear-button"]').addEventListener('click', (e) => {
+    WorldTextureClear();
+  })
 
   const ReadParams = () => {
     const wasDirty = state.dirty;

@@ -901,6 +901,10 @@ click/drag to move the light
   <p>
   debug probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" />
   </p>
+
+  <p>
+    <button name="clear-button">Clear</button>
+  </p>
 </section>
 
 
