@@ -1077,9 +1077,26 @@
       format: 'rg32uint',
       usage: (
         GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.STORAGE_BINDING
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.COPY_SRC
       ),
       label: 'WorldTexture'
+    })
+  }
+
+  // Create the world texture
+  {
+    state.worldAndBrushPreviewTexture = state.gpu.device.createTexture({
+      size: [canvas.width, canvas.height, 1],
+      dimension: '2d',
+      // r=rgba, b=emission
+      format: 'rg32uint',
+      usage: (
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.COPY_DST
+      ),
+      label: 'WorldAndBrushPreviewTexture'
     })
   }
 
@@ -1106,13 +1123,13 @@
       debugWorldBlit: shaders.DebugWorldBlit(
         state.gpu.device,
         state.gpu.presentationFormat,
-        state.worldTexture,
+        state.worldAndBrushPreviewTexture,
         state.irradianceTexture
       ),
       probeAtlasRaycast: shaders.ProbeAtlasRaycast(
         state.gpu,
         state.probeBuffer,
-        state.worldTexture,
+        state.worldAndBrushPreviewTexture,
         [256, 1, 1],
         state.maxLevel0Rays
       ),
@@ -1131,6 +1148,11 @@
       worldPaint: shaders.WorldPaint(
         state.gpu.device,
         state.worldTexture,
+        [WorldPaintWorkgroupSize, WorldPaintWorkgroupSize, 1]
+      ),
+      worldPaintBrushPreview: shaders.WorldPaint(
+        state.gpu.device,
+        state.worldAndBrushPreviewTexture,
         [WorldPaintWorkgroupSize, WorldPaintWorkgroupSize, 1]
       ),
     }
@@ -1299,6 +1321,36 @@
 
       state.mouse.lastPos[0] = state.mouse.pos[0]
       state.mouse.lastPos[1] = state.mouse.pos[1]
+    }
+
+    // Paint the preview brush
+    {
+      commandEncoder.copyTextureToTexture(
+        { texture:  state.worldTexture },
+        { texture:  state.worldAndBrushPreviewTexture },
+        [
+          canvas.width,
+          canvas.height,
+          1
+        ]
+      );
+
+      state.gpu.programs.worldPaintBrushPreview(
+        commandEncoder,
+        state.gpu.device.queue,
+        state.mouse.pos[0],
+        canvas.height - state.mouse.pos[1],
+        state.mouse.pos[0],
+        canvas.height - state.mouse.pos[1],
+        state.params.brushRadius,
+        state.params.brushRadiance * 1024.0,
+        state.params.color,
+        canvas.width,
+        canvas.height
+      );
+
+
+
     }
 
     // Fill the probe atlas via ray casting

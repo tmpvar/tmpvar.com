@@ -6,7 +6,6 @@
 - radiance-cascades: fix demos such that branching factor does not affect spatial resolution. It should remain a 2x jump at every level.
 - radiance-cascades: march in mips
   https://discord.com/channels/318590007881236480/1142751596858593372/1152840549812944988
-- radiance-cascades: brush preview
 - radiance-cascades: add slider for level 0 ray count
 - radiance-cascades: cascade 0 doesn't absolutely start at 0
   https://discord.com/channels/318590007881236480/1142751596858593372/1152843885844901928
@@ -24,6 +23,7 @@
 
 
 ## 2023-09-16
+- radiance-cascades: brush preview
 - radiance-cascades: add clear button
 - radiance-cascades: add a toggle for 2^N rays vs 4^N rays and sample 4 upper rays when merging
 - radiance-cascades: make radiance a float and allow it to go past 1.0
