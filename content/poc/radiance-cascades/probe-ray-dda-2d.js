@@ -356,7 +356,7 @@
           let UpperRaysPerProbe = ubo.probeRayCount << ubo.branchingFactor;
           let UpperLevelRayIndex = (rayIndex << ubo.branchingFactor);
           let UpperLevelBufferOffset = ubo.maxLevel0Rays * (UpperLevel % 2);
-          let UpperProbeDiameter = 2 * (ubo.probeRadius << ubo.branchingFactor);
+          let UpperProbeDiameter = 2 * (ubo.probeRadius << 1);
           let UpperCascadeWidth = ubo.width / UpperProbeDiameter;
 
           let uv = (lowerProbeCenter/f32(UpperProbeDiameter)) / f32(UpperCascadeWidth);
@@ -412,7 +412,7 @@
           let ProbeRayIndex = RayIndex % ubo.probeRayCount;
 
           let ProbeRadius = f32(ubo.probeRadius);
-          let LowerProbeRadius = f32(ubo.probeRadius >> ubo.branchingFactor);
+          let LowerProbeRadius = f32(ubo.probeRadius >> 1);
 
           let IntervalRadius = f32(ubo.intervalRadius);
           let LowerIntervalRadius = f32(ubo.intervalRadius >> ubo.branchingFactor);
@@ -641,7 +641,7 @@
               if (d < f32(ubo.probeRadius) / probePixelDiameter * 0.5) {
                 return;
               }
-              if (d > f32(ubo.probeRadius << ubo.branchingFactor) / probePixelDiameter) {
+              if (d > f32(ubo.probeRadius << 1) / probePixelDiameter) {
                 return;
               }
 
@@ -1303,7 +1303,7 @@
 
       let pass = commandEncoder.beginComputePass()
       for (let level = levelCount; level >= 0; level--) {
-        let currentProbeDiameter = probeDiameter << (level * state.params.branchingFactor);
+        let currentProbeDiameter = probeDiameter << level;
         let currentProbeRayCount = state.params.probeRayCount << (level * state.params.branchingFactor);
         let intervalRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
 
