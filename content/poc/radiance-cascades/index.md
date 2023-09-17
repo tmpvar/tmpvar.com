@@ -866,32 +866,43 @@ click/drag to move the light
 
 <section id="probe-ray-dda-2d-controls">
 
-  <p>
-  2<sup>i</sup> spacing (level 0): <input type="range" min="1" max="9" value="1" name="i-slider">
+  <p class="probeRadius-control">
+    2<sup>i</sup> spacing (level 0): <input type="range" min="1" max="9" value="1">
+    <output></output>
   </p>
 
-  <p>
-  branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="level-branching-factor">
+  <p class="probeRayCount-control">
+    2<sup>r</sup> raycount (level 0): <input type="range" min="1" max="6" value="2">
+    <output></output>
   </p>
 
-  <p>
-  interval radius (level 0): <input type="range" min="0" max="1024" value="4" name="interval-radius-slider">
+  <p class="branchingFactor-control">
+    branching factor: <input type="range" min="1" max="3" value="2">
+    <output></output>
   </p>
 
-  <p>
-  max probe level: <input type="range" min="0" max="10" value="10" name="probe-level">
+  <p class="intervalRadius-control">
+    interval radius (level 0): <input type="range" min="0" max="1024" value="4">
+    <output></output>
+  </p>
+
+  <p class="maxProbeLevel-control">
+    max probe level: <input type="range" min="0" max="10" value="10">
+    <output></output>
   </p>
 
   <p>
   erase <input type="checkbox" value="1" name="brush-erase-mode" />
   </p>
 
-  <p>
-  brush radiance: <input type="range" min="0" max="20" value="1" step="0.1" name="brush-radiance-slider">
+  <p class="brushRadiance-control">
+    brush radiance: <input type="range" min="0" max="20" value="1" step="0.01">
+    <output></output>
   </p>
 
-  <p>
-  brush radius: <input type="range" min="2" max="100" value="5" name="brush-radius-slider">
+   <p class="brushRadius-control">
+    brush radius: <input type="range" min="2" max="100" value="5">
+    <output></output>
   </p>
 
   <p>
@@ -922,6 +933,7 @@ click/drag to move the light
   - if ray hits an emitter write store radiance in SSBO
   - if ray hits occluder write 0 into SSBO
   - if ray hits nothing (and level < max)
-    - fetch upper level by bilinear interpolation and store value in SSBO
+    - fetch upper level ray values per probe
+    - bilinear interpolate between these 4 values and store the result in SSBO
 - __irradiance__: compute irradiance per probe by accumulating the averaging the probe values stored in SSBO (e.g., average of all rays for the associated level 0 probe)
 

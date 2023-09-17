@@ -452,7 +452,6 @@
           //     vec4(vec3f(f32(ProbeRayIndex) / f32(ubo.probeRayCount)), 1.0)
           //   );
           // }
-
         }
       `
 
@@ -461,6 +460,7 @@
       })
 
       const bindGroupLayout = device.createBindGroupLayout({
+        label: 'ProbeAtlasRaycast - bindGroupLayout',
         entries: [
           {
             binding: 0,
@@ -500,6 +500,7 @@
       })
 
       const bindGroup = device.createBindGroup({
+        label: 'ProbeAtlasRaycast - bindGroup',
         layout: pipeline.getBindGroupLayout(0),
         entries: [
           {
@@ -739,7 +740,6 @@
         uboData[5] = branchingFactor
 
         queue.writeBuffer(ubo, 0, uboData)
-        // console.log('probeRayCount: %s cascadeWidth: %s', probeRayCount, cascadeWidth)
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup)
         computePass.dispatchWorkgroups(
@@ -949,9 +949,15 @@
     },
   }
 
-  const InitGPU = async (ctx) => {
+  const InitGPU = async (ctx, probeBufferByteSize) => {
     let adapter = await navigator.gpu.requestAdapter()
-    let device = await adapter.requestDevice()
+
+    let device = await adapter.requestDevice({
+      requiredLimits: {
+        maxStorageBufferBindingSize: probeBufferByteSize,
+        maxBufferSize: probeBufferByteSize,
+      }
+    })
 
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
@@ -988,24 +994,38 @@
     },
     dirty: true,
   }
-  state.gpu = await InitGPU(state.ctx)
 
   // Create the probe atlas
   {
     let minProbeDiameter = Math.pow(
       2,
-      parseFloat(document.querySelector('#probe-ray-dda-2d-controls input[name="i-slider"]').min)
+      parseFloat(document.querySelector('#probe-ray-dda-2d-controls .probeRadius-control input').min)
+    )
+    let maxProbeRays = Math.pow(
+      2,
+      parseFloat(document.querySelector('#probe-ray-dda-2d-controls .probeRayCount-control input').max)
     )
     let maxProbeCount = (canvas.width / minProbeDiameter) * (canvas.height / minProbeDiameter)
-    state.maxLevel0Rays = 4 * canvas.width * canvas.height;
+    state.maxLevel0Rays = maxProbeRays * maxProbeCount;
     const raySize = ([
       'r', 'g', 'b', 'a'
     ]).length * 4;
 
+    const probeBufferByteSize = state.maxLevel0Rays * raySize * 2
+
+    console.log({
+      minProbeDiameter,
+      maxProbeCount,
+      maxProbeRays,
+      maxLevel0Rays: state.maxLevel0Rays,
+      probeBufferByteSize
+    })
+    state.gpu = await InitGPU(state.ctx, probeBufferByteSize)
+
     state.probeBuffer = state.gpu.device.createBuffer({
       label: 'ProbeBuffer',
       // Note: we need to ping-pong so the buffer needs to be doubled in size
-      size: state.maxLevel0Rays * raySize * 2,
+      size: probeBufferByteSize,
       usage: GPUBufferUsage.STORAGE
     })
   }
@@ -1198,12 +1218,61 @@
     state.gpu.device.queue.submit([commandEncoder.finish()])
   }
 
-  const Param = (name, value) => {
+  const Param = (name, value, cb) => {
     if (state.params[name] != value) {
       state.params[name] = value;
+      if (cb) {
+        cb(value)
+      }
       return true;
     }
     return false;
+  }
+
+  const controlEl = document.getElementById('probe-ray-dda-2d-controls')
+  const AutoParam = (paramName, paramType, cb) => {
+    let selector = `.${paramName}-control`
+    let parentEl = controlEl.querySelector(selector)
+    let el = parentEl.querySelector('input')
+    if (!el) {
+      console.warn("could not locate '%s input'", selector)
+      return false
+    }
+
+    let value = 0;
+    switch (el.type) {
+      case 'checkbox': {
+        if (el.checked) {
+          value = el.value
+        }
+        break;
+      }
+      default: {
+        value = el.value;
+        break;
+      }
+    }
+
+    switch (paramType) {
+      case 'f32': {
+        value = parseFloat(value);
+        break;
+      }
+      case 'i32': {
+        value = parseFloat(value) | 0;
+      }
+    }
+
+    if (cb) {
+      value = cb(parentEl, value)
+    }
+
+    if (state.params[paramName] != value) {
+      state.params[paramName] = value;
+      return true;
+    }
+    return false;
+
   }
 
   const ColorParam = (name, value) => {
@@ -1223,44 +1292,84 @@
 
   const ReadParams = () => {
     const wasDirty = state.dirty;
-    const controlEl = document.getElementById('probe-ray-dda-2d-controls')
     // probe params
     {
-      state.dirty = state.dirty || Param(
-        'i',
-        parseFloat(controlEl.querySelector('input[name="i-slider"]').value)
+      state.dirty = state.dirty || AutoParam(
+        'probeRadius',
+        'i32',
+        (parentEl, value) => {
+          let newValue = Math.pow(2, value) * 0.5;
+          parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = ${newValue}`
+          return newValue
+        }
       )
 
-      state.dirty = state.dirty || Param(
+      state.dirty = state.dirty || AutoParam(
+        'probeRayCount',
+        'i32',
+        (parentEl, value) => {
+          let newValue = Math.pow(2, value)
+          parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = <span class="highlight-orange">${newValue}</span>`
+          return newValue
+        }
+      )
+
+      state.dirty = state.dirty || AutoParam(
         'branchingFactor',
-        parseFloat(controlEl.querySelector('input[name="level-branching-factor"]').value)
+        'i32',
+        (parentEl, value) => {
+          let probeRayCount = state.params.probeRayCount;
+          let displayValue = Math.pow(2, value)
+          let examples = ([0, 1, 2, 3]).map(level => {
+            let shifted = state.params.probeRayCount << (value * level)
+            let powed = probeRayCount * Math.pow(2, value * level)
+            return powed
+          })
+
+          parentEl.querySelector('output').innerHTML = `
+            2<sup class="highlight-blue">${value}</sup> = ${displayValue} (<span class="highlight-orange">${probeRayCount}</span> * 2<sup>(<span  class="highlight-blue">${value}</span> * level)</sup> = ${examples.join(', ')}, ...)
+          `
+          return value
+        }
       )
 
-      state.dirty = state.dirty || Param(
+      state.dirty = state.dirty || AutoParam(
         'intervalRadius',
-        parseFloat(controlEl.querySelector('input[name="interval-radius-slider"]').value)
+        'i32',
+        (parentEl, value) => {
+          parentEl.querySelector('output').innerHTML = `${value}`
+          return value
+        }
       )
 
-      state.params.probeRadius = Math.pow(2, state.params.i) * 0.5
-      state.params.probeRayCount = Math.max(4, Math.pow(2, state.params.i))
-
-      state.dirty = state.dirty || Param(
-        'probeLevel',
-        parseFloat(controlEl.querySelector('input[name="probe-level"]').value)
+      state.dirty = state.dirty || AutoParam(
+        'maxProbeLevel',
+        'i32',
+        (parentEl, value) => {
+          parentEl.querySelector('output').innerHTML = `${value}`
+          return value
+        }
       )
     }
 
     // brush params
     {
-
-      state.dirty = state.dirty || Param(
+      state.dirty = state.dirty || AutoParam(
         'brushRadiance',
-        parseFloat(controlEl.querySelector('input[name="brush-radiance-slider"]').value)
+        'f32',
+        (parentEl, value) => {
+          parentEl.querySelector('output').innerHTML = `${value}`
+          return value
+        }
       )
 
-      state.dirty = state.dirty || Param(
+      state.dirty = state.dirty || AutoParam(
         'brushRadius',
-        parseFloat(controlEl.querySelector('input[name="brush-radius-slider"]').value)
+        'f32',
+        (parentEl, value) => {
+          parentEl.querySelector('output').innerHTML = `${value}`
+          return value
+        }
       )
 
       state.dirty = state.dirty || ColorParam(
@@ -1284,7 +1393,7 @@
     }
 
     if (state.dirty && !wasDirty) {
-      console.log(JSON.stringify(state.params, 2, '  '))
+      // console.log(JSON.stringify(state.params, 2, '  '))
     }
   }
 
@@ -1322,8 +1431,8 @@
     // Paint the preview brush
     {
       commandEncoder.copyTextureToTexture(
-        { texture:  state.worldTexture },
-        { texture:  state.worldAndBrushPreviewTexture },
+        { texture: state.worldTexture },
+        { texture: state.worldAndBrushPreviewTexture },
         [
           canvas.width,
           canvas.height,
@@ -1348,10 +1457,10 @@
 
     // Fill the probe atlas via ray casting
     {
-      const probeDiameter = Math.pow(2, state.params.i)
+      const probeDiameter = state.params.probeRadius * 2.0
       const levelCount = Math.min(
         Math.round(Math.log(state.canvas.width / probeDiameter) / Math.log(Math.pow(2, state.params.branchingFactor))),
-        state.params.probeLevel
+        state.params.maxProbeLevel
       );
 
       let pass = commandEncoder.beginComputePass()
