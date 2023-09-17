@@ -1266,7 +1266,7 @@
     }
 
     if (state.dirty && !wasDirty) {
-      // console.log(JSON.stringify(state.params, 2, '  '))
+      console.log(JSON.stringify(state.params, 2, '  '))
     }
   }
 
