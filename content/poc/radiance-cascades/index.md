@@ -867,7 +867,7 @@ click/drag to move the light
 <section id="probe-ray-dda-2d-controls">
 
   <p>
-  2<sup>i</sup> spacing (level 0): <input type="range" min="1" max="9" value="3" name="i-slider">
+  2<sup>i</sup> spacing (level 0): <input type="range" min="1" max="9" value="1" name="i-slider">
   </p>
 
   <p>

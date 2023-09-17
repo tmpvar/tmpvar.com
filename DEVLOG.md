@@ -3,7 +3,7 @@
   - number of probes in cascade 0
   - number of directions per probe in cascade 0
   - interval range of cascade 0
-- radiance-cascades: add a toggle for 2^N rays vs 4^N rays and sample 4 upper rays when merging
+- radiance-cascades: fix demos such that branching factor does not affect spatial resolution. It should remain a 2x jump at every level.
 
 - poc: dual-marching-squares
 - article: generating marching cubes lookup tables
@@ -16,6 +16,7 @@
 
 
 ## 2023-09-16
+- radiance-cascades: add a toggle for 2^N rays vs 4^N rays and sample 4 upper rays when merging
 - radiance-cascades: make radiance a float and allow it to go past 1.0
 ## 2023-09-15
 - radiance-cascades: fix angle between next cascade - was offsetting the upper sample by the ray offset
