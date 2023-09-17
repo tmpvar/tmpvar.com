@@ -1339,8 +1339,8 @@
         state.mouse.pos[0],
         canvas.height - state.mouse.pos[1],
         state.params.brushRadius,
-        state.params.brushRadiance * 1024.0,
-        state.params.color,
+        state.params.erase ? 0 : state.params.brushRadiance * 1024.0,
+        state.params.erase ? 0 : state.params.color,
         canvas.width,
         canvas.height
       );
