@@ -65,7 +65,11 @@
           var value = textureLoad(worldTexture, worldSamplePos, 0);
           var color: vec4f;
           if (value.r != 0) {
-            color = unpack4x8unorm(value.r) * f32(value.g) / 1024.0;
+            if (value.g > 0) {
+              color = unpack4x8unorm(value.r) * f32(value.g) / 1024.0;
+            } else {
+              color = unpack4x8unorm(value.r);
+            }
           } else {
             let probeDiameter = ubo.probeRadius * 2;
             let irradianceSamplePos = pixelPos;//fragData.uv;// * f32(probeDiameter);
