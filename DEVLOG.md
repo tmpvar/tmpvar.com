@@ -4,6 +4,7 @@
   - number of directions per probe in cascade 0
   - interval range of cascade 0
 - radiance-cascades: fix demos such that branching factor does not affect spatial resolution. It should remain a 2x jump at every level.
+- radiance-cascades: add clear button
 
 - poc: dual-marching-squares
 - article: generating marching cubes lookup tables
