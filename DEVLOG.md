@@ -16,6 +16,7 @@
 
 
 ## 2023-09-16
+- radiance-cascades: make radiance a float and allow it to go past 1.0
 ## 2023-09-15
 - radiance-cascades: fix angle between next cascade - was offsetting the upper sample by the ray offset
 - radiance-cascades: make intervalRadius start where the previous one left off
