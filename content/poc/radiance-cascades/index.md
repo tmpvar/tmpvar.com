@@ -923,5 +923,5 @@ click/drag to move the light
   - if ray hits occluder write 0 into SSBO
   - if ray hits nothing (and level < max)
     - fetch upper level by bilinear interpolation and store value in SSBO
-- __irradiance__: compute irradiance per probe by accumulating the max over probe values stored in SSBO (e.g., component-wise max of all rays for the associated level 0 probe)
+- __irradiance__: compute irradiance per probe by accumulating the averaging the probe values stored in SSBO (e.g., average of all rays for the associated level 0 probe)
 

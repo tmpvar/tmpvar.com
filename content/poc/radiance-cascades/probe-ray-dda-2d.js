@@ -1344,9 +1344,6 @@
         canvas.width,
         canvas.height
       );
-
-
-
     }
 
     // Fill the probe atlas via ray casting
