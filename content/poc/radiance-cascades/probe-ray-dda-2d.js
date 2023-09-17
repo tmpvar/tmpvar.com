@@ -217,6 +217,8 @@
         label: "ProbeAtlasRaycast/ubo",
       })
 
+      const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
+
       const source =  /* wgsl */`
 
         const maxLevelRayCount : u32 = ${maxLevelRayCount};
@@ -398,12 +400,12 @@
         }
 
         @compute @workgroup_size(${workgroupSize.join(',')})
-        fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
-          if (id.x > ubo.totalRays) {
+        fn ComputeMain(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
+          let RayIndex = i32(GlobalInvocationID.x + GlobalInvocationID.y * ${workgroupSize[0]});
+          if (RayIndex > i32(ubo.totalRays)) {
             return;
           }
 
-          let RayIndex = i32(id.x);
           let ProbeIndex = RayIndex / ubo.probeRayCount;
           let ProbeRayIndex = RayIndex % ubo.probeRayCount;
 
@@ -556,12 +558,16 @@
 
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup, [byteOffset])
+        let totalWorkGroups = Math.floor(totalRays / workgroupSize[0] + 1)
+        let x = totalWorkGroups
+        let y = 1
 
-        computePass.dispatchWorkgroups(
-          Math.floor(totalRays / workgroupSize[0] + 1),
-          1,
-          1
-        )
+        if (x > maxWorkgroupsPerDimension) {
+          x = maxWorkgroupsPerDimension
+          y = Math.floor(totalWorkGroups / maxWorkgroupsPerDimension + 1)
+        }
+
+        computePass.dispatchWorkgroups(x, y, 1)
       }
     },
 
