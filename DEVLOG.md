@@ -9,16 +9,13 @@
 - article: hotcart & hotcart redux
 
 ## Pending
-- radiance-cascades: it could be helpful if you added all the standard controls
-  - number of probes in cascade 0
-  - number of directions per probe in cascade 0
-- radiance-cascades: march in mips
-  https://discord.com/channels/318590007881236480/1142751596858593372/1152840549812944988
-- radiance-cascades: add slider for level 0 ray count
-- radiance-cascades: cascade 0 doesn't absolutely start at 0
-  https://discord.com/channels/318590007881236480/1142751596858593372/1152843885844901928
+- radiance-cascades: add slider for level 0 ray count e.g., the number of directions
 - radiance-cascades: add the actual values of the sliders
 - radiance-cascades: performance timers
+- radiance-cascades: march in mips
+  https://discord.com/channels/318590007881236480/1142751596858593372/1152840549812944988
+- radiance-cascades: cascade 0 doesn't absolutely start at 0
+  https://discord.com/channels/318590007881236480/1142751596858593372/1152843885844901928
 - radiance-cascades: raytrace approach for comparison's sake
 
 
