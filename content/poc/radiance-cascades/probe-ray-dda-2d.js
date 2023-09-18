@@ -85,6 +85,7 @@
       })
 
       const bindGroupLayout = device.createBindGroupLayout({
+        label: "DebugWorldBlit-BindGroupLayout",
         entries: [
           {
             binding: 0,
@@ -111,6 +112,7 @@
       })
 
       const pipeline = device.createRenderPipeline({
+        label: "DebugWorldBlit-Pipeline",
         vertex: {
           module: shaderModule,
           entryPoint: 'VertexMain',
@@ -133,6 +135,7 @@
       })
 
       const bindGroup = device.createBindGroup({
+        label: "DebugWorldBlit-BindGroup",
         layout: pipeline.getBindGroupLayout(0),
         entries: [
           {
@@ -462,7 +465,7 @@
       })
 
       const bindGroupLayout = device.createBindGroupLayout({
-        label: 'ProbeAtlasRaycast - bindGroupLayout',
+        label: 'ProbeAtlasRaycast - BindGroupLayout',
         entries: [
           {
             binding: 0,
@@ -490,6 +493,7 @@
       })
 
       const pipeline = device.createComputePipeline({
+        label: 'ProbeAtlasRaycast - ComputePipeline',
         compute: {
           module: shaderModule,
           entryPoint: 'ComputeMain',
@@ -502,7 +506,7 @@
       })
 
       const bindGroup = device.createBindGroup({
-        label: 'ProbeAtlasRaycast - bindGroup',
+        label: 'ProbeAtlasRaycast - BindGroup',
         layout: pipeline.getBindGroupLayout(0),
         entries: [
           {
@@ -667,6 +671,7 @@
       })
 
       const bindGroupLayout = device.createBindGroupLayout({
+        label: 'BuildIrradianceTeture - BindGroupLayout',
         entries: [
           {
             binding: 0,
@@ -693,6 +698,7 @@
       })
 
       const pipeline = device.createComputePipeline({
+        label: 'BuildIrradianceTeture - Pipeline',
         compute: {
           module: shaderModule,
           entryPoint: 'ComputeMain',
@@ -705,6 +711,7 @@
       })
 
       const bindGroup = device.createBindGroup({
+        label: 'BuildIrradianceTeture - BindGroup',
         layout: pipeline.getBindGroupLayout(0),
         entries: [
           {
@@ -771,6 +778,7 @@
       })
 
       const bindGroupLayout = device.createBindGroupLayout({
+        label: 'WorldClear - BindGroupLayout',
         entries: [
           {
             binding: 0,
@@ -783,6 +791,7 @@
       })
 
       const pipeline = device.createComputePipeline({
+        label: 'WorldClear - ComputePipeline',
         compute: {
           module: shaderModule,
           entryPoint: 'ComputeMain',
@@ -795,6 +804,7 @@
       })
 
       const bindGroup = device.createBindGroup({
+        label: 'WorldClear - BindGroup',
         layout: pipeline.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: texture.createView() }
@@ -873,10 +883,12 @@
       `
 
       const shaderModule = device.createShaderModule({
+        label: 'WorldPaint - ShaderModule',
         code: source
       })
 
       const bindGroupLayout = device.createBindGroupLayout({
+        label: 'WorldPaint - BindGroupLayout',
         entries: [
           {
             binding: 0,
@@ -894,6 +906,7 @@
       })
 
       const pipeline = device.createComputePipeline({
+        label: 'WorldPaint - ComputePipeline',
         compute: {
           module: shaderModule,
           entryPoint: 'ComputeMain',
@@ -906,9 +919,17 @@
       })
 
       const bindGroup = device.createBindGroup({
+        label: 'WorldPaint - BindGroup',
         layout: pipeline.getBindGroupLayout(0),
         entries: [
-          { binding: 0, resource: texture.createView() },
+          {
+            binding: 0,
+            // This needs to handle WorldTexture and worldAndBrushPreviewTexture
+            resource: texture.createView({
+              baseMipLevel: 0,
+              mipLevelCount: 1,
+            })
+          },
           {
             binding: 1, resource: {
               buffer: ubo
@@ -1173,7 +1194,7 @@
     })
   }
 
-  // Create the world texture
+  // Create the world texture w/ included brush preview
   {
     state.worldAndBrushPreviewTexture = state.gpu.device.createTexture({
       size: [canvas.width, canvas.height, 1],
@@ -1185,7 +1206,8 @@
         GPUTextureUsage.STORAGE_BINDING |
         GPUTextureUsage.COPY_DST
       ),
-      label: 'WorldAndBrushPreviewTexture'
+      label: 'WorldAndBrushPreviewTexture',
+      mipLevelCount: Math.log2(canvas.width)
     })
   }
 
