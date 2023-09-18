@@ -484,6 +484,7 @@ async function ProbeRayDDA2DBegin() {
       `
 
       const shaderModule = device.createShaderModule({
+        label: 'ProbeAtlasRaycast - ShaderModule',
         code: source
       })
 
@@ -547,7 +548,9 @@ async function ProbeRayDDA2DBegin() {
           },
           {
             binding: 2,
-            resource: worldTexture.createView()
+            resource: worldTexture.createView({
+              label: 'ProbeAtlasRaycast - BindGroup - WorldTexture view'
+            })
           },
         ]
       })
@@ -1666,6 +1669,13 @@ Example on Windows:
       )
 
       state.dirty = state.dirty || AutoParam(
+        'debugDisbleBrushPreview',
+        'bool',
+        (parentEl, value) => {
+          return value
+        }
+      )
+      state.dirty = state.dirty || AutoParam(
         'debugPerformance',
         'bool',
         (parentEl, value) => {
@@ -1735,19 +1745,21 @@ Example on Windows:
             ]
           );
 
-          state.gpu.programs.worldPaintBrushPreview(
-            commandEncoder,
-            state.gpu.device.queue,
-            state.mouse.pos[0],
-            canvas.height - state.mouse.pos[1],
-            state.mouse.pos[0],
-            canvas.height - state.mouse.pos[1],
-            state.params.brushRadius,
-            state.params.erase ? 0 : state.params.brushRadiance * 1024.0,
-            state.params.erase ? 0 : state.params.color,
-            canvas.width,
-            canvas.height
-          );
+          if (!state.params.debugDisbleBrushPreview) {
+            state.gpu.programs.worldPaintBrushPreview(
+              commandEncoder,
+              state.gpu.device.queue,
+              state.mouse.pos[0],
+              canvas.height - state.mouse.pos[1],
+              state.mouse.pos[0],
+              canvas.height - state.mouse.pos[1],
+              state.params.brushRadius,
+              state.params.erase ? 0 : state.params.brushRadiance * 1024.0,
+              state.params.erase ? 0 : state.params.color,
+              canvas.width,
+              canvas.height
+            );
+          }
         }
       )
     }

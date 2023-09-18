@@ -889,6 +889,10 @@ click/drag to move the light
     render probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" />
   </p>
 
+  <p class="debugDisbleBrushPreview-control">
+    disable brush preview <input type="checkbox" value="1" checked />
+  </p>
+
   <p class="debugPerformance-control">
     run continuously and collect performance stats <input type="checkbox" value="1" />
     <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
