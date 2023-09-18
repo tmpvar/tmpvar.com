@@ -935,7 +935,7 @@ click/drag to move the light
   erase <input type="checkbox" value="1" name="brush-erase-mode" />
   </p>
 
-  <p class="brushOpacity-control">
+  <p class="brushOpacity-control" style="display:none">
     brush opacity: <input type="range" min="0" max="255" value="255" step="1">
     <output></output>
   </p>

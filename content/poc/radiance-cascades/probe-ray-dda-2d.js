@@ -340,7 +340,7 @@ async function ProbeRayDDA2DBegin() {
 
               result = vec4f(
                 (result.rgb * aa + unpacked.rgb * radianceMultiplier * ab * (1.0 - aa)) / a0,
-                result.a - transparency
+                result.a * transparency
               );
 
               if (result.a <= 0.0) {
