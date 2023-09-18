@@ -867,6 +867,24 @@ click/drag to move the light
 <section id="probe-ray-dda-2d-controls">
   <h4>Debug/Development</h4>
   <div class="indent">
+
+  <p class="debugWorldMipmapLevelRender-control">
+  render world mip level
+  <select>
+    <option value="-1">none</option>
+    <option value="0">0</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5">5</option>
+    <option value="6">6</option>
+    <option value="7">7</option>
+    <option value="8">8</option>
+    <option value="9">9</option>
+  </select>
+  </p>
+
   <p>
     render probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" />
   </p>
@@ -875,7 +893,6 @@ click/drag to move the light
     run continuously and collect performance stats <input type="checkbox" value="1" />
     <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
   </p>
-
   </div>
 
 

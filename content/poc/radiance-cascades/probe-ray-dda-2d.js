@@ -6,8 +6,7 @@
         "width",
         "height",
         "probeRadius",
-        "probeRayCount",
-        "probeInterpolation",
+        "debugRenderWorldMipLevel"
       ]
 
       const uboData = new Uint32Array(uboFields.length)
@@ -28,7 +27,10 @@
           height: u32,
 
           // Probes
-          probeRadius: i32
+          probeRadius: i32,
+
+          // Debug
+          debugRenderWorldMipLevel: i32,
         };
 
         @vertex
@@ -60,6 +62,25 @@
             fragData.uv.x * f32(ubo.width) / scale,
             fragData.uv.y * f32(ubo.height) / scale
           );
+
+
+          if (ubo.debugRenderWorldMipLevel > -1) {
+
+            var samplePos = vec2<i32>(
+              i32(pixelPos.x) >> u32(ubo.debugRenderWorldMipLevel),
+              i32(pixelPos.y) >> u32(ubo.debugRenderWorldMipLevel)
+            );
+
+            var packedColor = textureLoad(worldTexture, samplePos, ubo.debugRenderWorldMipLevel).r;
+            var color = unpack4x8unorm(packedColor);
+
+            return vec4f(
+              color.rgb,
+              1.0
+            );
+          }
+
+
 
           var worldSamplePos: vec2<u32> = vec2<u32>(pixelPos);
           var value = textureLoad(worldTexture, worldSamplePos, 0);
@@ -161,6 +182,7 @@
         width,
         height,
         probeRadius,
+        debugWorldMipmapLevelRender
       ) {
 
         // update uniform buffer
@@ -168,6 +190,8 @@
         uboData[1] = height
         // Probes
         uboData[2] = probeRadius
+        // Debug
+        uboData[3] = debugWorldMipmapLevelRender
         queue.writeBuffer(ubo, 0, uboData)
 
         // Note: apparently mapping the staging buffer can take multiple frames?
@@ -975,9 +999,10 @@
       }
     },
 
-    GenerateMipmapsBoxFilter(device, texture, workgroupSize, kernelDiameter) {
-      const kernelRadius = Math.floor(kernelDiameter / 2);
-      const kernelDivisor = 1.0 / (kernelRadius * kernelRadius * 2)
+    GenerateMipmapsBoxFilter(device, texture, workgroupSize, kernelRadius) {
+      const kernelDiameter = kernelRadius * 2
+      const kernelDivisor = 1.0 / (kernelDiameter * kernelDiameter)
+
       const source =  /* wgsl */`
         @group(0) @binding(0) var src: texture_2d<u32>;
         @group(0) @binding(1) var dst: texture_storage_2d<rg32uint, write>;
@@ -986,18 +1011,19 @@
 
           var color: vec4f = vec4f(0.0);
           var multiplier: f32 = 0.0;
-          let PixelPos = vec2<i32>(id.xy);
-          for (var x: i32 = -${kernelRadius}; x<=${kernelRadius}; x++) {
-            for (var y: i32 = -${kernelRadius}; y<=${kernelRadius}; y++) {
-              let offset = vec2<i32>(x, y);
-              var sample = textureLoad(src, PixelPos + offset, 0).rg;
-              color += unpack4x8unorm(sample.r);
-              multiplier += f32(sample.g) / 1024.0;
+          if (true) {
+            let PixelPos = vec2<i32>(id.xy) * 2 + 1;
+            for (var y: i32 = -${kernelRadius}; y<${kernelRadius}; y++) {
+              for (var x: i32 = -${kernelRadius}; x<${kernelRadius}; x++) {
+                let offset = vec2<i32>(x, y);
+                var sample = textureLoad(src, PixelPos + offset, 0).rg;
+                color += unpack4x8unorm(sample.r);
+                multiplier += f32(sample.g) / 1024.0;
+              }
             }
+            color *= ${kernelDivisor};
+            multiplier *= ${kernelDivisor};
           }
-
-          color *= ${kernelDivisor};
-          multiplier *= ${kernelDivisor};
 
           textureStore(dst, id.xy, vec4<u32>(
             pack4x8unorm(color),
@@ -1388,7 +1414,7 @@
         state.gpu.device,
         state.worldAndBrushPreviewTexture,
         [16, 16, 1],
-        3
+        1
       ),
     }
   }
@@ -1430,7 +1456,7 @@
       canvas.width * 0.5,
       canvas.height * 0.5,
       0xFFFFFFFF,
-      1024 * 2,
+      1024,
       30
     );
 
@@ -1452,7 +1478,7 @@
   const AutoParam = (paramName, paramType, cb) => {
     let selector = `.${paramName}-control`
     let parentEl = controlEl.querySelector(selector)
-    let el = parentEl.querySelector('input')
+    let el = parentEl.querySelector(['input', 'select'])
     if (!el) {
       console.warn("could not locate '%s input'", selector)
       return false
@@ -1630,18 +1656,14 @@ Example on Windows:
 
     // debug params
     {
+      state.dirty = state.dirty || AutoParam(
+        'debugWorldMipmapLevelRender',
+        'i32'
+      )
+
       state.dirty = state.dirty || Param(
         'debugProbeDirections',
         !!controlEl.querySelector('input[name="debug-probe-directions-mode"]').checked
-      )
-
-      state.dirty = state.dirty || AutoParam(
-        'brushRadius',
-        'f32',
-        (parentEl, value) => {
-          parentEl.querySelector('output').innerHTML = `${value}`
-          return value
-        }
       )
 
       state.dirty = state.dirty || AutoParam(
@@ -1810,7 +1832,8 @@ Example on Windows:
             state.ctx,
             canvas.width,
             canvas.height,
-            probeRadius
+            probeRadius,
+            state.params.debugWorldMipmapLevelRender
           )
         }
       )
@@ -1854,7 +1877,7 @@ Example on Windows:
         console.log(`${entry.label} ${ms.toFixed(2)}ms`)
       })
       console.log("total %sms", totalMs.toFixed(2))
-
+      console.log("\n\n");
     }
 
     window.requestAnimationFrame(RenderFrame)
