@@ -974,6 +974,123 @@
 
       }
     },
+
+    GenerateMipmapsBoxFilter(device, texture, workgroupSize, kernelDiameter) {
+      const kernelRadius = Math.floor(kernelDiameter / 2);
+      const kernelDivisor = 1.0 / (kernelRadius * kernelRadius * 2)
+      const source =  /* wgsl */`
+        @group(0) @binding(0) var src: texture_2d<u32>;
+        @group(0) @binding(1) var dst: texture_storage_2d<rg32uint, write>;
+        @compute @workgroup_size(${workgroupSize.join(',')})
+        fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
+
+          var color: vec4f = vec4f(0.0);
+          var multiplier: f32 = 0.0;
+          let PixelPos = vec2<i32>(id.xy);
+          for (var x: i32 = -${kernelRadius}; x<=${kernelRadius}; x++) {
+            for (var y: i32 = -${kernelRadius}; y<=${kernelRadius}; y++) {
+              let offset = vec2<i32>(x, y);
+              var sample = textureLoad(src, PixelPos + offset, 0).rg;
+              color += unpack4x8unorm(sample.r);
+              multiplier += f32(sample.g) / 1024.0;
+            }
+          }
+
+          color *= ${kernelDivisor};
+          multiplier *= ${kernelDivisor};
+
+          textureStore(dst, id.xy, vec4<u32>(
+            pack4x8unorm(color),
+            u32(multiplier * 1024),
+            0,
+            0
+          ));
+        }
+      `
+
+      const shaderModule = device.createShaderModule({
+        label: 'GenerateMipmapsBoxFilter - ShaderModule',
+        code: source
+      })
+
+      const bindGroupLayout = device.createBindGroupLayout({
+        label: 'GenerateMipmapsBoxFilter - BindGroupLayout',
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+
+            texture: {
+              format: "rg32uint",
+              sampleType: 'uint',
+            },
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            storageTexture: {
+              format: "rg32uint",
+            },
+          }
+        ]
+      })
+
+      const pipeline = device.createComputePipeline({
+        label: 'GenerateMipmapsBoxFilter - ComputePipeline',
+        compute: {
+          module: shaderModule,
+          entryPoint: 'ComputeMain',
+        },
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout
+          ]
+        }),
+      })
+
+      let levelTextureViews = []
+      for (var level = 0; level < texture.mipLevelCount; level++) {
+        let view = texture.createView({
+          label: `GenerateMipmapsBoxFilter/${texture.label}/view @ mip(${level})`,
+          baseMipLevel: level,
+          mipLevelCount: 1
+        })
+        levelTextureViews.push(view)
+      }
+
+      let levelBindGroups = [null]
+      for (var level = 1; level < texture.mipLevelCount; level++) {
+        const bindGroup = device.createBindGroup({
+          label: `GenerateMipmapsBoxFilter - BindGroup @ mip(${level})`,
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: levelTextureViews[level - 1] },
+            { binding: 1, resource: levelTextureViews[level] }
+          ]
+        })
+
+        levelBindGroups.push(bindGroup);
+      }
+
+      return function GenerateMipmapsBoxFilter(commandEncoder, width, height) {
+        for (var level = 1; level < texture.mipLevelCount; level++) {
+          GPUTimedBlock(
+            commandEncoder,
+            `ProbeAtlasRaycast level(${level})`, () => {
+              let computePass = commandEncoder.beginComputePass();
+              computePass.setPipeline(pipeline)
+              computePass.setBindGroup(0, levelBindGroups[level])
+              computePass.dispatchWorkgroups(
+                Math.floor((width >> level) / workgroupSize[0] + 1),
+                Math.floor((height >> level) / workgroupSize[1] + 1),
+                1
+              )
+              computePass.end()
+            }
+          )
+        }
+      }
+    },
   }
 
   const InitGPU = async (ctx, probeBufferByteSize) => {
@@ -1265,6 +1382,13 @@
         state.gpu.device,
         state.worldAndBrushPreviewTexture,
         [WorldPaintWorkgroupSize, WorldPaintWorkgroupSize, 1]
+      ),
+
+      generateWorldMips: shaders.GenerateMipmapsBoxFilter(
+        state.gpu.device,
+        state.worldAndBrushPreviewTexture,
+        [16, 16, 1],
+        3
       ),
     }
   }
@@ -1604,6 +1728,15 @@ Example on Windows:
             canvas.height
           );
         }
+      )
+    }
+
+    // Generate mipmaps
+    {
+      state.gpu.programs.generateWorldMips(
+        commandEncoder,
+        canvas.width,
+        canvas.height
       )
     }
 
