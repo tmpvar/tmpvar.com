@@ -890,7 +890,7 @@ click/drag to move the light
   </p>
 
   <p class="debugDisbleBrushPreview-control">
-    disable brush preview <input type="checkbox" value="1" checked />
+    disable brush preview <input type="checkbox" value="1" />
   </p>
 
   <p class="debugPerformance-control">
