@@ -1882,7 +1882,15 @@ Example on Windows:
     window.requestAnimationFrame(RenderFrame)
   }
 
-  RenderFrame()
+  window.requestAnimationFrame(RenderFrame)
 }
 
-window.addEventListener("load", ProbeRayDDA2DBegin);
+if (document.readyState != 'complete') {
+  document.addEventListener("readystatechange", e => {
+    if (document.readyState == 'complete') {
+      ProbeRayDDA2DBegin();
+    }
+  })
+} else {
+  ProbeRayDDA2DBegin();
+}
