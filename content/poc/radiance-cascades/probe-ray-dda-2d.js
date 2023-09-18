@@ -1632,7 +1632,8 @@ Example on Windows:
         'f32',
         (parentEl, value) => {
           parentEl.querySelector('output').innerHTML = `${value}`
-          return value
+          // 0..1024 maps to 0..1, but it is stored in a u32
+          return value * 1024.0
         }
       )
 
@@ -1718,8 +1719,7 @@ Example on Windows:
             state.mouse.pos[0],
             canvas.height - state.mouse.pos[1],
             state.params.brushRadius,
-            // 0..1024 maps to 0..1, but it is stored in a u32
-            state.params.brushRadiance * 1024.0,
+            state.params.erase ? 0 : state.params.brushRadiance,
             state.params.erase ? 0 : state.params.color,
             canvas.width,
             canvas.height
@@ -1754,7 +1754,7 @@ Example on Windows:
               state.mouse.pos[0],
               canvas.height - state.mouse.pos[1],
               state.params.brushRadius,
-              state.params.erase ? 0 : state.params.brushRadiance * 1024.0,
+              state.params.erase ? 0 : state.params.brushRadiance,
               state.params.erase ? 0 : state.params.color,
               canvas.width,
               canvas.height
