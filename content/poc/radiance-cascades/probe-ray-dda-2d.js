@@ -306,18 +306,11 @@ async function ProbeRayDDA2DBegin() {
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
         @group(0) @binding(2) var worldTexture: texture_2d<u32>;
 
-        struct RayMarchResult {
-          color: vec4f,
-          hit: bool,
-        };
-
-        fn RayMarch(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> RayMarchResult {
+        fn RayMarch(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
           // return vec4(rayDirection * 0.5 + 0.5, 0.0, 1.0);
           var cursor = DDACursorInit(rayOrigin, rayDirection);
-          // a=hit something
-          var result: RayMarchResult;
-          result.color = vec4f(0.0, 0.0, 0.0, 0.0);
-          result.hit = false;
+          // a=transparency
+          var result = vec4f(0.0, 0.0, 0.0, 1.0);
 
           while(true) {
             if (distance(cursor.mapPos, probeCenter) > maxDistance) {
@@ -335,9 +328,24 @@ async function ProbeRayDDA2DBegin() {
 
             var value = textureLoad(worldTexture, vec2<i32>(cursor.mapPos), 0).rg;
             if (value.r != 0) {
-              result.hit = true;
-              result.color = unpack4x8unorm(value.r) * f32(value.g) / 1024.0;
-              break;
+              let unpacked = unpack4x8unorm(value.r);
+
+              // convert alpha/opacity to transparency
+              let transparency = 1.0 - unpacked.a;
+              let radianceMultiplier = f32(value.g) / 1024.0;
+
+              let aa = 1.0 - result.a;
+              let ab = unpacked.a;
+              let a0 = aa + ab * (1.0 - aa);
+
+              result = vec4f(
+                result.rgb * aa + unpacked.rgb * radianceMultiplier * ab * (1.0 - aa),
+                result.a * transparency
+              );
+
+              if (result.a <= 0.0) {
+                break;
+              }
             }
 
             // Step the ray
@@ -352,9 +360,8 @@ async function ProbeRayDDA2DBegin() {
         }
 
         fn SampleUpperProbe(pos: vec2<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> vec4f {
-          var result: RayMarchResult;
           if (pos.x < 0 || pos.y < 0 || pos.x >= cascadeWidth || pos.y >= cascadeWidth) {
-            return vec4f(0.0);
+            return vec4f(0.0, 0.0, 0.0, 1.0);
           }
 
           let index = raysPerProbe * pos.x + pos.y * cascadeWidth * raysPerProbe;
@@ -374,7 +381,7 @@ async function ProbeRayDDA2DBegin() {
           let UpperLevel = ubo.level + 1;
 
           if (UpperLevel >= ubo.levelCount) {
-            return vec4f(0.0);
+            return vec4f(0.0, 0.0, 0.0, 1.0);
           }
 
           let UpperRaysPerProbe = ubo.probeRayCount << ubo.branchingFactor;
@@ -416,7 +423,6 @@ async function ProbeRayDDA2DBegin() {
             ),
           );
 
-          var ret: RayMarchResult;
           let factor = fract(index);
           let invFactor = 1.0 - factor;
 
@@ -459,18 +465,19 @@ async function ProbeRayDDA2DBegin() {
           );
 
           let OutputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
-          var Result = RayMarch(
+          let LowerResult = RayMarch(
             RayOrigin,
             RayOrigin + RayDirection * LowerIntervalRadius,
             RayDirection,
             IntervalRadius
           );
 
-          if (!Result.hit) {
-            probes[OutputIndex] = SampleUpperProbes(RayOrigin, ProbeRayIndex);
-          } else {
-            probes[OutputIndex] = Result.color;
-          }
+          let UpperResult = SampleUpperProbes(RayOrigin, ProbeRayIndex);
+
+          probes[OutputIndex] = vec4f(
+            LowerResult.rgb + LowerResult.a * UpperResult.rgb,
+            LowerResult.a * UpperResult.a
+          );
 
           // color based on the angle
           // {
@@ -1645,11 +1652,21 @@ Example on Windows:
           return value
         }
       )
+      state.dirty = state.dirty || AutoParam(
+        'brushOpacity',
+        'i32',
+        (parentEl, value) => {
+          parentEl.querySelector('output').innerHTML = `${(value / 255).toFixed(2)}`
+          return value
+        }
+      )
 
       state.dirty = state.dirty || ColorParam(
         'color',
         controlEl.querySelector('input[name="brush-color-selector"]').value
       )
+
+      state.params.color = (state.params.color & 0x00FFFFFF) | ((state.params.brushOpacity & 0xFF) << 24)
 
       state.dirty = state.dirty || Param(
         'erase',
