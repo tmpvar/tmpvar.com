@@ -1,5 +1,4 @@
-(async function () {
-
+async function ProbeRayDDA2DBegin() {
   const shaders = {
     DebugWorldBlit(device, presentationFormat, worldTexture, irradianceTexture) {
       const uboFields = [
@@ -1884,4 +1883,6 @@ Example on Windows:
   }
 
   RenderFrame()
-})()
+}
+
+window.addEventListener("load", ProbeRayDDA2DBegin);
