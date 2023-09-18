@@ -1076,7 +1076,7 @@
         for (var level = 1; level < texture.mipLevelCount; level++) {
           GPUTimedBlock(
             commandEncoder,
-            `ProbeAtlasRaycast level(${level})`, () => {
+            `GenerateMipmapsBoxFilter level(${level})`, () => {
               let computePass = commandEncoder.beginComputePass();
               computePass.setPipeline(pipeline)
               computePass.setBindGroup(0, levelBindGroups[level])
@@ -1134,7 +1134,7 @@
     gpu.timestampQueryCount = 0;
 
     if (hasTimestampQueryFeature) {
-      gpu.timestampQuerySetCapacity = 1 << 5;
+      gpu.timestampQuerySetCapacity = 1 << 6;
       gpu.timestampQuerySet = device.createQuerySet({
         type: "timestamp",
         count: gpu.timestampQuerySetCapacity,
@@ -1771,7 +1771,8 @@ Example on Windows:
               state.params.branchingFactor
             );
             pass.end()
-          })
+          }
+        )
       }
 
     }
