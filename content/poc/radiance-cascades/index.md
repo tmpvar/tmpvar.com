@@ -865,7 +865,22 @@ click/drag to move the light
 ### Probe Ray DDA (2D)
 
 <section id="probe-ray-dda-2d-controls">
+  <h4>Debug/Development</h4>
+  <div class="indent">
+  <p>
+    render probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" />
+  </p>
 
+  <p class="debugPerformance-control">
+    run continuously and collect performance stats <input type="checkbox" value="1" />
+    <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
+  </p>
+
+  </div>
+
+
+  <h4>Radiance Cascade Parameters</h4>
+  <div class="indent">
   <p class="probeRadius-control">
     2<sup>i</sup> spacing (level 0): <input type="range" min="1" max="9" value="1">
     <output></output>
@@ -890,6 +905,10 @@ click/drag to move the light
     max probe level: <input type="range" min="0" max="10" value="10">
     <output></output>
   </p>
+  </div>
+
+  <h4>Brush Parameters</h4>
+  <div class="indent">
 
   <p>
   erase <input type="checkbox" value="1" name="brush-erase-mode" />
@@ -910,12 +929,9 @@ click/drag to move the light
   </p>
 
   <p>
-  debug probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" />
-  </p>
-
-  <p>
     <button name="clear-button">Clear</button>
   </p>
+  </div>
 </section>
 
 

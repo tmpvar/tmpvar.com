@@ -9,7 +9,6 @@
 - article: hotcart & hotcart redux
 
 ## Pending
-- radiance-cascades: performance timers
 - radiance-cascades: march in mips
   https://discord.com/channels/318590007881236480/1142751596858593372/1152840549812944988
 - radiance-cascades: cascade 0 doesn't absolutely start at 0
@@ -19,6 +18,7 @@
 
 
 ## 2023-09-17
+- radiance-cascades: performance timers + option to run continuously
 - radiance-cascades: add slider for level 0 ray count e.g., the number of directions
 - radiance-cascades: add the actual values of the sliders
 ## 2023-09-16

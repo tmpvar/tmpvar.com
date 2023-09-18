@@ -956,14 +956,26 @@
   }
 
   const InitGPU = async (ctx, probeBufferByteSize) => {
-    let adapter = await navigator.gpu.requestAdapter()
+    let adapter = await navigator.gpu.requestAdapter({
+      powerPreference: 'high-performance'
+    })
 
+    let requiredFeatures = []
+
+    let hasTimestampQueryFeature = adapter.features.has('timestamp-query')
+    if (hasTimestampQueryFeature) {
+      requiredFeatures.push('timestamp-query');
+    }
+
+    window.adapter = adapter
     let device = await adapter.requestDevice({
+      requiredFeatures,
       requiredLimits: {
         maxStorageBufferBindingSize: probeBufferByteSize,
         maxBufferSize: probeBufferByteSize,
       }
     })
+
 
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
@@ -974,11 +986,51 @@
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
     });
 
-    return {
+    let gpu = {
       adapter,
       device,
       presentationFormat,
     }
+
+    gpu.timestampQueries = []
+    gpu.timestampQueryCount = 0;
+
+    if (hasTimestampQueryFeature) {
+      gpu.timestampQuerySetCapacity = 1 << 5;
+      gpu.timestampQuerySet = device.createQuerySet({
+        type: "timestamp",
+        count: gpu.timestampQuerySetCapacity,
+      });
+
+      gpu.hasTimestampQueryFeature = true
+      gpu.timestampQueryBufferSizeInBytes = gpu.timestampQuerySetCapacity * 8
+
+      gpu.timestampMappableBuffer = gpu.device.createBuffer({
+        label: 'TimstampMappableBuffer',
+        size: gpu.timestampQueryBufferSizeInBytes,
+        usage: (
+          GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+        )
+      })
+
+      gpu.timestampResultBuffer = gpu.device.createBuffer({
+        label: 'TimestampResultBuffer',
+        size: gpu.timestampQueryBufferSizeInBytes,
+        usage: (
+          GPUBufferUsage.QUERY_RESOLVE |
+          GPUBufferUsage.COPY_SRC |
+          GPUBufferUsage.COPY_DST |
+          GPUBufferUsage.STORAGE
+        )
+      })
+
+
+
+    } else {
+      gpu.hasTimestampQueryFeature = false
+    }
+
+    return gpu
   }
 
   let canvas = document.getElementById('probe-ray-dda-2d-canvas');
@@ -997,8 +1049,31 @@
       brushRadius: 16,
       probeRadius: 4,
       probeRayCount: 2,
+      debugPerformance: false
     },
     dirty: true,
+  }
+
+  function GPUResetTimers() {
+    if (!state.gpu.hasTimestampQueryFeature) {
+      return;
+    }
+
+    state.gpu.timestampQueryCount = 0;
+    state.gpu.timestampQueries.length = 0;
+  }
+
+  function GPUTimedBlock(encoder, label, fn) {
+    if (state.gpu.hasTimestampQueryFeature && state.params.debugPerformance) {
+      const startIndex = state.gpu.timestampQueryCount++
+      encoder.writeTimestamp(state.gpu.timestampQuerySet, startIndex)
+      fn && fn()
+      const endIndex = state.gpu.timestampQueryCount++
+      encoder.writeTimestamp(state.gpu.timestampQuerySet, endIndex)
+      state.gpu.timestampQueries.push({ label, startIndex, endIndex })
+    } else {
+      fn && fn()
+    }
   }
 
   // Create the probe atlas
@@ -1019,13 +1094,6 @@
 
     const probeBufferByteSize = state.maxLevel0Rays * raySize * 2
 
-    console.log({
-      minProbeDiameter,
-      maxProbeCount,
-      maxProbeRays,
-      maxLevel0Rays: state.maxLevel0Rays,
-      probeBufferByteSize
-    })
     state.gpu = await InitGPU(state.ctx, probeBufferByteSize)
 
     state.probeBuffer = state.gpu.device.createBuffer({
@@ -1035,7 +1103,6 @@
       usage: GPUBufferUsage.STORAGE
     })
   }
-
 
   // Wire up mouse
   {
@@ -1296,6 +1363,32 @@
     WorldTextureClear();
   })
 
+  // disable some controls based on detected webgpu features
+  {
+    // debug performance control
+    if (!state.gpu.hasTimestampQueryFeature) {
+
+
+      console.warn(`
+No "timestamp-query" support, you should use Chrome Canary and launch with the following flag:
+  --enable-dawn-features=allow_unsafe_apis
+
+Example on Windows:
+  "%LOCALAPPDATA%\\Google\\Chrome SxS\\Application\\chrome.exe" --enable-dawn-features=allow_unsafe_apis
+      `)
+
+
+      controlEl.querySelector('.debugPerformance-control').className += " error-border"
+
+      let el = controlEl.querySelector('.debugPerformance-control input')
+      el.disabled = true
+      el.checked = false
+      controlEl.querySelectorAll('.timestamp-query-unavailable').forEach(el => {
+        el.style.display = 'block'
+      })
+    }
+  }
+
   const ReadParams = () => {
     const wasDirty = state.dirty;
     // probe params
@@ -1396,6 +1489,22 @@
         !!controlEl.querySelector('input[name="debug-probe-directions-mode"]').checked
       )
 
+      state.dirty = state.dirty || AutoParam(
+        'brushRadius',
+        'f32',
+        (parentEl, value) => {
+          parentEl.querySelector('output').innerHTML = `${value}`
+          return value
+        }
+      )
+
+      state.dirty = state.dirty || AutoParam(
+        'debugPerformance',
+        'bool',
+        (parentEl, value) => {
+          return value
+        }
+      )
     }
 
     if (state.dirty && !wasDirty) {
@@ -1404,10 +1513,16 @@
   }
 
   const RenderFrame = async () => {
+    // reset the timestamp query array
+    GPUResetTimers()
+
     ReadParams()
-    if (!state.dirty) {
-      window.requestAnimationFrame(RenderFrame)
-      return;
+
+    if (!state.gpu.hasTimestampQueryFeature || !state.params.debugPerformance) {
+      if (!state.dirty) {
+        window.requestAnimationFrame(RenderFrame)
+        return;
+      }
     }
     state.dirty = false
 
@@ -1415,50 +1530,59 @@
 
     // Paint Into World
     if (state.mouse.down) {
-      await state.gpu.programs.worldPaint(
+      GPUTimedBlock(
         commandEncoder,
-        state.gpu.device.queue,
-        state.mouse.lastPos[0],
-        canvas.height - state.mouse.lastPos[1],
-        state.mouse.pos[0],
-        canvas.height - state.mouse.pos[1],
-        state.params.brushRadius,
-        // 0..1024 maps to 0..1, but it is stored in a u32
-        state.params.brushRadiance * 1024.0,
-        state.params.erase ? 0 : state.params.color,
-        canvas.width,
-        canvas.height
+        `world paint`, () => {
+          state.gpu.programs.worldPaint(
+            commandEncoder,
+            state.gpu.device.queue,
+            state.mouse.lastPos[0],
+            canvas.height - state.mouse.lastPos[1],
+            state.mouse.pos[0],
+            canvas.height - state.mouse.pos[1],
+            state.params.brushRadius,
+            // 0..1024 maps to 0..1, but it is stored in a u32
+            state.params.brushRadiance * 1024.0,
+            state.params.erase ? 0 : state.params.color,
+            canvas.width,
+            canvas.height
+          )
+        }
       )
-
       state.mouse.lastPos[0] = state.mouse.pos[0]
       state.mouse.lastPos[1] = state.mouse.pos[1]
     }
 
     // Paint the preview brush
     {
-      commandEncoder.copyTextureToTexture(
-        { texture: state.worldTexture },
-        { texture: state.worldAndBrushPreviewTexture },
-        [
-          canvas.width,
-          canvas.height,
-          1
-        ]
-      );
-
-      state.gpu.programs.worldPaintBrushPreview(
+      GPUTimedBlock(
         commandEncoder,
-        state.gpu.device.queue,
-        state.mouse.pos[0],
-        canvas.height - state.mouse.pos[1],
-        state.mouse.pos[0],
-        canvas.height - state.mouse.pos[1],
-        state.params.brushRadius,
-        state.params.erase ? 0 : state.params.brushRadiance * 1024.0,
-        state.params.erase ? 0 : state.params.color,
-        canvas.width,
-        canvas.height
-      );
+        `preview brush`, () => {
+          commandEncoder.copyTextureToTexture(
+            { texture: state.worldTexture },
+            { texture: state.worldAndBrushPreviewTexture },
+            [
+              canvas.width,
+              canvas.height,
+              1
+            ]
+          );
+
+          state.gpu.programs.worldPaintBrushPreview(
+            commandEncoder,
+            state.gpu.device.queue,
+            state.mouse.pos[0],
+            canvas.height - state.mouse.pos[1],
+            state.mouse.pos[0],
+            canvas.height - state.mouse.pos[1],
+            state.params.brushRadius,
+            state.params.erase ? 0 : state.params.brushRadiance * 1024.0,
+            state.params.erase ? 0 : state.params.color,
+            canvas.width,
+            canvas.height
+          );
+        }
+      )
     }
 
     // Fill the probe atlas via ray casting
@@ -1469,61 +1593,114 @@
         state.params.maxProbeLevel
       );
 
-      let pass = commandEncoder.beginComputePass()
       for (let level = levelCount; level >= 0; level--) {
         let currentProbeDiameter = probeDiameter << level;
         let currentProbeRayCount = state.params.probeRayCount << (level * state.params.branchingFactor);
         let intervalRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
 
-        state.gpu.programs.probeAtlasRaycast(
-          state.gpu.device.queue,
-          pass,
-          canvas.width,
-          canvas.height,
-          currentProbeDiameter * 0.5,
-          currentProbeRayCount,
-          intervalRadius,
-          level,
-          levelCount,
-          state.maxLevel0Rays,
-          state.params.branchingFactor
-        );
+        GPUTimedBlock(
+          commandEncoder,
+          `ProbeAtlasRaycast level(${level})`, () => {
+            let pass = commandEncoder.beginComputePass()
+            state.gpu.programs.probeAtlasRaycast(
+              state.gpu.device.queue,
+              pass,
+              canvas.width,
+              canvas.height,
+              currentProbeDiameter * 0.5,
+              currentProbeRayCount,
+              intervalRadius,
+              level,
+              levelCount,
+              state.maxLevel0Rays,
+              state.params.branchingFactor
+            );
+            pass.end()
+          })
       }
-      pass.end()
 
     }
 
     // Populate the irradiance texture
     {
-      let pass = commandEncoder.beginComputePass()
-      state.gpu.programs.buildIrradianceTexture(
-        state.gpu.device.queue,
-        pass,
-        state.params.probeRayCount,
-        canvas.width,
-        canvas.height,
-        state.params.probeRadius,
-        state.params.debugProbeDirections,
-        state.params.branchingFactor
+      GPUTimedBlock(
+        commandEncoder,
+        `populate irradiance texture`, () => {
+          let pass = commandEncoder.beginComputePass()
+          state.gpu.programs.buildIrradianceTexture(
+            state.gpu.device.queue,
+            pass,
+            state.params.probeRayCount,
+            canvas.width,
+            canvas.height,
+            state.params.probeRadius,
+            state.params.debugProbeDirections,
+            state.params.branchingFactor
+          )
+          pass.end();
+        }
       );
-      pass.end();
     }
 
     // Debug Render World Texture
     {
       let probeRadius = Math.pow(2, state.params.probeRadius)
-
-      await state.gpu.programs.debugWorldBlit(
+      GPUTimedBlock(
         commandEncoder,
-        state.gpu.device.queue,
-        state.ctx,
-        canvas.width,
-        canvas.height,
-        probeRadius
+        `final blit`, () => {
+          state.gpu.programs.debugWorldBlit(
+            commandEncoder,
+            state.gpu.device.queue,
+            state.ctx,
+            canvas.width,
+            canvas.height,
+            probeRadius
+          )
+        }
       )
     }
 
+    // Finish gpu timers
+    if (state.gpu.hasTimestampQueryFeature) {
+      commandEncoder.resolveQuerySet(
+        state.gpu.timestampQuerySet,
+        0,
+        state.gpu.timestampQueryCount,
+        state.gpu.timestampResultBuffer,
+        0
+      );
+    }
+
     state.gpu.device.queue.submit([commandEncoder.finish()])
+
+    if (state.gpu.hasTimestampQueryFeature && state.gpu.timestampQueries.length) {
+      const copyEncoder = state.gpu.device.createCommandEncoder();
+      copyEncoder.copyBufferToBuffer(
+        state.gpu.timestampResultBuffer,
+        0,
+        state.gpu.timestampMappableBuffer,
+        0,
+        state.gpu.timestampQueryBufferSizeInBytes
+      );
+
+      state.gpu.device.queue.submit([copyEncoder.finish()]);
+      await state.gpu.timestampMappableBuffer.mapAsync(GPUMapMode.READ);
+
+      const buffer = state.gpu.timestampMappableBuffer.getMappedRange();
+      const results = new BigInt64Array(buffer.slice(0))
+      state.gpu.timestampMappableBuffer.unmap();
+
+      let totalMs = 0.0
+      state.gpu.timestampQueries.forEach(entry => {
+        let diff = Number(results[entry.endIndex] - results[entry.startIndex])
+        let ms = diff / 1000000.0
+        totalMs += ms
+        console.log(`${entry.label} ${ms.toFixed(2)}ms`)
+      })
+      console.log("total %sms", totalMs.toFixed(2))
+
+    }
+
     window.requestAnimationFrame(RenderFrame)
   }
 
