@@ -14,6 +14,9 @@
                      or a play button is pressed - maybe use the visual convention developed by
                      shadertoy
 - radiance-cascades: raytrace approach for comparison's sake
+- radiance-cascades: add a ring of probes along the outside of the bounds to correctly sample upper probes
+                     from lower probes that live on the edge (e.g., outside of a fully valid
+                     bilinear interpolation cage)
 
 ## 2023-09-18
 - radiance-cascades: default demo world
