@@ -310,7 +310,8 @@ async function ProbeRayDDA2DBegin() {
           // return vec4(rayDirection * 0.5 + 0.5, 0.0, 1.0);
           var cursor = DDACursorInit(rayOrigin, rayDirection);
           // a=transparency
-          var result = vec4f(0.0, 0.0, 0.0, 1.0);
+          var acc = vec4f(0.0, 0.0, 0.0, 1.0);
+          let dims = vec2f(f32(ubo.width), f32(ubo.height));
 
           while(true) {
             if (distance(cursor.mapPos, probeCenter) > maxDistance) {
@@ -320,32 +321,22 @@ async function ProbeRayDDA2DBegin() {
             if (
               cursor.mapPos.x < 0 ||
               cursor.mapPos.y < 0 ||
-              cursor.mapPos.x > f32(ubo.width) ||
-              cursor.mapPos.y > f32(ubo.height)
+              cursor.mapPos.x >= dims.x ||
+              cursor.mapPos.y >= dims.y
             ) {
               break;
             }
 
+            // TODO: sample from mip@ubo.level
             var value = textureLoad(worldTexture, vec2<i32>(cursor.mapPos), 0).rg;
             if (value.r != 0) {
-              let unpacked = unpack4x8unorm(value.r);
-
-              // convert alpha/opacity to transparency
-              let transparency = 1.0 - unpacked.a;
+              var sample = unpack4x8unorm(value.r);
               let radianceMultiplier = f32(value.g) / 1024.0;
-
-              let aa = 1.0 - result.a;
-              let ab = unpacked.a;
-              let a0 = aa + ab * (1.0 - aa);
-
-              result = vec4f(
-                (result.rgb * aa + unpacked.rgb * radianceMultiplier * ab * (1.0 - aa)) / a0,
-                result.a * transparency
+              sample = vec4f(sample.rgb * radianceMultiplier, (1.0 - sample.a));
+              acc = vec4(
+                acc.rgb + sample.rgb * (1.0 - sample.a) * acc.a,
+                acc.a * sample.a
               );
-
-              if (result.a <= 0.0) {
-                break;
-              }
             }
 
             // Step the ray
@@ -356,7 +347,7 @@ async function ProbeRayDDA2DBegin() {
             }
           }
 
-          return result;
+          return acc;
         }
 
         fn SampleUpperProbe(pos: vec2<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> vec4f {
