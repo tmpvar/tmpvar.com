@@ -209,7 +209,8 @@ async function ProbeRayDDA2DBegin() {
         "width",
         "height",
         "maxLevel0Rays",
-        "intervalRadius",
+        "intervalStartRadius",
+        "intervalEndRadius",
         "branchingFactor",
         "debugRaymarchMipmaps",
       ]
@@ -250,7 +251,8 @@ async function ProbeRayDDA2DBegin() {
           width: i32,
           height: i32,
           maxLevel0Rays: i32,
-          intervalRadius: i32,
+          intervalStartRadius: i32,
+          intervalEndRadius: i32,
           // WGSL wants this to be unsigned because it is used as a shift
           branchingFactor: u32,
           debugRaymarchMipmaps: u32,
@@ -438,8 +440,8 @@ async function ProbeRayDDA2DBegin() {
           let ProbeRadius = f32(ubo.probeRadius);
           let LowerProbeRadius = f32(ubo.probeRadius >> 1);
 
-          let IntervalRadius = f32(ubo.intervalRadius);
-          let LowerIntervalRadius = f32(ubo.intervalRadius >> ubo.branchingFactor);
+          let IntervalRadius = f32(ubo.intervalEndRadius);
+          let LowerIntervalRadius = f32(ubo.intervalStartRadius);
 
           let ProbeDiameter = ProbeRadius * 2.0;
           let CascadeWidth = ubo.width / i32(ProbeDiameter);
@@ -574,7 +576,8 @@ async function ProbeRayDDA2DBegin() {
         height,
         probeRadius,
         probeRayCount,
-        intervalRadius,
+        intervalStartRadius,
+        intervalEndRadius,
         level,
         levelCount,
         maxLevel0Rays,
@@ -593,9 +596,10 @@ async function ProbeRayDDA2DBegin() {
         uboData[levelIndexOffset + 5] = width
         uboData[levelIndexOffset + 6] = height
         uboData[levelIndexOffset + 7] = maxLevel0Rays
-        uboData[levelIndexOffset + 8] = intervalRadius
-        uboData[levelIndexOffset + 9] = branchingFactor
-        uboData[levelIndexOffset + 10] = debugRaymarchMipmaps
+        uboData[levelIndexOffset + 8] = intervalStartRadius
+        uboData[levelIndexOffset + 9] = intervalEndRadius
+        uboData[levelIndexOffset + 10] = branchingFactor
+        uboData[levelIndexOffset + 11] = debugRaymarchMipmaps
 
         const byteOffset = level * alignedSize
         queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
@@ -1816,7 +1820,11 @@ Example on Windows:
       for (let level = levelCount; level >= 0; level--) {
         let currentProbeDiameter = probeDiameter << level;
         let currentProbeRayCount = state.params.probeRayCount << (level * state.params.branchingFactor);
-        let intervalRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
+
+        let intervalStartRadius = level == 0
+          ? 0
+          : state.params.intervalRadius << ((level-1) * state.params.branchingFactor)
+        let intervalEndRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
 
         GPUTimedBlock(
           commandEncoder,
@@ -1829,7 +1837,8 @@ Example on Windows:
               canvas.height,
               currentProbeDiameter * 0.5,
               currentProbeRayCount,
-              intervalRadius,
+              intervalStartRadius,
+              intervalEndRadius,
               level,
               levelCount,
               state.maxLevel0Rays,
