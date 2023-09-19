@@ -898,7 +898,7 @@ click/drag to move the light
   </p>
 
   <p class="debugRaymarchMipmaps-control">
-    raymarch mipmap N on cascade level N <input type="checkbox" value="1" />
+    raymarch mipmap N on cascade level N <input type="checkbox" value="1" checked />
   </p>
   </div>
 
