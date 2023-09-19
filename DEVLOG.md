@@ -10,7 +10,6 @@
 - article: pullstream
 
 ## Pending
-- radiance-cascades: default demo world
 - radiance-cascades: consider adding a dumb FPS counter when the "run continuously"
                      or a play button is pressed - maybe use the visual convention developed by
                      shadertoy
@@ -19,6 +18,7 @@
 
 
 ## 2023-09-18
+- radiance-cascades: default demo world
 - radiance-cascades: cascade 0 doesn't absolutely start at 0
                       https://discord.com/channels/318590007881236480/1142751596858593372/1152843885844901928
 - radiance-cascades: fix the embed image!
