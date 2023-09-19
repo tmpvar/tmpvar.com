@@ -211,6 +211,7 @@ async function ProbeRayDDA2DBegin() {
         "maxLevel0Rays",
         "intervalRadius",
         "branchingFactor",
+        "debugRaymarchMipmaps",
       ]
 
       // TODO: if we go over 256 bytes then this needs to be updated
@@ -252,6 +253,7 @@ async function ProbeRayDDA2DBegin() {
           intervalRadius: i32,
           // WGSL wants this to be unsigned because it is used as a shift
           branchingFactor: u32,
+          debugRaymarchMipmaps: u32,
         };
 
         struct ProbeRayResult {
@@ -299,14 +301,23 @@ async function ProbeRayDDA2DBegin() {
         @group(0) @binding(3) var worldSampler: sampler;
 
         fn RayMarch(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
-          // return vec4(rayDirection * 0.5 + 0.5, 0.0, 1.0);
-          var cursor = DDACursorInit(rayOrigin, rayDirection);
+
+          var levelDivisor = 1.0;
+          if (ubo.debugRaymarchMipmaps > 0) {
+            levelDivisor = 1.0 / f32(1<<u32(ubo.level));
+          }
+
+          let levelRayOrigin = rayOrigin * levelDivisor;
+          let levelProbeCenter = probeCenter * levelDivisor;
+          let levelMaxDistance = maxDistance * levelDivisor;
+          let levelMip = f32(ubo.level) * (1 - levelDivisor);
+          var cursor = DDACursorInit(levelRayOrigin, rayDirection);
           // a=transparency
           var acc = vec4f(0.0, 0.0, 0.0, 1.0);
-          let dims = vec2f(f32(ubo.width), f32(ubo.height));
+          let dims = vec2f(f32(ubo.width), f32(ubo.height)) * levelDivisor;
 
           while(true) {
-            if (distance(cursor.mapPos, probeCenter) > maxDistance) {
+            if (distance(cursor.mapPos, levelProbeCenter) > levelMaxDistance) {
               break;
             }
 
@@ -319,17 +330,15 @@ async function ProbeRayDDA2DBegin() {
               break;
             }
 
-            // TODO: sample from mip@ubo.level
-            var sample = textureLoad(worldTexture, vec2<i32>(cursor.mapPos), 0);
-            // var sample = textureSampleLevel(
-            //   worldTexture,
-            //   worldSampler,
-            //   cursor.mapPos / dims,
-            //   f32(ubo.level)
-            // );
+            var sample = textureSampleLevel(
+              worldTexture,
+              worldSampler,
+              cursor.mapPos / dims,
+              levelMip
+            );
             sample = vec4f(sample.rgb, (1.0 - sample.a));
             acc = vec4(
-              acc.rgb + sample.rgb * (1.0 - sample.a) * acc.a,
+              acc.rgb + sample.rgb * acc.a,
               acc.a * sample.a
             );
 
@@ -457,7 +466,7 @@ async function ProbeRayDDA2DBegin() {
             IntervalRadius
           );
 
-          let UpperResult = SampleUpperProbes(RayOrigin, ProbeRayIndex);
+          var UpperResult = SampleUpperProbes(RayOrigin, ProbeRayIndex);
 
           probes[OutputIndex] = vec4f(
             LowerResult.rgb + LowerResult.a * UpperResult.rgb,
@@ -569,7 +578,8 @@ async function ProbeRayDDA2DBegin() {
         level,
         levelCount,
         maxLevel0Rays,
-        branchingFactor
+        branchingFactor,
+        debugRaymarchMipmaps
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
@@ -585,6 +595,7 @@ async function ProbeRayDDA2DBegin() {
         uboData[levelIndexOffset + 7] = maxLevel0Rays
         uboData[levelIndexOffset + 8] = intervalRadius
         uboData[levelIndexOffset + 9] = branchingFactor
+        uboData[levelIndexOffset + 10] = debugRaymarchMipmaps
 
         const byteOffset = level * alignedSize
         queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
@@ -899,11 +910,13 @@ async function ProbeRayDDA2DBegin() {
           ) -  f32(ubo.radius);
 
           if (d <= 0.0) {
-            var color = unpack4x8unorm(ubo.color);
+            let color = unpack4x8unorm(ubo.color);
+            let radianceMultiplier = f32(ubo.radiance) / 1024.0;
+            let premultiplied = vec4(color.rgb * radianceMultiplier * color.a, color.a);
             textureStore(
               texture,
               id.xy,
-              vec4f(color.rgb * f32(ubo.radiance) / 1024.0, color.a)
+              premultiplied
             );
           }
         }
@@ -1002,28 +1015,31 @@ async function ProbeRayDDA2DBegin() {
       }
     },
 
-    GenerateMipmapsBoxFilter(device, texture, workgroupSize, kernelRadius) {
+    GenerateMipmapsBoxFilter(device, texture, workgroupSize) {
       const source =  /* wgsl */`
         @group(0) @binding(0) var src: texture_2d<f32>;
         @group(0) @binding(1) var dst: texture_storage_2d<rgba16float, write>;
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
 
-          var color: vec4f = vec4f(0.0);
-          var multiplier: f32 = 0.0;
-          let PixelPos = vec2<i32>(id.xy) * 2 + 1;
+          var color: vec4f = vec4f(0.0, 0.0, 0.0, 0.0);
           let TextureSize = vec2<i32>(textureDimensions(src));
-          var lo = clamp(PixelPos - ${kernelRadius}, vec2<i32>(0), TextureSize);
-          var hi = clamp(PixelPos + ${kernelRadius}, vec2<i32>(0), TextureSize);
-          var divisor: f32 = 1.0 / f32((hi.x - lo.x) * (hi.y - lo.y));
-          for (var y: i32 = lo.y; y<hi.y; y++) {
-            for (var x: i32 = lo.x; x<hi.x; x++) {
-              color += textureLoad(src, vec2<i32>(x, y), 0);
+
+          let lo = vec2<i32>(id.xy) * 2;
+          let hi = lo + 2;
+          for (var y = lo.y; y<hi.y; y++) {
+            for (var x = lo.x; x<hi.x; x++) {
+              var samplePos = vec2<i32>(x, y);
+              var sample = vec4(0.0, 0.0, 0.0, 0.0);
+              if (samplePos.x < TextureSize.x && samplePos.y < TextureSize.y) {
+                sample = textureLoad(src, samplePos, 0);
+              }
+
+              color += sample;
             }
           }
 
-          color *= divisor;
-          textureStore(dst, id.xy, color);
+          textureStore(dst, id.xy, color * 0.25);
         }
       `
 
@@ -1671,12 +1687,21 @@ Example on Windows:
       )
 
       state.dirty = state.dirty || AutoParam(
+        'debugRaymarchMipmaps',
+        'bool',
+        (parentEl, value) => {
+          return value
+        }
+      )
+
+      state.dirty = state.dirty || AutoParam(
         'debugDisbleBrushPreview',
         'bool',
         (parentEl, value) => {
           return value
         }
       )
+
       state.dirty = state.dirty || AutoParam(
         'debugPerformance',
         'bool',
@@ -1802,7 +1827,8 @@ Example on Windows:
               level,
               levelCount,
               state.maxLevel0Rays,
-              state.params.branchingFactor
+              state.params.branchingFactor,
+              state.params.debugRaymarchMipmaps
             );
             pass.end()
           }

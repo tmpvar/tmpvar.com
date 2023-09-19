@@ -867,11 +867,15 @@ click/drag to move the light
 <section id="probe-ray-dda-2d-controls">
   <h4>Debug/Development</h4>
   <div class="indent">
+  <p class="debugPerformance-control">
+    run continuously and collect performance stats <input type="checkbox" value="1" />
+    <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
+  </p>
 
   <p class="debugWorldMipmapLevelRender-control">
   render world mip level
   <select>
-    <option value="-1">none</option>
+    <option value="-1">disabled</option>
     <option value="0">0</option>
     <option value="1">1</option>
     <option value="2">2</option>
@@ -893,9 +897,8 @@ click/drag to move the light
     disable brush preview <input type="checkbox" value="1" />
   </p>
 
-  <p class="debugPerformance-control">
-    run continuously and collect performance stats <input type="checkbox" value="1" />
-    <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
+  <p class="debugRaymarchMipmaps-control">
+    raymarch mipmap N on cascade level N <input type="checkbox" value="1" />
   </p>
   </div>
 
