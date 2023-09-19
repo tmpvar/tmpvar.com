@@ -1009,9 +1009,6 @@ async function ProbeRayDDA2DBegin() {
     },
 
     GenerateMipmapsBoxFilter(device, texture, workgroupSize, kernelRadius) {
-      const kernelDiameter = kernelRadius * 2
-      const kernelDivisor = 1.0 / (kernelDiameter * kernelDiameter)
-
       const source =  /* wgsl */`
         @group(0) @binding(0) var src: texture_2d<u32>;
         @group(0) @binding(1) var dst: texture_storage_2d<rg32uint, write>;
@@ -1020,19 +1017,20 @@ async function ProbeRayDDA2DBegin() {
 
           var color: vec4f = vec4f(0.0);
           var multiplier: f32 = 0.0;
-          if (true) {
-            let PixelPos = vec2<i32>(id.xy) * 2 + 1;
-            for (var y: i32 = -${kernelRadius}; y<${kernelRadius}; y++) {
-              for (var x: i32 = -${kernelRadius}; x<${kernelRadius}; x++) {
-                let offset = vec2<i32>(x, y);
-                var sample = textureLoad(src, PixelPos + offset, 0).rg;
-                color += unpack4x8unorm(sample.r);
-                multiplier += f32(sample.g) / 1024.0;
-              }
+          let PixelPos = vec2<i32>(id.xy) * 2 + 1;
+          let TextureSize = vec2<i32>(textureDimensions(src));
+          var lo = clamp(PixelPos - ${kernelRadius}, vec2<i32>(0), TextureSize);
+          var hi = clamp(PixelPos + ${kernelRadius}, vec2<i32>(0), TextureSize);
+          var divisor: f32 = 1.0 / f32((hi.x - lo.x) * (hi.y - lo.y));
+          for (var y: i32 = lo.y; y<hi.y; y++) {
+            for (var x: i32 = lo.x; x<hi.x; x++) {
+              var sample = textureLoad(src, vec2<i32>(x, y), 0).rg;
+              color += unpack4x8unorm(sample.r);
+              multiplier += f32(sample.g) / 1024.0;
             }
-            color *= ${kernelDivisor};
-            multiplier *= ${kernelDivisor};
           }
+          color *= divisor;
+          multiplier *= divisor;
 
           textureStore(dst, id.xy, vec4<u32>(
             pack4x8unorm(color),
