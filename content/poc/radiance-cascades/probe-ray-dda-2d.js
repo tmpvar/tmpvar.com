@@ -225,6 +225,15 @@ async function ProbeRayDDA2DBegin() {
         label: "ProbeAtlasRaycast/ubo",
       })
 
+      const sampler = gpu.device.createSampler({
+        label: "ProbeAtlasRaycast - Sampler",
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        magFilter: 'linear',
+        minFilter: 'linear',
+        mipmapFilter: 'nearest',
+      })
+
       const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
 
       const source =  /* wgsl */`
@@ -287,6 +296,7 @@ async function ProbeRayDDA2DBegin() {
         @group(0) @binding(0) var<storage,read_write> probes: array<vec4f>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
         @group(0) @binding(2) var worldTexture: texture_2d<f32>;
+        @group(0) @binding(3) var worldSampler: sampler;
 
         fn RayMarch(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
           // return vec4(rayDirection * 0.5 + 0.5, 0.0, 1.0);
@@ -311,6 +321,12 @@ async function ProbeRayDDA2DBegin() {
 
             // TODO: sample from mip@ubo.level
             var sample = textureLoad(worldTexture, vec2<i32>(cursor.mapPos), 0);
+            // var sample = textureSampleLevel(
+            //   worldTexture,
+            //   worldSampler,
+            //   cursor.mapPos / dims,
+            //   f32(ubo.level)
+            // );
             sample = vec4f(sample.rgb, (1.0 - sample.a));
             acc = vec4(
               acc.rgb + sample.rgb * (1.0 - sample.a) * acc.a,
@@ -489,6 +505,13 @@ async function ProbeRayDDA2DBegin() {
               sampleType: 'float'
             },
           },
+          {
+            binding: 3,
+            visibility: GPUShaderStage.COMPUTE,
+            sampler: {
+              type: "filtering"
+            },
+          }
         ]
       })
 
@@ -527,6 +550,10 @@ async function ProbeRayDDA2DBegin() {
             resource: worldTexture.createView({
               label: 'ProbeAtlasRaycast - BindGroup - WorldTexture view'
             })
+          },
+          {
+            binding: 3,
+            resource: sampler,
           },
         ]
       })
@@ -764,7 +791,6 @@ async function ProbeRayDDA2DBegin() {
         )
       }
     },
-
 
     WorldClear(device, texture, color, workgroupSize) {
       const source =  /* wgsl */`
