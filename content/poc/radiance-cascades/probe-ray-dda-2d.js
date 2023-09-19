@@ -358,10 +358,16 @@ async function ProbeRayDDA2DBegin() {
           return acc;
         }
 
-        fn SampleUpperProbe(pos: vec2<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> vec4f {
-          if (pos.x < 0 || pos.y < 0 || pos.x >= cascadeWidth || pos.y >= cascadeWidth) {
-            return vec4f(0.0, 0.0, 0.0, 1.0);
-          }
+        fn SampleUpperProbe(rawPos: vec2<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> vec4f {
+          // TODO: rawPos can be out of the scene bounds, intentionally.
+          //       this is a bit of a hack, that reuses an in-bounds probe multiple times
+          //       instead of going out of bounds to a probe that doesn't exist or simply
+          //       returning transparent black.
+          //
+          //       The real fix is to add another ring of probes for every level that live
+          //       just out of bounds to add converage for lower corner/edge probes
+
+          let pos = clamp(rawPos, vec2<i32>(0), vec2<i32>(cascadeWidth - 1));
 
           let index = raysPerProbe * pos.x + pos.y * cascadeWidth * raysPerProbe;
           let rayCount = 1<<ubo.branchingFactor;
