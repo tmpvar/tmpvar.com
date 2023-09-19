@@ -15,8 +15,6 @@
                      shadertoy
 - radiance-cascades: raytrace approach for comparison's sake
 
-
-
 ## 2023-09-18
 - radiance-cascades: default demo world
 - radiance-cascades: cascade 0 doesn't absolutely start at 0

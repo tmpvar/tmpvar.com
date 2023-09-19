@@ -867,12 +867,12 @@ click/drag to move the light
 <section id="probe-ray-dda-2d-controls" class="webgpu-required">
   <h4>Debug/Development</h4>
   <div class="indent">
-  <p class="debugPerformance-control">
+  <div class="debugPerformance-control control">
     run continuously and collect performance stats <input type="checkbox" value="1" />
     <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
-  </p>
+  </div>
 
-  <p class="debugWorldMipmapLevelRender-control">
+  <div class="debugWorldMipmapLevelRender-control control">
   render world mip level
   <select>
     <option value="-1">disabled</option>
@@ -887,79 +887,80 @@ click/drag to move the light
     <option value="8">8</option>
     <option value="9">9</option>
   </select>
-  </p>
+  </div>
 
-  <p>
+  <div class="control">
     render probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" />
-  </p>
+  </div>
 
-  <p class="debugDisbleBrushPreview-control">
+  <div class="debugDisbleBrushPreview-control control">
     disable brush preview <input type="checkbox" value="1" />
-  </p>
+  </div>
 
-  <p class="debugRaymarchMipmaps-control">
+  <div class="debugRaymarchMipmaps-control control">
     raymarch mipmap N on cascade level N <input type="checkbox" value="1" checked />
-  </p>
+  </div>
   </div>
 
 
   <h4>Radiance Cascade Parameters</h4>
   <div class="indent">
-  <p class="probeRadius-control">
+  <div class="probeRadius-control control">
     2<sup>i</sup> spacing (level 0): <input type="range" min="1" max="9" value="1">
     <output></output>
-  </p>
+  </div>
 
-  <p class="probeRayCount-control">
+  <div class="probeRayCount-control control">
     2<sup>r</sup> raycount (level 0): <input type="range" min="1" max="6" value="2">
     <output></output>
-  </p>
+  </div>
 
-  <p class="branchingFactor-control">
+  <div class="branchingFactor-control control">
     branching factor: <input type="range" min="1" max="3" value="2">
     <output></output>
-  </p>
+  </div>
 
-  <p class="intervalRadius-control">
+  <div class="intervalRadius-control control">
     interval radius (level 0): <input type="range" min="0" max="1024" value="5">
     <output></output>
-  </p>
+  </div>
 
-  <p class="maxProbeLevel-control">
+  <div class="maxProbeLevel-control control">
     max probe level: <input type="range" min="0" max="10" value="10">
     <output></output>
-  </p>
+  </div>
   </div>
 
   <h4>Brush Parameters</h4>
   <div class="indent">
 
-  <p>
+  <div class="control" style="float: right">
+    <button name="clear-button">Clear Canvas</button>
+  </div>
+  <div class="control">
   erase <input type="checkbox" value="1" name="brush-erase-mode" />
-  </p>
+  </div>
 
-  <p class="brushOpacity-control" style="display:none">
+  <div class="control brushOpacity-control">
     brush opacity: <input type="range" min="0" max="255" value="255" step="1">
     <output></output>
-  </p>
+  </div>
 
-  <p class="brushRadiance-control">
+  <div class="brushRadiance-control control">
     brush radiance: <input type="range" min="0" max="20" value="1" step="0.01">
     <output></output>
-  </p>
+  </div>
 
-   <p class="brushRadius-control">
+  <div class="brushRadius-control control">
     brush radius: <input type="range" min="2" max="100" value="5">
     <output></output>
-  </p>
+  </div>
 
-  <p>
+  <div class="control">
   color: <input type="color" name="brush-color-selector" value="#FFFC99">
-  </p>
+  </div>
 
-  <p>
-    <button name="clear-button">Clear</button>
-  </p>
+
   </div>
 </section>
 
