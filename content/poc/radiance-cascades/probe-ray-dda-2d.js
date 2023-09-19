@@ -1,3 +1,6 @@
+const DemoImage = document.createElement('img');
+DemoImage.src = window.location.pathname + "probe-ray-dda-2d-demo.png"
+
 async function ProbeRayDDA2DBegin() {
   const shaders = {
     DebugWorldBlit(device, presentationFormat, worldTexture, irradianceTexture) {
@@ -1343,6 +1346,8 @@ async function ProbeRayDDA2DBegin() {
   // Create the world texture
   {
     state.worldTexture = state.gpu.device.createTexture({
+      label: 'WorldTexture',
+
       size: [canvas.width, canvas.height, 1],
       dimension: '2d',
       // r=rgba, b=emission
@@ -1350,6 +1355,8 @@ async function ProbeRayDDA2DBegin() {
       usage: (
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.COPY_DST |
         GPUTextureUsage.COPY_SRC
       ),
       label: 'WorldTexture'
@@ -1359,6 +1366,7 @@ async function ProbeRayDDA2DBegin() {
   // Create the world texture w/ included brush preview
   {
     state.worldAndBrushPreviewTexture = state.gpu.device.createTexture({
+      label: 'WorldAndBrushPreviewTexture',
       size: [canvas.width, canvas.height, 1],
       dimension: '2d',
       // r=rgba, b=emission
@@ -1376,6 +1384,7 @@ async function ProbeRayDDA2DBegin() {
   // Create the irradiance texture
   {
     state.irradianceTexture = state.gpu.device.createTexture({
+      label: 'IrradianceTexture',
       size: [canvas.width, canvas.height, 1],
       dimension: '2d',
       format: 'rgba8unorm',
@@ -1448,39 +1457,57 @@ async function ProbeRayDDA2DBegin() {
     state.dirty = true;
   }
 
-  WorldTextureClear();
+  // WorldTextureClear();
 
+  // Fill with a demo image
   {
-    let commandEncoder = state.gpu.device.createCommandEncoder()
+    await DemoImage.decode();
+    const DemoImageBitmap = await createImageBitmap(DemoImage);
 
-    const DrawLine = (ax, ay, bx, by, color, radiance, radius) => {
-      state.gpu.programs.worldPaint(
-        commandEncoder,
-        state.gpu.device.queue,
-        ax,
-        ay,
-        bx,
-        by,
-        radius,
-        radiance,
-        color,
-        canvas.width,
-        canvas.height
-      )
-    }
-
-    DrawLine(
-      canvas.width * 0.5,
-      canvas.height * 0.5,
-      canvas.width * 0.5,
-      canvas.height * 0.5,
-      0xFFFFFFFF,
-      1024,
-      30
+    state.gpu.device.queue.copyExternalImageToTexture(
+      {
+        source: DemoImageBitmap,
+        flipY: true,
+      },
+      {
+        texture: state.worldTexture,
+        premultipliedAlpha: true,
+      },
+      [DemoImage.width, DemoImage.height]
     );
-
-    state.gpu.device.queue.submit([commandEncoder.finish()])
   }
+
+  // {
+  //   let commandEncoder = state.gpu.device.createCommandEncoder()
+
+  //   const DrawLine = (ax, ay, bx, by, color, radiance, radius) => {
+  //     state.gpu.programs.worldPaint(
+  //       commandEncoder,
+  //       state.gpu.device.queue,
+  //       ax,
+  //       ay,
+  //       bx,
+  //       by,
+  //       radius,
+  //       radiance,
+  //       color,
+  //       canvas.width,
+  //       canvas.height
+  //     )
+  //   }
+
+  //   DrawLine(
+  //     canvas.width * 0.5,
+  //     canvas.height * 0.5,
+  //     canvas.width * 0.5,
+  //     canvas.height * 0.5,
+  //     0xFFFFFFFF,
+  //     1024,
+  //     30
+  //   );
+
+  //   state.gpu.device.queue.submit([commandEncoder.finish()])
+  // }
 
   const Param = (name, value, cb) => {
     if (state.params[name] != value) {
