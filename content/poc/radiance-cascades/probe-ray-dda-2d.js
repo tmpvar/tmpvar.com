@@ -50,7 +50,7 @@ async function ProbeRayDDA2DBegin() {
         const PI: f32 = 3.141592653589793;
         const TAU: f32 = PI * 2;
 
-        @group(0) @binding(0) var worldTexture: texture_2d<u32>;
+        @group(0) @binding(0) var worldTexture: texture_2d<f32>;
         @group(0) @binding(1) var irradianceTexture: texture_2d<f32>;
         @group(0) @binding(2) var<uniform> ubo: UBOParams;
 
@@ -64,39 +64,21 @@ async function ProbeRayDDA2DBegin() {
 
 
           if (ubo.debugRenderWorldMipLevel > -1) {
-
             var samplePos = vec2<i32>(
               i32(pixelPos.x) >> u32(ubo.debugRenderWorldMipLevel),
               i32(pixelPos.y) >> u32(ubo.debugRenderWorldMipLevel)
             );
 
-            var packedColor = textureLoad(worldTexture, samplePos, ubo.debugRenderWorldMipLevel).r;
-            var color = unpack4x8unorm(packedColor);
-
-            return vec4f(
-              color.rgb,
+            return vec4(
+              textureLoad(worldTexture, samplePos, ubo.debugRenderWorldMipLevel).rgb,
               1.0
             );
           }
 
-
-
-          var worldSamplePos: vec2<u32> = vec2<u32>(pixelPos);
-          var value = textureLoad(worldTexture, worldSamplePos, 0);
-          var color: vec4f;
-          if (value.r != 0) {
-            color = unpack4x8unorm(value.r) * f32(value.g) / 1024.0;
-          } else {
-            let probeDiameter = ubo.probeRadius * 2;
-            let irradianceSamplePos = pixelPos;//fragData.uv;// * f32(probeDiameter);
-            color = textureLoad(irradianceTexture, vec2<i32>(irradianceSamplePos), 0);
-          }
-
-          return vec4f(
-            color.rgb,
+          return vec4(
+            textureLoad(irradianceTexture, vec2<i32>(pixelPos), 0).rgb,
             1.0
           );
-
         }
       `;
 
@@ -111,7 +93,7 @@ async function ProbeRayDDA2DBegin() {
             binding: 0,
             visibility: GPUShaderStage.FRAGMENT,
             texture: {
-              sampleType: 'uint',
+              sampleType: 'float',
             },
           },
           {
@@ -304,7 +286,7 @@ async function ProbeRayDDA2DBegin() {
 
         @group(0) @binding(0) var<storage,read_write> probes: array<vec4f>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
-        @group(0) @binding(2) var worldTexture: texture_2d<u32>;
+        @group(0) @binding(2) var worldTexture: texture_2d<f32>;
 
         fn RayMarch(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
           // return vec4(rayDirection * 0.5 + 0.5, 0.0, 1.0);
@@ -328,16 +310,12 @@ async function ProbeRayDDA2DBegin() {
             }
 
             // TODO: sample from mip@ubo.level
-            var value = textureLoad(worldTexture, vec2<i32>(cursor.mapPos), 0).rg;
-            if (value.r != 0) {
-              var sample = unpack4x8unorm(value.r);
-              let radianceMultiplier = f32(value.g) / 1024.0;
-              sample = vec4f(sample.rgb * radianceMultiplier, (1.0 - sample.a));
-              acc = vec4(
-                acc.rgb + sample.rgb * (1.0 - sample.a) * acc.a,
-                acc.a * sample.a
-              );
-            }
+            var sample = textureLoad(worldTexture, vec2<i32>(cursor.mapPos), 0);
+            sample = vec4f(sample.rgb, (1.0 - sample.a));
+            acc = vec4(
+              acc.rgb + sample.rgb * (1.0 - sample.a) * acc.a,
+              acc.a * sample.a
+            );
 
             // Step the ray
             {
@@ -508,7 +486,7 @@ async function ProbeRayDDA2DBegin() {
             binding: 2,
             visibility: GPUShaderStage.COMPUTE,
             texture: {
-              sampleType: 'uint'
+              sampleType: 'float'
             },
           },
         ]
@@ -790,10 +768,10 @@ async function ProbeRayDDA2DBegin() {
 
     WorldClear(device, texture, color, workgroupSize) {
       const source =  /* wgsl */`
-        @group(0) @binding(0) var texture: texture_storage_2d<rg32uint, write>;
+        @group(0) @binding(0) var texture: texture_storage_2d<rgba16float, write>;
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
-          textureStore(texture, id.xy, vec4<u32>(${color.join(',')}, 0, 0));
+          textureStore(texture, id.xy, vec4f(${color.join(',')}));
         }
       `
 
@@ -808,7 +786,7 @@ async function ProbeRayDDA2DBegin() {
             binding: 0,
             visibility: GPUShaderStage.COMPUTE,
             storageTexture: {
-              format: "rg32uint"
+              format: "rgba16float"
             },
           }
         ]
@@ -876,7 +854,7 @@ async function ProbeRayDDA2DBegin() {
           color: u32,
         };
 
-        @group(0) @binding(0) var texture: texture_storage_2d<rg32uint, write>;
+        @group(0) @binding(0) var texture: texture_storage_2d<rgba16float, write>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
 
         fn SDFSegment(p: vec2f, a: vec2f, b: vec2f) -> f32{
@@ -886,9 +864,6 @@ async function ProbeRayDDA2DBegin() {
           return length( pa - ba*h );
         }
 
-        fn Squared(a: i32) -> i32 {
-          return a * a;
-        }
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           let d = SDFSegment(
@@ -898,10 +873,12 @@ async function ProbeRayDDA2DBegin() {
           ) -  f32(ubo.radius);
 
           if (d <= 0.0) {
-          // var radiusSquared : i32 = ubo.radius * ubo.radius;
-          // var distanceSquared : i32 = Squared(i32(id.x) - ubo.x) + Squared(i32(id.y) - ubo.y);
-          // if (distanceSquared <= radiusSquared) {
-            textureStore(texture, id.xy, vec4<u32>(ubo.color, ubo.radiance, 0, 0));
+            var color = unpack4x8unorm(ubo.color);
+            textureStore(
+              texture,
+              id.xy,
+              vec4f(color.rgb * f32(ubo.radiance) / 1024.0, color.a)
+            );
           }
         }
       `
@@ -918,7 +895,7 @@ async function ProbeRayDDA2DBegin() {
             binding: 0,
             visibility: GPUShaderStage.COMPUTE,
             storageTexture: {
-              format: "rg32uint"
+              format: "rgba16float"
             },
           },
           {
@@ -1001,8 +978,8 @@ async function ProbeRayDDA2DBegin() {
 
     GenerateMipmapsBoxFilter(device, texture, workgroupSize, kernelRadius) {
       const source =  /* wgsl */`
-        @group(0) @binding(0) var src: texture_2d<u32>;
-        @group(0) @binding(1) var dst: texture_storage_2d<rg32uint, write>;
+        @group(0) @binding(0) var src: texture_2d<f32>;
+        @group(0) @binding(1) var dst: texture_storage_2d<rgba16float, write>;
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
 
@@ -1015,20 +992,12 @@ async function ProbeRayDDA2DBegin() {
           var divisor: f32 = 1.0 / f32((hi.x - lo.x) * (hi.y - lo.y));
           for (var y: i32 = lo.y; y<hi.y; y++) {
             for (var x: i32 = lo.x; x<hi.x; x++) {
-              var sample = textureLoad(src, vec2<i32>(x, y), 0).rg;
-              color += unpack4x8unorm(sample.r);
-              multiplier += f32(sample.g) / 1024.0;
+              color += textureLoad(src, vec2<i32>(x, y), 0);
             }
           }
-          color *= divisor;
-          multiplier *= divisor;
 
-          textureStore(dst, id.xy, vec4<u32>(
-            pack4x8unorm(color),
-            u32(multiplier * 1024),
-            0,
-            0
-          ));
+          color *= divisor;
+          textureStore(dst, id.xy, color);
         }
       `
 
@@ -1045,15 +1014,15 @@ async function ProbeRayDDA2DBegin() {
             visibility: GPUShaderStage.COMPUTE,
 
             texture: {
-              format: "rg32uint",
-              sampleType: 'uint',
+              format: "rgba16float",
+              sampleType: 'float',
             },
           },
           {
             binding: 1,
             visibility: GPUShaderStage.COMPUTE,
             storageTexture: {
-              format: "rg32uint",
+              format: "rgba16float",
             },
           }
         ]
@@ -1325,7 +1294,7 @@ async function ProbeRayDDA2DBegin() {
       size: [canvas.width, canvas.height, 1],
       dimension: '2d',
       // r=rgba, b=emission
-      format: 'rg32uint',
+      format: 'rgba16float',
       usage: (
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.STORAGE_BINDING |
@@ -1341,7 +1310,7 @@ async function ProbeRayDDA2DBegin() {
       size: [canvas.width, canvas.height, 1],
       dimension: '2d',
       // r=rgba, b=emission
-      format: 'rg32uint',
+      format: 'rgba16float',
       usage: (
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.STORAGE_BINDING |
@@ -1394,7 +1363,7 @@ async function ProbeRayDDA2DBegin() {
       worldClear: shaders.WorldClear(
         state.gpu.device,
         state.worldTexture,
-        [0, 0],
+        [0.0, 0.0, 0.0, 0.0],
         [WorldClearWorkgroupSize, WorldClearWorkgroupSize, 1]
       ),
       worldPaint: shaders.WorldPaint(
