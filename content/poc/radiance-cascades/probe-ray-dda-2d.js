@@ -1267,7 +1267,13 @@ async function ProbeRayDDA2DBegin() {
 
     const probeBufferByteSize = state.maxLevel0Rays * raySize * 2
 
-    state.gpu = await InitGPU(state.ctx, probeBufferByteSize)
+    try {
+      state.gpu = await InitGPU(state.ctx, probeBufferByteSize)
+    } catch(e) {
+      return;
+    }
+
+    document.querySelector("#poc").className += " has-webgpu"
 
     state.probeBuffer = state.gpu.device.createBuffer({
       label: 'ProbeBuffer',

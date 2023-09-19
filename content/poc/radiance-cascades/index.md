@@ -864,7 +864,7 @@ click/drag to move the light
 
 ### Probe Ray DDA (2D)
 
-<section id="probe-ray-dda-2d-controls">
+<section id="probe-ray-dda-2d-controls" class="webgpu-required">
   <h4>Debug/Development</h4>
   <div class="indent">
   <p class="debugPerformance-control">
@@ -964,10 +964,9 @@ click/drag to move the light
 </section>
 
 
-<section class="center-align">
+<section class="center-align webgpu-required">
   <canvas id="probe-ray-dda-2d-canvas" width="1024" height="1024"></canvas>
-</section>
-<script src="probe-ray-dda-2d.js" defer></script>
+  <section class="left-align">
 
 #### approach
 
@@ -981,4 +980,17 @@ click/drag to move the light
     - fetch upper level ray values per probe
     - bilinear interpolate between these 4 values and store the result in SSBO
 - __irradiance__: compute irradiance per probe by accumulating the averaging the probe values stored in SSBO (e.g., average of all rays for the associated level 0 probe)
+
+  </section>
+</section>
+
+<script src="probe-ray-dda-2d.js" defer></script>
+
+<section class="center-align webgpu-missing error-border">
+  <img src="/img/webgpu-responsive.svg" width="768" height="768" />
+  <p class="error">
+  This demo requires <a href="https://en.wikipedia.org/wiki/WebGPU">WebGPU</a> - in other words, you should open this page in Chrome or Edge.
+  <p>
+</section>
+
 

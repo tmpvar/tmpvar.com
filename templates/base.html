@@ -99,6 +99,10 @@
       text-align: center;
     }
 
+    .left-align {
+      text-align: left;
+    }
+
     a {
       /* color: #91b8ff; */
       color: #9de64e;
@@ -192,7 +196,15 @@
     #poc canvas {
       border: 1px dashed #2c1e31;
       border-radius: 5px;
+      max-width: 90%;
+    }
+
+    #poc img {
       max-width: 75%;
+      max-height: 75%;
+      background: #1f1f1f;
+      border-radius: 5px;
+      border: 1px dashed #2c1e31;
     }
 
     /* #poc ul {
@@ -229,6 +241,22 @@
       padding: 1em;
       border-radius: 5px;
 
+    }
+
+    #poc .webgpu-required {
+      display: none;
+    }
+
+    #poc .webgpu-missing {
+      display: block;
+    }
+
+    #poc.has-webgpu .webgpu-required {
+      display: block;
+    }
+
+    #poc.has-webgpu .webgpu-missing {
+      display: none;
     }
 
     #poc #probe-ray-dda-2d-controls .indent {
