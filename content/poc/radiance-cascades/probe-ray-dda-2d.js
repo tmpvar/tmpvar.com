@@ -308,18 +308,17 @@ async function ProbeRayDDA2DBegin() {
         @group(0) @binding(3) var worldSampler: sampler;
 
         fn RayMarch(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
-
           var levelDivisor = 1.0;
+          var levelMip = 0.0;
           if (ubo.debugRaymarchMipmaps > 0) {
             levelDivisor = 1.0 / f32(1<<u32(ubo.level));
+            levelMip = f32(ubo.level);
           }
 
           let levelRayOrigin = rayOrigin * levelDivisor;
           let levelProbeCenter = probeCenter * levelDivisor;
           let levelMaxDistance = maxDistance * levelDivisor;
-          let levelMip = f32(ubo.level) * (1 - levelDivisor);
           var cursor = DDACursorInit(levelRayOrigin, rayDirection);
-          // a=transparency
           var acc = vec4f(0.0, 0.0, 0.0, 1.0);
           let dims = vec2f(f32(ubo.width), f32(ubo.height)) * levelDivisor;
 
@@ -368,7 +367,7 @@ async function ProbeRayDDA2DBegin() {
           //       returning transparent black.
           //
           //       The real fix is to add another ring of probes for every level that live
-          //       just out of bounds to add converage for lower corner/edge probes
+          //       just out of bounds to add coverage for lower corner/edge probes
 
           let pos = clamp(rawPos, vec2<i32>(0), vec2<i32>(cascadeWidth - 1));
 
