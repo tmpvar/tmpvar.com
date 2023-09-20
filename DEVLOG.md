@@ -16,7 +16,6 @@
 - radiance-cascades: consider adding an environment light to the 2d demo
 
 ## Pending
-- radiance-cascades: add another debug flag that flips between dda and constant sized stepping
 - radiance-cascades: add a separate raymarching approach that does constant sized steps
 - radiance-cascades: when computing fluence, how does the alpha channel affect the result?
 
@@ -27,6 +26,7 @@
 - radiance-cascades: change `Probe RayDDA` to Flatland and update all links in the channel
 
 ## 2023-09-20
+- radiance-cascades: add another debug flag that flips between dda and constant sized stepping
 ## 2023-09-19
 - radiance-cascades: default demo world
 - radiance-cascades: cascade 0 doesn't absolutely start at 0

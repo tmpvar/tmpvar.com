@@ -894,14 +894,16 @@ click/drag to move the light
   </div>
 
   <div class="debugDisbleBrushPreview-control control">
-    disable brush preview <input type="checkbox" value="1" />
+    disable brush preview <input type="checkbox" value="1" checked />
   </div>
 
   <div class="debugRaymarchMipmaps-control control">
     raymarch mipmap N on cascade level N <input type="checkbox" value="1" checked />
   </div>
+  <div class="debugRaymarchWithDDA-control control">
+    raymarch with dda<input type="checkbox" value="1" checked />
   </div>
-
+  </div>
 
   <h4>Radiance Cascade Parameters</h4>
   <div class="indent">

@@ -216,7 +216,8 @@ async function ProbeRayDDA2DBegin() {
         "intervalEndRadius",
         "branchingFactor",
         "debugRaymarchMipmaps",
-        "intervalAccumulationDecay"
+        "intervalAccumulationDecay",
+        "debugRaymarchWithDDA",
       ]
 
       // TODO: if we go over 256 bytes then this needs to be updated
@@ -261,6 +262,7 @@ async function ProbeRayDDA2DBegin() {
           branchingFactor: u32,
           debugRaymarchMipmaps: u32,
           intervalAccumulationDecay: u32,
+          debugRaymarchWithDDA: u32,
         };
 
         struct ProbeRayResult {
@@ -307,7 +309,7 @@ async function ProbeRayDDA2DBegin() {
         @group(0) @binding(2) var worldTexture: texture_2d<f32>;
         @group(0) @binding(3) var worldSampler: sampler;
 
-        fn RayMarch(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
+        fn RayMarchDDA(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
           var levelDivisor = 1.0;
           var levelMip = 0.0;
           if (ubo.debugRaymarchMipmaps > 0) {
@@ -343,11 +345,19 @@ async function ProbeRayDDA2DBegin() {
               cursor.mapPos / dims,
               levelMip
             );
-            sample = vec4f(sample.rgb, (1.0 - sample.a));
-            acc = vec4(
-              acc.rgb + sample.rgb * acc.a,
-              acc.a * sample.a
-            );
+
+            if (false) {
+              sample = vec4f(sample.rgb, exp(-sample.a * decay));
+              acc = vec4f(
+                acc.rgb + acc.a * sample.rgb * (1.0 - sample.a),
+                acc.a * sample.a
+              );
+            } else {
+              acc = vec4f(
+                acc.rgb + acc.a * sample.rgb,
+                acc.a * (1.0 - sample.a)
+              );
+            }
 
             // Step the ray
             {
@@ -472,12 +482,16 @@ async function ProbeRayDDA2DBegin() {
           );
 
           let OutputIndex = (ubo.maxLevel0Rays * (ubo.level % 2)) + RayIndex;
-          let LowerResult = RayMarch(
-            RayOrigin,
-            RayOrigin + RayDirection * LowerIntervalRadius,
-            RayDirection,
-            IntervalRadius
-          );
+          var LowerResult: vec4f;
+
+          if (ubo.debugRaymarchWithDDA > 0) {
+            LowerResult = RayMarchDDA(
+              RayOrigin,
+              RayOrigin + RayDirection * LowerIntervalRadius,
+              RayDirection,
+              IntervalRadius
+            );
+          }
 
           var UpperResult = SampleUpperProbes(RayOrigin, ProbeRayIndex);
 
@@ -594,7 +608,8 @@ async function ProbeRayDDA2DBegin() {
         maxLevel0Rays,
         branchingFactor,
         debugRaymarchMipmaps,
-        intervalAccumulationDecay
+        intervalAccumulationDecay,
+        debugRaymarchWithDDA
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
@@ -613,6 +628,7 @@ async function ProbeRayDDA2DBegin() {
         uboData[levelIndexOffset + 10] = branchingFactor
         uboData[levelIndexOffset + 11] = debugRaymarchMipmaps
         uboData[levelIndexOffset + 12] = intervalAccumulationDecay
+        uboData[levelIndexOffset + 13] = debugRaymarchWithDDA
 
         const byteOffset = level * alignedSize
         queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
@@ -1726,6 +1742,13 @@ Example on Windows:
           return value
         }
       )
+      state.dirty = state.dirty || AutoParam(
+        'debugRaymarchWithDDA',
+        'bool',
+        (parentEl, value) => {
+          return value
+        }
+      )
 
       state.dirty = state.dirty || AutoParam(
         'debugDisbleBrushPreview',
@@ -1867,7 +1890,8 @@ Example on Windows:
               state.maxLevel0Rays,
               state.params.branchingFactor,
               state.params.debugRaymarchMipmaps,
-              state.params.intervalAccumulationDecay
+              state.params.intervalAccumulationDecay,
+              state.params.debugRaymarchWithDDA
             );
             pass.end()
           }
