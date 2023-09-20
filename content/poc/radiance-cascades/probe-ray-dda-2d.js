@@ -3,7 +3,10 @@ DemoImage.src = window.location.pathname + "probe-ray-dda-2d-demo.png"
 
 async function ProbeRayDDA2DBegin() {
   const shaders = {
-    DebugWorldBlit(device, presentationFormat, worldTexture, irradianceTexture) {
+    DebugWorldBlit(gpu, worldTexture, irradianceTexture) {
+      const device = gpu.device
+      const presentationFormat = gpu.presentationFormat
+
       const uboFields = [
         "width",
         "height",
@@ -16,6 +19,15 @@ async function ProbeRayDDA2DBegin() {
         size: uboData.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         label: "DebugWorldBlit/ubo",
+      })
+
+      const sampler = gpu.device.createSampler({
+        label: "DebugWorldBlit - Sampler",
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        magFilter: 'linear',
+        minFilter: 'linear',
+        mipmapFilter: 'nearest',
       })
 
       const source = /* wgsl */`
@@ -55,12 +67,13 @@ async function ProbeRayDDA2DBegin() {
 
         @group(0) @binding(0) var worldTexture: texture_2d<f32>;
         @group(0) @binding(1) var irradianceTexture: texture_2d<f32>;
-        @group(0) @binding(2) var<uniform> ubo: UBOParams;
+        @group(0) @binding(2) var irradianceSampler: sampler;
+        @group(0) @binding(3) var<uniform> ubo: UBOParams;
 
         @fragment
         fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
           var scale = 1.0;
-          var pixelPos: vec2<f32> = vec2<f32>(
+          var pixelPos = vec2f(
             fragData.uv.x * f32(ubo.width) / scale,
             fragData.uv.y * f32(ubo.height) / scale
           );
@@ -72,16 +85,23 @@ async function ProbeRayDDA2DBegin() {
               i32(pixelPos.y) >> u32(ubo.debugRenderWorldMipLevel)
             );
 
-            return vec4(
+            return vec4f(
               textureLoad(worldTexture, samplePos, ubo.debugRenderWorldMipLevel).rgb,
               1.0
             );
           }
 
-          return vec4(
-            textureLoad(irradianceTexture, vec2<i32>(pixelPos), 0).rgb,
-            1.0
-          );
+          if (true) {
+            return vec4f(
+              textureSample(irradianceTexture, irradianceSampler, fragData.uv / scale).rgb,
+              1.0
+            );
+          } else {
+            return vec4f(
+              textureLoad(irradianceTexture,  vec2<i32>(pixelPos), 0).rgb,
+              1.0
+            );
+          }
         }
       `;
 
@@ -108,6 +128,13 @@ async function ProbeRayDDA2DBegin() {
           },
           {
             binding: 2,
+            visibility: GPUShaderStage.FRAGMENT,
+            sampler: {
+              type: "filtering"
+            },
+          },
+          {
+            binding: 3,
             visibility: GPUShaderStage.FRAGMENT,
             buffer: {
               type: 'uniform',
@@ -152,7 +179,11 @@ async function ProbeRayDDA2DBegin() {
             resource: irradianceTexture.createView()
           },
           {
-            binding: 2, resource: {
+            binding: 2,
+            resource: sampler,
+          },
+          {
+            binding: 3, resource: {
               buffer: ubo
             }
           },
@@ -1489,8 +1520,7 @@ async function ProbeRayDDA2DBegin() {
 
     state.gpu.programs = {
       debugWorldBlit: shaders.DebugWorldBlit(
-        state.gpu.device,
-        state.gpu.presentationFormat,
+        state.gpu,
         state.worldAndBrushPreviewTexture,
         state.irradianceTexture
       ),

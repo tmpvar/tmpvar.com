@@ -18,12 +18,12 @@
                      timer queries
 
 ## Pending
-- radiance-cascades: interpolate fluence on a per pixel basis (bilinear interpolation)
 - radiance-cascades: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades: add dom output for timings
 - radiance-cascades: change `Probe RayDDA` to Flatland and update all links in the channel
 
 ## 2023-09-20
+- radiance-cascades: interpolate fluence on a per pixel basis (bilinear interpolation)
 - radiance-cascades: add a separate raymarching approach that does constant sized steps
 - radiance-cascades: add another debug flag that flips between dda and constant sized stepping
 ## 2023-09-19

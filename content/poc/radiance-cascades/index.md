@@ -928,7 +928,7 @@ click/drag to move the light
   </div>
 
   <div class="intervalRadius-control control">
-    interval radius (level 0): <input type="range" min="0" max="1024" value="5">
+    interval radius (level 0): <input type="range" min="0" max="1024" value="6">
     <output></output>
   </div>
 
