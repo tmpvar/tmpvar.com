@@ -8,17 +8,24 @@
 - article: lbvh
 - article: hotcart & hotcart redux
 - article: pullstream
+- radiance-cascades: raytrace approach for comparison's sake
+- radiance-cascades: add a ring of probes along the outside of the bounds to correctly sample
+                     upper probes from lower probes that live on the edge
+                     (e.g., outside of a fully valid bilinear interpolation cage)
+- radiance-cascades: consider replacing "run continuously" with a play butt
 
 ## Pending
-- radiance-cascades: consider adding a dumb FPS counter when the "run continuously"
-                     or a play button is pressed - maybe use the visual convention developed by
-                     shadertoy
-- radiance-cascades: raytrace approach for comparison's sake
-- radiance-cascades: add a ring of probes along the outside of the bounds to correctly sample upper probes
-                     from lower probes that live on the edge (e.g., outside of a fully valid
-                     bilinear interpolation cage)
+- radiance-cascades: add another debug flag that flips between dda and constant sized stepping
+- radiance-cascades: add a separate raymarching approach that does constant sized steps
+- radiance-cascades: when computing fluence, how does the alpha channel affect the result?
 
-## 2023-09-18
+- radiance-cascades: interpolate fluence on a per pixel basis
+- radiance-cascades: consider adding a dumb FPS counter when the "run continuously" without
+                     timer queries
+- radiance-cascades: add dom output for timings
+
+## 2023-09-20
+## 2023-09-19
 - radiance-cascades: default demo world
 - radiance-cascades: cascade 0 doesn't absolutely start at 0
                       https://discord.com/channels/318590007881236480/1142751596858593372/1152843885844901928
