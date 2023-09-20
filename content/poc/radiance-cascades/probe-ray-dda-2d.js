@@ -201,7 +201,7 @@ async function ProbeRayDDA2DBegin() {
       }
     },
 
-    ProbeAtlasRaycast(gpu, probeBuffer, worldTexture, workgroupSize, maxLevelRayCount) {
+    ProbeAtlasRaymarch(gpu, probeBuffer, worldTexture, workgroupSize, maxLevelRayCount) {
       const device = gpu.device
       const uboFields = [
         "totalRays",
@@ -227,11 +227,11 @@ async function ProbeRayDDA2DBegin() {
       const ubo = gpu.device.createBuffer({
         size: uboData.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        label: "ProbeAtlasRaycast/ubo",
+        label: "ProbeAtlasRaymarch/ubo",
       })
 
       const sampler = gpu.device.createSampler({
-        label: "ProbeAtlasRaycast - Sampler",
+        label: "ProbeAtlasRaymarch - Sampler",
         addressModeU: 'clamp-to-edge',
         addressModeV: 'clamp-to-edge',
         magFilter: 'linear',
@@ -496,12 +496,12 @@ async function ProbeRayDDA2DBegin() {
       `
 
       const shaderModule = device.createShaderModule({
-        label: 'ProbeAtlasRaycast - ShaderModule',
+        label: 'ProbeAtlasRaymarch - ShaderModule',
         code: source
       })
 
       const bindGroupLayout = device.createBindGroupLayout({
-        label: 'ProbeAtlasRaycast - BindGroupLayout',
+        label: 'ProbeAtlasRaymarch - BindGroupLayout',
         entries: [
           {
             binding: 0,
@@ -536,7 +536,7 @@ async function ProbeRayDDA2DBegin() {
       })
 
       const pipeline = device.createComputePipeline({
-        label: 'ProbeAtlasRaycast - ComputePipeline',
+        label: 'ProbeAtlasRaymarch - ComputePipeline',
         compute: {
           module: shaderModule,
           entryPoint: 'ComputeMain',
@@ -549,7 +549,7 @@ async function ProbeRayDDA2DBegin() {
       })
 
       const bindGroup = device.createBindGroup({
-        label: 'ProbeAtlasRaycast - BindGroup',
+        label: 'ProbeAtlasRaymarch - BindGroup',
         layout: pipeline.getBindGroupLayout(0),
         entries: [
           {
@@ -568,7 +568,7 @@ async function ProbeRayDDA2DBegin() {
           {
             binding: 2,
             resource: worldTexture.createView({
-              label: 'ProbeAtlasRaycast - BindGroup - WorldTexture view'
+              label: 'ProbeAtlasRaymarch - BindGroup - WorldTexture view'
             })
           },
           {
@@ -578,7 +578,7 @@ async function ProbeRayDDA2DBegin() {
         ]
       })
 
-      return function ProbeAtlasRaycast(
+      return function ProbeAtlasRaymarch(
         queue,
         computePass,
         width,
@@ -1414,7 +1414,7 @@ async function ProbeRayDDA2DBegin() {
         state.worldAndBrushPreviewTexture,
         state.irradianceTexture
       ),
-      probeAtlasRaycast: shaders.ProbeAtlasRaycast(
+      probeAtlasRaymarch: shaders.ProbeAtlasRaymarch(
         state.gpu,
         state.probeBuffer,
         state.worldAndBrushPreviewTexture,
@@ -1861,9 +1861,9 @@ Example on Windows:
 
         GPUTimedBlock(
           commandEncoder,
-          `ProbeAtlasRaycast level(${level})`, () => {
+          `ProbeAtlasRaymarch level(${level})`, () => {
             let pass = commandEncoder.beginComputePass()
-            state.gpu.programs.probeAtlasRaycast(
+            state.gpu.programs.probeAtlasRaymarch(
               state.gpu.device.queue,
               pass,
               canvas.width,
