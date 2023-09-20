@@ -558,8 +558,8 @@ async function ProbeRayDDA2DBegin() {
 
           let RayAngle = TAU * (f32(ProbeRayIndex) + 0.5) /  f32(ubo.probeRayCount);
           let RayDirection = vec2<f32>(
-            sin(RayAngle),
-            cos(RayAngle)
+            cos(RayAngle),
+            sin(RayAngle)
           );
 
           let RayOrigin = vec2<f32>(
@@ -802,8 +802,7 @@ async function ProbeRayDDA2DBegin() {
               angle += TAU;
             }
 
-            let AnglePerProbeRay = TAU / f32(ubo.probeRayCount);
-            let rayIndex = i32(angle / AnglePerProbeRay);
+            let rayIndex = i32(angle / TAU * f32(ubo.probeRayCount) - 0.5);
             // color based on the angle
             // {
             //   var col = i32(rayIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
