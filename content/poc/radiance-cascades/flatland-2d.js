@@ -1,5 +1,5 @@
 const DemoImage = document.createElement('img');
-DemoImage.src = window.location.pathname + "probe-ray-dda-2d-demo.png"
+DemoImage.src = window.location.pathname + "flatland-2d-demo.png"
 
 async function ProbeRayDDA2DBegin() {
   const shaders = {
@@ -1330,7 +1330,7 @@ async function ProbeRayDDA2DBegin() {
     return gpu
   }
 
-  let canvas = document.getElementById('probe-ray-dda-2d-canvas');
+  let canvas = document.getElementById('flatland-2d-canvas');
   let state = {
     canvas: canvas,
     ctx: canvas.getContext('webgpu'),
@@ -1377,11 +1377,11 @@ async function ProbeRayDDA2DBegin() {
   {
     let minProbeDiameter = Math.pow(
       2,
-      parseFloat(document.querySelector('#probe-ray-dda-2d-controls .probeRadius-control input').min)
+      parseFloat(document.querySelector('#flatland-2d-controls .probeRadius-control input').min)
     )
     let maxProbeRays = Math.pow(
       2,
-      parseFloat(document.querySelector('#probe-ray-dda-2d-controls .probeRayCount-control input').max)
+      parseFloat(document.querySelector('#flatland-2d-controls .probeRayCount-control input').max)
     )
     let maxProbeCount = (canvas.width / minProbeDiameter) * (canvas.height / minProbeDiameter)
     state.maxLevel0Rays = maxProbeRays * maxProbeCount;
@@ -1393,7 +1393,7 @@ async function ProbeRayDDA2DBegin() {
 
     try {
       state.gpu = await InitGPU(state.ctx, probeBufferByteSize)
-    } catch(e) {
+    } catch (e) {
       return;
     }
 
@@ -1612,19 +1612,17 @@ async function ProbeRayDDA2DBegin() {
     state.gpu.device.queue.submit([commandEncoder.finish()])
   }
 
-  const Param = (name, value, cb) => {
-    if (state.params[name] != value) {
-      state.params[name] = value;
-      if (cb) {
-        cb(value)
-      }
-      return true;
-    }
-    return false;
+  const ParseColor = (value) => {
+    let v = parseInt(value.replace("#", ""), 16)
+
+    let r = (v >> 16) & 0xFF
+    let g = (v >> 8) & 0xFF
+    let b = (v >> 0) & 0xFF
+    return r | (g << 8) | (b << 16) | 0xFF000000
   }
 
-  const controlEl = document.getElementById('probe-ray-dda-2d-controls')
-  const AutoParam = (paramName, paramType, cb) => {
+  const controlEl = document.getElementById('flatland-2d-controls')
+  const Param = (paramName, paramType, cb) => {
     let selector = `.${paramName}-control`
     let parentEl = controlEl.querySelector(selector)
     let el = parentEl.querySelector(['input', 'select'])
@@ -1654,6 +1652,15 @@ async function ProbeRayDDA2DBegin() {
       }
       case 'i32': {
         value = parseFloat(value) | 0;
+        break;
+      }
+      case 'bool': {
+        value = !!parseFloat(value) ? 1 : 0;
+        break;
+      }
+      case 'color': {
+        value = ParseColor(value)
+        break;
       }
     }
 
@@ -1662,25 +1669,17 @@ async function ProbeRayDDA2DBegin() {
     }
 
     if (state.params[paramName] != value) {
-      state.params[paramName] = value;
-      return true;
+      state.params[paramName] = value
+      state.dirty = true
+      return true
     }
-    return false;
+    return false
 
   }
 
-  const ColorParam = (name, value) => {
-    let v = parseInt(value.replace("#", ""), 16)
 
-    let r = (v >> 16) & 0xFF
-    let g = (v >> 8) & 0xFF
-    let b = (v >> 0) & 0xFF
-    let color = r | (g << 8) | (b << 16) | 0xFF000000
 
-    return Param(name, color)
-  }
-
-  document.querySelector('#probe-ray-dda-2d-controls button[name="clear-button"]').addEventListener('click', (e) => {
+  document.querySelector('#flatland-2d-controls button[name="clear-button"]').addEventListener('click', (e) => {
     WorldTextureClear();
   })
 
@@ -1714,140 +1713,85 @@ Example on Windows:
     const wasDirty = state.dirty;
     // probe params
     {
-      state.dirty = state.dirty || AutoParam(
-        'probeRadius',
-        'i32',
-        (parentEl, value) => {
-          let newValue = Math.pow(2, value) * 0.5;
-          parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = ${newValue}`
-          return newValue
-        }
-      )
+      Param('probeRadius','i32', (parentEl, value) => {
+        let newValue = Math.pow(2, value) * 0.5;
+        parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = ${newValue}`
+        return newValue
+      })
 
-      state.dirty = state.dirty || AutoParam(
-        'probeRayCount',
-        'i32',
-        (parentEl, value) => {
-          let newValue = Math.pow(2, value)
-          parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = <span class="highlight-orange">${newValue}</span>`
-          return newValue
-        }
-      )
+      Param('probeRayCount', 'i32', (parentEl, value) => {
+        let newValue = Math.pow(2, value)
+        parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = <span class="highlight-orange">${newValue}</span>`
+        return newValue
+      })
 
-      state.dirty = state.dirty || AutoParam(
-        'branchingFactor',
-        'i32',
-        (parentEl, value) => {
-          let probeRayCount = state.params.probeRayCount;
-          let displayValue = Math.pow(2, value)
-          let examples = ([0, 1, 2, 3]).map(level => {
-            let shifted = state.params.probeRayCount << (value * level)
-            let powed = probeRayCount * Math.pow(2, value * level)
-            return powed
-          })
+      Param('branchingFactor', 'i32', (parentEl, value) => {
+        let probeRayCount = state.params.probeRayCount;
+        let displayValue = Math.pow(2, value)
+        let examples = ([0, 1, 2, 3]).map(level => {
+          let shifted = state.params.probeRayCount << (value * level)
+          let powed = probeRayCount * Math.pow(2, value * level)
+          return powed
+        })
 
-          parentEl.querySelector('output').innerHTML = `
-            2<sup class="highlight-blue">${value}</sup> = ${displayValue} (<span class="highlight-orange">${probeRayCount}</span> * 2<sup>(<span  class="highlight-blue">${value}</span> * level)</sup> = ${examples.join(', ')}, ...)
-          `
-          return value
-        }
-      )
+        parentEl.querySelector('output').innerHTML = `
+          2<sup class="highlight-blue">${value}</sup> = ${displayValue} (<span class="highlight-orange">${probeRayCount}</span> * 2<sup>(<span  class="highlight-blue">${value}</span> * level)</sup> = ${examples.join(', ')}, ...)
+        `
+        return value
+      })
 
-      state.dirty = state.dirty || AutoParam(
-        'intervalRadius',
-        'i32',
-        (parentEl, value) => {
-          parentEl.querySelector('output').innerHTML = `${value}`
-          return value
-        }
-      )
+      Param('intervalRadius', 'i32', (parentEl, value) => {
+        parentEl.querySelector('output').innerHTML = `${value}`
+        return value
+      })
 
-      state.dirty = state.dirty || AutoParam(
-        'intervalAccumulationDecay',
-        'i32',
-        (parentEl, value) => {
-          let displayValue = value / 100.0;
-          parentEl.querySelector('output').innerHTML = `${displayValue.toFixed(2)}`
-          return value
-        }
-      )
+      Param('intervalAccumulationDecay', 'i32', (parentEl, value) => {
+        let displayValue = value / 100.0;
+        parentEl.querySelector('output').innerHTML = `${displayValue.toFixed(2)}`
+        return value
+      })
 
-      state.dirty = state.dirty || AutoParam(
-        'maxProbeLevel',
-        'i32',
-        (parentEl, value) => {
-          parentEl.querySelector('output').innerHTML = `${value}`
-          return value
-        }
-      )
+      Param('maxProbeLevel', 'i32', (parentEl, value) => {
+        parentEl.querySelector('output').innerHTML = `${value}`
+        return value
+      })
     }
 
     // brush params
     {
-      state.dirty = state.dirty || AutoParam(
-        'brushRadiance',
-        'f32',
-        (parentEl, value) => {
-          parentEl.querySelector('output').innerHTML = `${value}`
-          // 0..1024 maps to 0..1, but it is stored in a u32
-          return value * 1024.0
-        }
-      )
+      Param('brushRadiance', 'f32', (parentEl, value) => {
+        parentEl.querySelector('output').innerHTML = `${value}`
+        // 0..1024 maps to 0..1, but it is stored in a u32
+        return value * 1024.0
+      })
 
-      state.dirty = state.dirty || AutoParam(
-        'brushRadius',
-        'f32',
-        (parentEl, value) => {
-          parentEl.querySelector('output').innerHTML = `${value}`
-          return value
-        }
-      )
-      state.dirty = state.dirty || AutoParam(
-        'brushOpacity',
-        'i32',
-        (parentEl, value) => {
-          parentEl.querySelector('output').innerHTML = `${(value / 255).toFixed(2)}`
-          return value
-        }
-      )
+      Param('brushRadius', 'f32', (parentEl, value) => {
+        parentEl.querySelector('output').innerHTML = `${value}`
+        return value
+      })
 
-      state.dirty = state.dirty || ColorParam(
-        'color',
-        controlEl.querySelector('input[name="brush-color-selector"]').value
-      )
+      Param('brushOpacity', 'i32', (parentEl, value) => {
+        parentEl.querySelector('output').innerHTML = `${(value / 255).toFixed(2)}`
+        return value
+      })
 
-      state.params.color = (state.params.color & 0x00FFFFFF) | ((state.params.brushOpacity & 0xFF) << 24)
+      Param('brushColor', 'color', (parentEl, value) => {
+        return (value & 0x00FFFFFF) | ((state.params.brushOpacity & 0xFF) << 24)
+      })
 
-      state.dirty = state.dirty || Param(
-        'erase',
-        !!controlEl.querySelector('input[name="brush-erase-mode"]').checked
-      )
+      Param('brushEraseMode', 'bool')
     }
 
     // debug params
     {
-      state.dirty = state.dirty || AutoParam(
-        'debugWorldMipmapLevelRender',
-        'i32'
-      )
+      Param('debugWorldMipmapLevelRender', 'i32')
+      Param('debugProbeDirections', 'bool')
+      Param('debugRaymarchMipmaps', 'bool')
+      Param('debugRaymarchWithDDA', 'bool', (parentEl, value) => {
+          let stepSizeMultiplierEl = controlEl.querySelector(
+            '.debugRaymarchFixedSizeStepMultiplier-control input'
+          )
 
-      state.dirty = state.dirty || Param(
-        'debugProbeDirections',
-        !!controlEl.querySelector('input[name="debug-probe-directions-mode"]').checked
-      )
-
-      state.dirty = state.dirty || AutoParam(
-        'debugRaymarchMipmaps',
-        'bool',
-        (parentEl, value) => {
-          return value
-        }
-      )
-      state.dirty = state.dirty || AutoParam(
-        'debugRaymarchWithDDA',
-        'bool',
-        (parentEl, value) => {
-          let stepSizeMultiplierEl = controlEl.querySelector('.debugRaymarchFixedSizeStepMultiplier-control input')
           if (value) {
             stepSizeMultiplierEl.disabled = true
           } else {
@@ -1857,30 +1801,13 @@ Example on Windows:
         }
       )
 
-      state.dirty = state.dirty || AutoParam(
-        'debugRaymarchFixedSizeStepMultiplier',
-        'i32',
-        (parentEl, value) => {
-          parentEl.querySelector('output').innerHTML = `${(value / 100).toFixed(2)}`
-          return value
-        }
-      )
+      Param('debugRaymarchFixedSizeStepMultiplier', 'i32', (parentEl, value) => {
+        parentEl.querySelector('output').innerHTML = `${(value / 100).toFixed(2)}`
+        return value
+      })
 
-      state.dirty = state.dirty || AutoParam(
-        'debugDisbleBrushPreview',
-        'bool',
-        (parentEl, value) => {
-          return value
-        }
-      )
-
-      state.dirty = state.dirty || AutoParam(
-        'debugPerformance',
-        'bool',
-        (parentEl, value) => {
-          return value
-        }
-      )
+      Param('debugDisbleBrushPreview', 'bool')
+      Param('debugPerformance', 'bool')
     }
 
     if (state.dirty && !wasDirty) {
@@ -1917,8 +1844,8 @@ Example on Windows:
             state.mouse.pos[0],
             canvas.height - state.mouse.pos[1],
             state.params.brushRadius,
-            state.params.erase ? 0 : state.params.brushRadiance,
-            state.params.erase ? 0 : state.params.color,
+            state.params.brushEraseMode ? 0 : state.params.brushRadiance,
+            state.params.brushEraseMode ? 0 : state.params.brushColor,
             canvas.width,
             canvas.height
           )
@@ -1952,8 +1879,8 @@ Example on Windows:
               state.mouse.pos[0],
               canvas.height - state.mouse.pos[1],
               state.params.brushRadius,
-              state.params.erase ? 0 : state.params.brushRadiance,
-              state.params.erase ? 0 : state.params.color,
+              state.params.brushEraseMode ? 0 : state.params.brushRadiance,
+              state.params.brushEraseMode ? 0 : state.params.brushColor,
               canvas.width,
               canvas.height
             );
@@ -1985,7 +1912,7 @@ Example on Windows:
 
         let intervalStartRadius = level == 0
           ? 0
-          : state.params.intervalRadius << ((level-1) * state.params.branchingFactor)
+          : state.params.intervalRadius << ((level - 1) * state.params.branchingFactor)
         let intervalEndRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
 
         GPUTimedBlock(

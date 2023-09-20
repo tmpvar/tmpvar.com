@@ -862,9 +862,11 @@ click/drag to move the light
   }
 </script>
 
-### Probe Ray DDA (2D)
+<!-- alias so the rename doesn't really break things-->
+<span id="probe-ray-dda-2d"></span>
+### Flatland (2D)
 
-<section id="probe-ray-dda-2d-controls" class="webgpu-required">
+<section id="flatland-2d-controls" class="webgpu-required">
   <h4>Debug/Development</h4>
   <div class="indent">
   <div class="debugPerformance-control control">
@@ -889,12 +891,13 @@ click/drag to move the light
   </select>
   </div>
 
-  <div class="control">
-    render probe directions <input type="checkbox" value="1" name="debug-probe-directions-mode" />
+
+  <div class="debugProbeDirections-control control">
+    render probe directions <input type="checkbox" value="1" />
   </div>
 
   <div class="debugDisbleBrushPreview-control control">
-    disable brush preview <input type="checkbox" value="1" checked />
+    disable brush preview <input type="checkbox" value="1" />
   </div>
 
   <div class="debugRaymarchMipmaps-control control">
@@ -949,8 +952,9 @@ click/drag to move the light
   <div class="control" style="float: right">
     <button name="clear-button">Clear Canvas</button>
   </div>
-  <div class="control">
-  erase <input type="checkbox" value="1" name="brush-erase-mode" />
+
+  <div class="control brushEraseMode-control">
+  erase <input type="checkbox" value="1" />
   </div>
 
   <div class="control brushOpacity-control">
@@ -968,15 +972,14 @@ click/drag to move the light
     <output></output>
   </div>
 
-  <div class="control">
-  color: <input type="color" name="brush-color-selector" value="#FFFC99">
-  </div>
+  <div class="brushColor-control control">
+    brush color: <input type="color" value="#FFFC99">
   </div>
 </section>
 
 
 <section class="center-align webgpu-required">
-  <canvas id="probe-ray-dda-2d-canvas" width="1024" height="1024"></canvas>
+  <canvas id="flatland-2d-canvas" width="1024" height="1024"></canvas>
   <section class="left-align">
 
 #### approach
@@ -995,7 +998,7 @@ click/drag to move the light
   </section>
 </section>
 
-<script src="probe-ray-dda-2d.js" defer></script>
+<script src="flatland-2d.js" defer></script>
 
 <section class="center-align webgpu-missing error-border">
   <img src="/img/webgpu-responsive.svg" width="768" height="768" />
