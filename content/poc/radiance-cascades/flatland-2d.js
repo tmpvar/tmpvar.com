@@ -342,6 +342,21 @@ async function ProbeRayDDA2DBegin() {
         @group(0) @binding(2) var worldTexture: texture_2d<f32>;
         @group(0) @binding(3) var worldSampler: sampler;
 
+        fn AccumulateSample(acc: vec4f, sample: vec4f, decay: f32) -> vec4f {
+          if (false) {
+            let adjustedSample = vec4f(sample.rgb, exp(-sample.a * decay));
+            return vec4f(
+              acc.rgb + acc.a * adjustedSample.rgb * (1.0 - adjustedSample.a),
+              acc.a * adjustedSample.a
+            );
+          } else {
+            return vec4f(
+              acc.rgb + acc.a * sample.rgb,
+              acc.a * (1.0 - sample.a)
+            );
+          }
+        }
+
         fn RayMarchDDA(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
           var levelDivisor = 1.0;
           var levelMip = 0.0;
@@ -379,18 +394,7 @@ async function ProbeRayDDA2DBegin() {
               levelMip
             );
 
-            if (false) {
-              sample = vec4f(sample.rgb, exp(-sample.a * decay));
-              acc = vec4f(
-                acc.rgb + acc.a * sample.rgb * (1.0 - sample.a),
-                acc.a * sample.a
-              );
-            } else {
-              acc = vec4f(
-                acc.rgb + acc.a * sample.rgb,
-                acc.a * (1.0 - sample.a)
-              );
-            }
+            acc = AccumulateSample(acc, sample, decay);
 
             // Step the ray
             {
@@ -444,18 +448,7 @@ async function ProbeRayDDA2DBegin() {
               levelMip
             );
 
-            if (false) {
-              sample = vec4f(sample.rgb, exp(-sample.a * decay));
-              acc = vec4f(
-                acc.rgb + acc.a * sample.rgb * (1.0 - sample.a),
-                acc.a * sample.a
-              );
-            } else {
-              acc = vec4f(
-                acc.rgb + acc.a * sample.rgb,
-                acc.a * (1.0 - sample.a)
-              );
-            }
+            acc = AccumulateSample(acc, sample, decay);
 
             t += stepSize;
           }

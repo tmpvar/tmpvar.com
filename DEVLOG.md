@@ -20,6 +20,7 @@
 ## Pending
 - radiance-cascades: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades: add dom output for timings
+- radiance-cascades: 'proper' transparency accumulation
 
 ## 2023-09-20
 - radiance-cascades: change `Probe RayDDA` to Flatland and update all links in the channel
