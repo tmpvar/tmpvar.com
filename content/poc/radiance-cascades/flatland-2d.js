@@ -1780,17 +1780,17 @@ Example on Windows:
       Param('debugProbeDirections', 'bool')
       Param('debugRaymarchMipmaps', 'bool')
       Param('debugRaymarchWithDDA', 'bool', (parentEl, value) => {
-          let stepSizeMultiplierEl = controlEl.querySelector(
-            '.debugRaymarchFixedSizeStepMultiplier-control input'
-          )
+        let stepSizeMultiplierEl = controlEl.querySelector(
+          '.debugRaymarchFixedSizeStepMultiplier-control input'
+        )
 
-          if (value) {
-            stepSizeMultiplierEl.disabled = true
-          } else {
-            stepSizeMultiplierEl.disabled = false
-          }
-          return value
+        if (value) {
+          stepSizeMultiplierEl.disabled = true
+        } else {
+          stepSizeMultiplierEl.disabled = false
         }
+        return value
+      }
       )
 
       Param('debugRaymarchFixedSizeStepMultiplier', 'i32', (parentEl, value) => {
