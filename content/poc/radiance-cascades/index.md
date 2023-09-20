@@ -925,6 +925,11 @@ click/drag to move the light
     <output></output>
   </div>
 
+  <div class="intervalAccumulationDecay-control control">
+    interval accumulation decay: <input type="range" min="1" max="400" value="100">
+    <output></output>
+  </div>
+
   <div class="maxProbeLevel-control control">
     max probe level: <input type="range" min="0" max="10" value="10">
     <output></output>
@@ -959,8 +964,6 @@ click/drag to move the light
   <div class="control">
   color: <input type="color" name="brush-color-selector" value="#FFFC99">
   </div>
-
-
   </div>
 </section>
 

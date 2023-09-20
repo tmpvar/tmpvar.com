@@ -216,6 +216,7 @@ async function ProbeRayDDA2DBegin() {
         "intervalEndRadius",
         "branchingFactor",
         "debugRaymarchMipmaps",
+        "intervalAccumulationDecay"
       ]
 
       // TODO: if we go over 256 bytes then this needs to be updated
@@ -259,6 +260,7 @@ async function ProbeRayDDA2DBegin() {
           // WGSL wants this to be unsigned because it is used as a shift
           branchingFactor: u32,
           debugRaymarchMipmaps: u32,
+          intervalAccumulationDecay: u32,
         };
 
         struct ProbeRayResult {
@@ -321,6 +323,7 @@ async function ProbeRayDDA2DBegin() {
           var acc = vec4f(0.0, 0.0, 0.0, 1.0);
           let dims = vec2f(f32(ubo.width), f32(ubo.height)) * levelDivisor;
 
+          let decay = f32(ubo.intervalAccumulationDecay) / 100.0;
           while(true) {
             if (distance(cursor.mapPos, levelProbeCenter) > levelMaxDistance) {
               break;
@@ -591,7 +594,8 @@ async function ProbeRayDDA2DBegin() {
         levelCount,
         maxLevel0Rays,
         branchingFactor,
-        debugRaymarchMipmaps
+        debugRaymarchMipmaps,
+        intervalAccumulationDecay
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
@@ -609,6 +613,7 @@ async function ProbeRayDDA2DBegin() {
         uboData[levelIndexOffset + 9] = intervalEndRadius
         uboData[levelIndexOffset + 10] = branchingFactor
         uboData[levelIndexOffset + 11] = debugRaymarchMipmaps
+        uboData[levelIndexOffset + 12] = intervalAccumulationDecay
 
         const byteOffset = level * alignedSize
         queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
@@ -1666,6 +1671,16 @@ Example on Windows:
       )
 
       state.dirty = state.dirty || AutoParam(
+        'intervalAccumulationDecay',
+        'i32',
+        (parentEl, value) => {
+          let displayValue = value / 100.0;
+          parentEl.querySelector('output').innerHTML = `${displayValue.toFixed(2)}`
+          return value
+        }
+      )
+
+      state.dirty = state.dirty || AutoParam(
         'maxProbeLevel',
         'i32',
         (parentEl, value) => {
@@ -1876,7 +1891,8 @@ Example on Windows:
               levelCount,
               state.maxLevel0Rays,
               state.params.branchingFactor,
-              state.params.debugRaymarchMipmaps
+              state.params.debugRaymarchMipmaps,
+              state.params.intervalAccumulationDecay
             );
             pass.end()
           }
