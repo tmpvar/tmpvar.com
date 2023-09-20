@@ -870,7 +870,7 @@ click/drag to move the light
   <h4>Debug/Development</h4>
   <div class="indent">
   <div class="debugPerformance-control control">
-    run continuously and collect frame timings <input type="checkbox" value="1" checked />
+    run continuously and collect frame timings <input type="checkbox" value="1" />
     <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
     <div class="performance-output">
       timings
