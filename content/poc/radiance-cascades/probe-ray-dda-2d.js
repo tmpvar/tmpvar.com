@@ -1173,7 +1173,7 @@ async function ProbeRayDDA2DBegin() {
     ctx.configure({
       device,
       format: presentationFormat,
-      alphaMode: 'premultiplied',
+      alphaMode: 'opaque',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
     });
 
@@ -1471,7 +1471,7 @@ async function ProbeRayDDA2DBegin() {
   // WorldTextureClear();
 
   // Fill with a demo image
-  {
+  if (false) {
     await DemoImage.decode();
     const DemoImageBitmap = await createImageBitmap(DemoImage);
 
@@ -1482,43 +1482,30 @@ async function ProbeRayDDA2DBegin() {
       },
       {
         texture: state.worldTexture,
-        premultipliedAlpha: true,
       },
       [DemoImage.width, DemoImage.height]
     );
   }
 
-  // {
-  //   let commandEncoder = state.gpu.device.createCommandEncoder()
+  // Draw a bright light in the bottom left corner
+  if (true) {
+    let commandEncoder = state.gpu.device.createCommandEncoder()
 
-  //   const DrawLine = (ax, ay, bx, by, color, radiance, radius) => {
-  //     state.gpu.programs.worldPaint(
-  //       commandEncoder,
-  //       state.gpu.device.queue,
-  //       ax,
-  //       ay,
-  //       bx,
-  //       by,
-  //       radius,
-  //       radiance,
-  //       color,
-  //       canvas.width,
-  //       canvas.height
-  //     )
-  //   }
-
-  //   DrawLine(
-  //     canvas.width * 0.5,
-  //     canvas.height * 0.5,
-  //     canvas.width * 0.5,
-  //     canvas.height * 0.5,
-  //     0xFFFFFFFF,
-  //     1024,
-  //     30
-  //   );
-
-  //   state.gpu.device.queue.submit([commandEncoder.finish()])
-  // }
+    state.gpu.programs.worldPaint(
+      commandEncoder,
+      state.gpu.device.queue,
+      30,
+      30,
+      30,
+      30,
+      30,
+      1024 * 10,
+      0xFFFFFFFF,
+      canvas.width,
+      canvas.height
+    )
+    state.gpu.device.queue.submit([commandEncoder.finish()])
+  }
 
   const Param = (name, value, cb) => {
     if (state.params[name] != value) {
