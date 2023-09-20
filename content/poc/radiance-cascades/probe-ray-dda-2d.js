@@ -929,11 +929,10 @@ async function ProbeRayDDA2DBegin() {
           if (d <= 0.0) {
             let color = unpack4x8unorm(ubo.color);
             let radianceMultiplier = f32(ubo.radiance) / 1024.0;
-            let premultiplied = vec4(color.rgb * radianceMultiplier * color.a, color.a);
             textureStore(
               texture,
               id.xy,
-              premultiplied
+              vec4(color.rgb * radianceMultiplier, color.a)
             );
           }
         }
@@ -1206,9 +1205,6 @@ async function ProbeRayDDA2DBegin() {
           GPUBufferUsage.STORAGE
         )
       })
-
-
-
     } else {
       gpu.hasTimestampQueryFeature = false
     }
