@@ -1039,23 +1039,16 @@ async function ProbeRayDDA2DBegin() {
         @group(0) @binding(1) var dst: texture_storage_2d<rgba16float, write>;
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
-
-          var color: vec4f = vec4f(0.0, 0.0, 0.0, 0.0);
           let TextureSize = vec2<i32>(textureDimensions(src));
-
           let lo = vec2<i32>(id.xy) * 2;
-          let hi = lo + 2;
-          for (var y = lo.y; y<hi.y; y++) {
-            for (var x = lo.x; x<hi.x; x++) {
-              var samplePos = vec2<i32>(x, y);
-              var sample = vec4(0.0, 0.0, 0.0, 0.0);
-              if (samplePos.x < TextureSize.x && samplePos.y < TextureSize.y) {
-                sample = textureLoad(src, samplePos, 0);
-              }
-
-              color += sample;
-            }
+          if (lo.x + 1 >= TextureSize.x || lo.y + 1 >= TextureSize.y) {
+            return;
           }
+
+          var color = textureLoad(src, lo + vec2<i32>(0, 0), 0)
+                    + textureLoad(src, lo + vec2<i32>(1, 0), 0)
+                    + textureLoad(src, lo + vec2<i32>(0, 1), 0)
+                    + textureLoad(src, lo + vec2<i32>(1, 1), 0);
 
           textureStore(dst, id.xy, color * 0.25);
         }
