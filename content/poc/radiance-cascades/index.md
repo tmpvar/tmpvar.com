@@ -901,8 +901,13 @@ click/drag to move the light
     raymarch mipmap N on cascade level N <input type="checkbox" value="1" checked />
   </div>
   <div class="debugRaymarchWithDDA-control control">
-    raymarch with dda<input type="checkbox" value="1" checked />
+    raymarch with dda<input type="checkbox" value="1" />
   </div>
+  <div class="debugRaymarchFixedSizeStepMultiplier-control control">
+    raymarch fixed size step multiplier: <input type="range" min="1" max="1000" value="100">
+    <output></output>
+  </div>
+
   </div>
 
   <h4>Radiance Cascade Parameters</h4>

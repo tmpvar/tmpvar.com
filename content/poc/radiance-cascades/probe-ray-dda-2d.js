@@ -218,6 +218,7 @@ async function ProbeRayDDA2DBegin() {
         "debugRaymarchMipmaps",
         "intervalAccumulationDecay",
         "debugRaymarchWithDDA",
+        "debugRaymarchFixedSizeStepMultiplier"
       ]
 
       // TODO: if we go over 256 bytes then this needs to be updated
@@ -263,6 +264,7 @@ async function ProbeRayDDA2DBegin() {
           debugRaymarchMipmaps: u32,
           intervalAccumulationDecay: u32,
           debugRaymarchWithDDA: u32,
+          debugRaymarchFixedSizeStepMultiplier: u32
         };
 
         struct ProbeRayResult {
@@ -365,6 +367,66 @@ async function ProbeRayDDA2DBegin() {
               cursor.sideDist += mask * cursor.deltaDist;
               cursor.mapPos += mask * cursor.rayStep;
             }
+          }
+
+          return acc;
+        }
+
+        fn RayMarchFixedSize(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
+          var levelDivisor = 1.0;
+          var levelMip = 0.0;
+          if (ubo.debugRaymarchMipmaps > 0) {
+            levelDivisor = 1.0 / f32(1<<u32(ubo.level));
+            levelMip = f32(ubo.level);
+          }
+
+          let levelRayOrigin = rayOrigin * levelDivisor;
+          let levelProbeCenter = probeCenter * levelDivisor;
+          let levelMaxDistance = maxDistance * levelDivisor;
+          var acc = vec4f(0.0, 0.0, 0.0, 1.0);
+          let dims = vec2f(f32(ubo.width), f32(ubo.height));
+
+          let decay = f32(ubo.intervalAccumulationDecay) / 100.0;
+          var t = 0.0;
+          let stepSizeMultiplier = max(0.1, f32(ubo.debugRaymarchFixedSizeStepMultiplier) / 100.0);
+          let stepSize = f32(levelMip + 1) * stepSizeMultiplier;
+          while(true) {
+            let pos = rayOrigin + rayDirection * t;
+
+            if (distance(pos, probeCenter) > maxDistance) {
+              break;
+            }
+
+            if (
+              pos.x < 0 ||
+              pos.y < 0 ||
+              pos.x >= dims.x ||
+              pos.y >= dims.y
+            ) {
+              break;
+            }
+
+            var sample = textureSampleLevel(
+              worldTexture,
+              worldSampler,
+              pos / dims,
+              levelMip
+            );
+
+            if (false) {
+              sample = vec4f(sample.rgb, exp(-sample.a * decay));
+              acc = vec4f(
+                acc.rgb + acc.a * sample.rgb * (1.0 - sample.a),
+                acc.a * sample.a
+              );
+            } else {
+              acc = vec4f(
+                acc.rgb + acc.a * sample.rgb,
+                acc.a * (1.0 - sample.a)
+              );
+            }
+
+            t += stepSize;
           }
 
           return acc;
@@ -491,6 +553,13 @@ async function ProbeRayDDA2DBegin() {
               RayDirection,
               IntervalRadius
             );
+          } else {
+            LowerResult = RayMarchFixedSize(
+              RayOrigin,
+              RayOrigin + RayDirection * LowerIntervalRadius,
+              RayDirection,
+              IntervalRadius
+            );
           }
 
           var UpperResult = SampleUpperProbes(RayOrigin, ProbeRayIndex);
@@ -609,7 +678,8 @@ async function ProbeRayDDA2DBegin() {
         branchingFactor,
         debugRaymarchMipmaps,
         intervalAccumulationDecay,
-        debugRaymarchWithDDA
+        debugRaymarchWithDDA,
+        debugRaymarchFixedSizeStepMultiplier
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
@@ -629,6 +699,7 @@ async function ProbeRayDDA2DBegin() {
         uboData[levelIndexOffset + 11] = debugRaymarchMipmaps
         uboData[levelIndexOffset + 12] = intervalAccumulationDecay
         uboData[levelIndexOffset + 13] = debugRaymarchWithDDA
+        uboData[levelIndexOffset + 14] = debugRaymarchFixedSizeStepMultiplier
 
         const byteOffset = level * alignedSize
         queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
@@ -1746,6 +1817,21 @@ Example on Windows:
         'debugRaymarchWithDDA',
         'bool',
         (parentEl, value) => {
+          let stepSizeMultiplierEl = controlEl.querySelector('.debugRaymarchFixedSizeStepMultiplier-control input')
+          if (value) {
+            stepSizeMultiplierEl.disabled = true
+          } else {
+            stepSizeMultiplierEl.disabled = false
+          }
+          return value
+        }
+      )
+
+      state.dirty = state.dirty || AutoParam(
+        'debugRaymarchFixedSizeStepMultiplier',
+        'i32',
+        (parentEl, value) => {
+          parentEl.querySelector('output').innerHTML = `${(value / 100).toFixed(2)}`
           return value
         }
       )
@@ -1891,7 +1977,8 @@ Example on Windows:
               state.params.branchingFactor,
               state.params.debugRaymarchMipmaps,
               state.params.intervalAccumulationDecay,
-              state.params.debugRaymarchWithDDA
+              state.params.debugRaymarchWithDDA,
+              state.params.debugRaymarchFixedSizeStepMultiplier
             );
             pass.end()
           }

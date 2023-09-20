@@ -14,18 +14,17 @@
                      (e.g., outside of a fully valid bilinear interpolation cage)
 - radiance-cascades: consider replacing "run continuously" with a play button, like shadertoy
 - radiance-cascades: consider adding an environment light to the 2d demo
-
-## Pending
-- radiance-cascades: add a separate raymarching approach that does constant sized steps
-- radiance-cascades: when computing fluence, how does the alpha channel affect the result?
-
-- radiance-cascades: interpolate fluence on a per pixel basis
 - radiance-cascades: consider adding a dumb FPS counter when the "run continuously" without
                      timer queries
+
+## Pending
+- radiance-cascades: interpolate fluence on a per pixel basis (bilinear interpolation)
+- radiance-cascades: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades: add dom output for timings
 - radiance-cascades: change `Probe RayDDA` to Flatland and update all links in the channel
 
 ## 2023-09-20
+- radiance-cascades: add a separate raymarching approach that does constant sized steps
 - radiance-cascades: add another debug flag that flips between dda and constant sized stepping
 ## 2023-09-19
 - radiance-cascades: default demo world
