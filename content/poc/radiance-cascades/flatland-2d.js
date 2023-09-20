@@ -338,15 +338,24 @@ async function ProbeRayDDA2DBegin() {
 
         fn AccumulateSample(acc: vec4f, sample: vec4f, decay: f32) -> vec4f {
           if (false) {
-            let adjustedSample = vec4f(sample.rgb, exp(-sample.a * decay));
-            return vec4f(
-              acc.rgb + acc.a * adjustedSample.rgb * (1.0 - adjustedSample.a),
-              acc.a * adjustedSample.a
+            // TODO: I haven't had any success with this
+            var opacity = exp(-sample.a * decay);
+            let ab = opacity * (1.0 - acc.a);
+            let a0 = acc.a + ab;
+
+            let pa = vec4(acc.rgb * acc.a, acc.a);
+            let pb = vec4(sample.rgb * opacity, opacity);
+
+            return vec4(
+              (pa.rgb * pa.a + pb.rgb * pb.a * (1.0 - pa.a)) / a0,
+              // acc.rgb * acc.a + sample.rgb * opacity * (1.0 - acc.a),
+              a0
             );
           } else {
+            let transparency = 1.0 - sample.a;
             return vec4f(
               acc.rgb + acc.a * sample.rgb,
-              acc.a * (1.0 - sample.a)
+              acc.a * transparency
             );
           }
         }
@@ -1699,7 +1708,7 @@ Example on Windows:
     const wasDirty = state.dirty;
     // probe params
     {
-      Param('probeRadius','i32', (parentEl, value) => {
+      Param('probeRadius', 'i32', (parentEl, value) => {
         let newValue = Math.pow(2, value) * 0.5;
         parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = ${newValue}`
         return newValue
