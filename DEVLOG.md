@@ -19,11 +19,11 @@
 
 ## Pending
 - radiance-cascades: when computing fluence, how does the alpha channel affect the result?
-- radiance-cascades: add dom output for timings
 - radiance-cascades: 'proper' transparency accumulation
-- radiance-cascades: add a screenshot button
 
 ## 2023-09-20
+- radiance-cascades: add dom output for timings
+- radiance-cascades: ~~add a screenshot button~~ currently not possible
 - radiance-cascades: fix 'debug probe directions'
 - radiance-cascades: change `Probe RayDDA` to Flatland and update all links in the channel
                      opted to add a span with an id to allow the old link to work

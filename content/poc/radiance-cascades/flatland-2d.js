@@ -1799,7 +1799,15 @@ Example on Windows:
       })
 
       Param('debugDisbleBrushPreview', 'bool')
-      Param('debugPerformance', 'bool')
+      Param('debugPerformance', 'bool', (parentEl, value) => {
+        let outputEl = parentEl.querySelector('.performance-output')
+        if (value) {
+          outputEl.style.display = 'block'
+        } else {
+          outputEl.style.display = 'none'
+        }
+        return value
+      })
     }
 
     if (state.dirty && !wasDirty) {
@@ -2007,14 +2015,17 @@ Example on Windows:
       state.gpu.timestampMappableBuffer.unmap();
 
       let totalMs = 0.0
+      let output = ''
       state.gpu.timestampQueries.forEach(entry => {
         let diff = Number(results[entry.endIndex] - results[entry.startIndex])
         let ms = diff / 1000000.0
         totalMs += ms
-        console.log(`${entry.label} ${ms.toFixed(2)}ms`)
+        output += `${ms.toFixed(2)}ms ${entry.label}\n`
       })
-      console.log("total %sms", totalMs.toFixed(2))
-      console.log("\n\n");
+      output += `------\n`
+      output += `${totalMs.toFixed(2)}ms total\n`
+
+      document.querySelector('#flatland-2d-controls .debugPerformance-control .performance-output code pre').innerText = output;
     }
 
     window.requestAnimationFrame(RenderFrame)
