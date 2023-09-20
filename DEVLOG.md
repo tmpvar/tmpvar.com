@@ -12,7 +12,8 @@
 - radiance-cascades: add a ring of probes along the outside of the bounds to correctly sample
                      upper probes from lower probes that live on the edge
                      (e.g., outside of a fully valid bilinear interpolation cage)
-- radiance-cascades: consider replacing "run continuously" with a play butt
+- radiance-cascades: consider replacing "run continuously" with a play button, like shadertoy
+- radiance-cascades: consider adding an environment light to the 2d demo
 
 ## Pending
 - radiance-cascades: add another debug flag that flips between dda and constant sized stepping
@@ -23,6 +24,7 @@
 - radiance-cascades: consider adding a dumb FPS counter when the "run continuously" without
                      timer queries
 - radiance-cascades: add dom output for timings
+- radiance-cascades: change `Probe RayDDA` to Flatland and update all links in the channel
 
 ## 2023-09-20
 ## 2023-09-19
