@@ -91,17 +91,11 @@ async function ProbeRayDDA2DBegin() {
             );
           }
 
-          if (true) {
-            return vec4f(
-              textureSample(irradianceTexture, irradianceSampler, fragData.uv / scale).rgb,
-              1.0
-            );
-          } else {
-            return vec4f(
-              textureLoad(irradianceTexture,  vec2<i32>(pixelPos), 0).rgb,
-              1.0
-            );
-          }
+          let sample = textureSample(irradianceTexture, irradianceSampler, fragData.uv / scale);
+          return vec4f(
+            sample.rgb,
+            1.0
+          );
         }
       `;
 
