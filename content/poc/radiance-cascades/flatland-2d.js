@@ -1571,7 +1571,7 @@ async function ProbeRayDDA2DBegin() {
   // WorldTextureClear();
 
   // Fill with a demo image
-  if (false) {
+  if (true) {
     await DemoImage.decode();
     const DemoImageBitmap = await createImageBitmap(DemoImage);
 
@@ -1588,7 +1588,7 @@ async function ProbeRayDDA2DBegin() {
   }
 
   // Draw a bright light in the bottom left corner
-  if (true) {
+  if (false) {
     let commandEncoder = state.gpu.device.createCommandEncoder()
 
     state.gpu.programs.worldPaint(
