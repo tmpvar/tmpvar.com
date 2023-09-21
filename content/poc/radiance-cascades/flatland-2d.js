@@ -427,7 +427,7 @@ async function ProbeRayDDA2DBegin() {
           let decay = f32(ubo.intervalAccumulationDecay) / 100.0;
           var t = 0.0;
           let stepSizeMultiplier = max(0.1, f32(ubo.debugRaymarchFixedSizeStepMultiplier) / 100.0);
-          let stepSize = f32(levelMip + 1) * stepSizeMultiplier;
+          let stepSize = pow(2.0, levelMip) * stepSizeMultiplier;
           while(true) {
             let pos = rayOrigin + rayDirection * t;
 
