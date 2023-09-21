@@ -1582,6 +1582,8 @@ async function ProbeRayDDA2DBegin() {
       },
       {
         texture: state.worldTexture,
+        // TODO: without this, the anti-aliased edges of the webgpu logo will glow
+        premultipliedAlpha: true,
       },
       [DemoImage.width, DemoImage.height]
     );
