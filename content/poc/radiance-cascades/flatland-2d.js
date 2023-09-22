@@ -1390,10 +1390,10 @@ async function ProbeRayDDA2DBegin() {
     try {
       state.gpu = await InitGPU(state.ctx, probeBufferByteSize)
     } catch (e) {
+      console.log(e)
+      rootEl.className = rootEl.className.replace('has-webgpu', '')
       return;
     }
-
-    rootEl.className += " has-webgpu"
 
     state.probeBuffer = state.gpu.device.createBuffer({
       label: 'ProbeBuffer',
