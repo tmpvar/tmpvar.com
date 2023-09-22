@@ -1455,16 +1455,8 @@ async function ProbeRayDDA2DBegin() {
     }, { passive: false })
   }
 
-  // Note: I'm using rgba16float because I'm being a bit lazy. The ideal case
-  //       is using a format like rg32uint where the packing is like
-  //         r = rgba8
-  //         g = radianceMultiplier
-  //       Converting to this format requires some changes
-  //       - instead of copyExternalTextureToTexture, we need to run a compute shader
-  //         to pack in the above format
-  //       - mipmapping needs to use the packed format
-  //       - raymarching needs to use the packed format
-
+  // Note: I'm using rgba16float because rgb values need to be scaled by a radiance
+  //       multiplier and those scaled values get averaged when mipmapping.
   // Create the world texture
   {
     state.worldTexture = state.gpu.device.createTexture({
