@@ -16,12 +16,37 @@
 - radiance-cascades/2d: consider adding an environment light to the 2d demo
 - radiance-cascades/2d: consider adding a dumb FPS counter when the "run continuously" without
                      timer queries
-
-## Pending
+## Next
 - radiance-cascades/2d: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades/2d: 'proper' transparency accumulation
 - radiance-cascades/2d: how to fix the ringing artifacts?
 
+## Pending
+- radiance-cascades/3d: build orbit camera
+- radiance-cascades/3d: playground: ray distribution on a single probe
+                        - fibonacci
+
+- radiance-cascades/3d: setup another webgpu instance
+- radiance-cascades/3d: create a 3d volume texture (rgba16float) and fill with some primitives
+- radiance-cascades/3d: raymarch 3d volume from the screen
+
+- radiance-cascades/3d: add probe buffer
+- radiance-cascades/3d: trace cascade 0 probe rays, collecting into probe buffer
+- radiance-cascades/3d: debug render probes
+
+- radiance-cascades/3d: fill 3d volume with data - a fractal from jb
+- radiance-cascades/3d: texture wrapper that tracks version - will be used for resizing the
+                        volume via a slider, and we'll want to rebuild the bindGroup when
+                        that happens
+
+
+- radiance-cascades/3d: mipmap volume whenever it changes
+- radiance-cascades/3d: cone trace the volume
+
+- radiance-cascades/3d: mipmap only changed regions
+
+
+## 2023-09-22
 ## 2023-09-20
 - radiance-cascades/2d: add dom output for timings
 - radiance-cascades/2d: ~~add a screenshot button~~ currently not possible
