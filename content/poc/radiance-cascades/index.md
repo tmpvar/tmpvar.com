@@ -14,7 +14,11 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
   - shadertoy: [Radiance Cascades 2d Smooth WIP
  ](https://www.shadertoy.com/view/mlSfRD) - Suslik's fork of fad's work
 
-## Radiance Intervals
+## 2D
+
+Things are simpler in 2D so we'll start there.
+
+### Radiance Intervals (2D)
 In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where relative to the previous level, each cascade level:
 - doubles the inner radius of the band
 - doubles the width of the band
@@ -142,7 +146,7 @@ In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where rel
   }
 </script>
 
-### Ray Distributions
+### Ray Distributions (2D)
 
 <section id="ray-distributions-2d-controls">
   <p>
@@ -313,7 +317,7 @@ In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where rel
 </script>
 
 
-### Probe Ray Interpolation
+### Probe Ray Interpolation (2D)
 
 <section id="probe-interpolation-2d-controls">
   <p>
@@ -448,7 +452,7 @@ In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where rel
   }
 </script>
 
-### Probe Rays vs Light
+### Probe Rays vs Light (2D)
 
 Visualize the radiance intervals that have a light in their bounds by drawing the quantized angle to the light
 
@@ -864,151 +868,157 @@ click/drag to move the light
 
 <!-- alias so the rename doesn't really break things-->
 <span id="probe-ray-dda-2d"></span>
+
 ### Flatland (2D)
 
-<section id="flatland-2d-controls" class="webgpu-required">
-  <h4>Debug/Development</h4>
-  <div class="indent">
-  <div class="debugPerformance-control control">
-    run continuously and collect frame timings <input type="checkbox" value="1" />
-    <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
-    <div class="performance-output">
-      timings
-      <code><pre></pre></code>
+<section id="flatland-2d-content">
+  <section id="flatland-2d-controls" class="webgpu-required">
+    <h4>Debug/Development</h4>
+    <div class="indent">
+    <div class="debugPerformance-control control">
+      run continuously and collect frame timings <input type="checkbox" value="1" />
+      <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
+      <div class="performance-output">
+        timings
+        <code><pre></pre></code>
+      </div>
     </div>
-  </div>
+    <div class="debugWorldMipmapLevelRender-control control">
+    render world mip level
+    <select>
+      <option value="-1">disabled</option>
+      <option value="0">0</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+      <option value="9">9</option>
+    </select>
+    </div>
+    <div class="debugProbeDirections-control control">
+      render probe directions <input type="checkbox" value="1" />
+    </div>
+    <div class="debugDisbleBrushPreview-control control">
+      disable brush preview <input type="checkbox" value="1" />
+    </div>
+    <div class="debugRaymarchMipmaps-control control">
+      raymarch mipmap N on cascade level N <input type="checkbox" value="1" checked />
+    </div>
+    <div class="debugRaymarchWithDDA-control control">
+      raymarch with dda<input type="checkbox" value="1" />
+    </div>
+    <div class="debugRaymarchFixedSizeStepMultiplier-control control">
+      raymarch fixed size step multiplier: <input type="range" min="1" max="1000" value="100">
+      <output></output>
+    </div>
+    </div>
+    <h4>Radiance Cascade Parameters</h4>
+    <div class="indent">
+      <div class="probeRadius-control control">
+        2<sup>i</sup> spacing (level 0): <input type="range" min="1" max="9" value="1">
+        <output></output>
+      </div>
+      <div class="probeRayCount-control control">
+        2<sup>r</sup> raycount (level 0): <input type="range" min="1" max="6" value="2">
+        <output></output>
+      </div>
+      <div class="branchingFactor-control control">
+        branching factor: <input type="range" min="1" max="3" value="2">
+        <output></output>
+      </div>
+      <div class="intervalRadius-control control">
+        interval radius (level 0): <input type="range" min="0" max="1024" value="6">
+        <output></output>
+      </div>
+      <div class="intervalAccumulationDecay-control control">
+        interval accumulation decay: <input type="range" min="1" max="400" value="100">
+        <output></output>
+      </div>
+      <div class="maxProbeLevel-control control">
+        max probe level: <input type="range" min="0" max="10" value="10">
+        <output></output>
+      </div>
+    </div>
+    <h4>Brush Parameters</h4>
+    <div class="indent">
+      <div class="control" style="float: right">
+        <button name="clear-button">Clear Canvas</button>
+      </div>
+      <div class="control brushEraseMode-control">
+        erase <input type="checkbox" value="1" />
+      </div>
+      <div class="control brushOpacity-control">
+        brush opacity: <input type="range" min="0" max="255" value="255" step="1">
+        <output></output>
+      </div>
+      <div class="brushRadiance-control control">
+        brush radiance: <input type="range" min="0" max="20" value="1" step="0.01">
+        <output></output>
+      </div>
+      <div class="brushRadius-control control">
+        brush radius: <input type="range" min="2" max="100" value="5">
+        <output></output>
+      </div>
+      <div class="brushColor-control control">
+        brush color: <input type="color" value="#FFFC99">
+      </div>
+    </div>
+  </section>
+  <section class="center-align webgpu-required">
+    <canvas id="flatland-2d-canvas" width="1024" height="1024"></canvas>
+    <section class="left-align">
 
-  <div class="debugWorldMipmapLevelRender-control control">
-  render world mip level
-  <select>
-    <option value="-1">disabled</option>
-    <option value="0">0</option>
-    <option value="1">1</option>
-    <option value="2">2</option>
-    <option value="3">3</option>
-    <option value="4">4</option>
-    <option value="5">5</option>
-    <option value="6">6</option>
-    <option value="7">7</option>
-    <option value="8">8</option>
-    <option value="9">9</option>
-  </select>
-  </div>
+  #### approach
 
+  - __storage__: create an 'SSBO' for probes that has enough space to cover level 0 (e.g., `probeCount * raysPerProbe`). Double this size so we can ping pong cascade levels
+  - __raymarch__: for level=max..0
+    - cast rays from the probe center offset by the level's interval start
+    - dda through the world texture (emitters / occluders)
+    - if ray hits an emitter write store radiance in SSBO
+    - if ray hits occluder write 0 into SSBO
+    - if ray hits nothing (and level < max)
+      - fetch upper level ray values per probe
+      - bilinear interpolate between these 4 values and store the result in SSBO
+  - __irradiance__: compute irradiance per probe by accumulating the averaging the probe values stored in SSBO (e.g., average of all rays for the associated level 0 probe)
 
-  <div class="debugProbeDirections-control control">
-    render probe directions <input type="checkbox" value="1" />
-  </div>
+    </section>
+  </section>
+  <script src="flatland-2d.js" defer></script>
 
-  <div class="debugDisbleBrushPreview-control control">
-    disable brush preview <input type="checkbox" value="1" />
-  </div>
-
-  <div class="debugRaymarchMipmaps-control control">
-    raymarch mipmap N on cascade level N <input type="checkbox" value="1" checked />
-  </div>
-  <div class="debugRaymarchWithDDA-control control">
-    raymarch with dda<input type="checkbox" value="1" />
-  </div>
-  <div class="debugRaymarchFixedSizeStepMultiplier-control control">
-    raymarch fixed size step multiplier: <input type="range" min="1" max="1000" value="100">
-    <output></output>
-  </div>
-
-  </div>
-
-  <h4>Radiance Cascade Parameters</h4>
-  <div class="indent">
-  <div class="probeRadius-control control">
-    2<sup>i</sup> spacing (level 0): <input type="range" min="1" max="9" value="1">
-    <output></output>
-  </div>
-
-  <div class="probeRayCount-control control">
-    2<sup>r</sup> raycount (level 0): <input type="range" min="1" max="6" value="2">
-    <output></output>
-  </div>
-
-  <div class="branchingFactor-control control">
-    branching factor: <input type="range" min="1" max="3" value="2">
-    <output></output>
-  </div>
-
-  <div class="intervalRadius-control control">
-    interval radius (level 0): <input type="range" min="0" max="1024" value="6">
-    <output></output>
-  </div>
-
-  <div class="intervalAccumulationDecay-control control">
-    interval accumulation decay: <input type="range" min="1" max="400" value="100">
-    <output></output>
-  </div>
-
-  <div class="maxProbeLevel-control control">
-    max probe level: <input type="range" min="0" max="10" value="10">
-    <output></output>
-  </div>
-  </div>
-
-  <h4>Brush Parameters</h4>
-  <div class="indent">
-
-  <div class="control" style="float: right">
-    <button name="clear-button">Clear Canvas</button>
-  </div>
-
-  <div class="control brushEraseMode-control">
-  erase <input type="checkbox" value="1" />
-  </div>
-
-  <div class="control brushOpacity-control">
-    brush opacity: <input type="range" min="0" max="255" value="255" step="1">
-    <output></output>
-  </div>
-
-  <div class="brushRadiance-control control">
-    brush radiance: <input type="range" min="0" max="20" value="1" step="0.01">
-    <output></output>
-  </div>
-
-  <div class="brushRadius-control control">
-    brush radius: <input type="range" min="2" max="100" value="5">
-    <output></output>
-  </div>
-
-  <div class="brushColor-control control">
-    brush color: <input type="color" value="#FFFC99">
-  </div>
-</section>
-
-
-<section class="center-align webgpu-required">
-  <canvas id="flatland-2d-canvas" width="1024" height="1024"></canvas>
-  <section class="left-align">
-
-#### approach
-
-- __storage__: create an 'SSBO' for probes that has enough space to cover level 0 (e.g., `probeCount * raysPerProbe`). Double this size so we can ping pong cascade levels
-- __raymarch__: for level=max..0
-  - cast rays from the probe center offset by the level's interval start
-  - dda through the world texture (emitters / occluders)
-  - if ray hits an emitter write store radiance in SSBO
-  - if ray hits occluder write 0 into SSBO
-  - if ray hits nothing (and level < max)
-    - fetch upper level ray values per probe
-    - bilinear interpolate between these 4 values and store the result in SSBO
-- __irradiance__: compute irradiance per probe by accumulating the averaging the probe values stored in SSBO (e.g., average of all rays for the associated level 0 probe)
-
+  <section class="center-align webgpu-missing error-border">
+    <img src="/img/webgpu-responsive.svg" width="768" height="768" />
+    <p class="error">
+      This demo requires <a href="https://en.wikipedia.org/wiki/WebGPU">WebGPU</a> - in other words, you should open this page in Chrome or Edge.
+    <p>
   </section>
 </section>
 
-<script src="flatland-2d.js" defer></script>
 
-<section class="center-align webgpu-missing error-border">
-  <img src="/img/webgpu-responsive.svg" width="768" height="768" />
-  <p class="error">
-  This demo requires <a href="https://en.wikipedia.org/wiki/WebGPU">WebGPU</a> - in other words, you should open this page in Chrome or Edge.
-  <p>
+## 3D
+
+### Probe Ray Distribution (3D)
+(Work in progress)
+<section id="probe-ray-distribution-3d-content">
+  <section class="controls">
+
+  </section>
+
+  <section class="center-align webgpu-required">
+    <canvas width="1024" height="1024"></canvas>
+  </section>
+
+  <script src="probe-ray-distribution-3d.js" defer></script>
+
+  <section class="center-align webgpu-missing error-border">
+    <img src="/img/webgpu-responsive.svg" width="768" height="768" />
+    <p class="error">
+      This demo requires <a href="https://en.wikipedia.org/wiki/WebGPU">WebGPU</a> - in other words, you should open this page in Chrome or Edge.
+    <p>
+  </section>
 </section>
 
 
