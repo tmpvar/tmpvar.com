@@ -42,6 +42,9 @@
 
 - radiance-cascades/3d: mipmap volume whenever it changes
 - radiance-cascades/3d: cone trace the volume
+- radiance-cascades/3d: render a mesh
+- radiance-cascades/3d: render an analytic primitive
+- radiance-cascades/3d: render a sdf
 
 - radiance-cascades/3d: mipmap only changed regions
 

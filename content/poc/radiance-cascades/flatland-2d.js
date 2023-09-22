@@ -2,6 +2,7 @@ const DemoImage = document.createElement('img');
 DemoImage.src = window.location.pathname + "flatland-2d-demo.png"
 
 async function ProbeRayDDA2DBegin() {
+  const rootEl = document.querySelector('#flatland-2d-content')
   const shaders = {
     DebugWorldBlit(gpu, worldTexture, irradianceTexture) {
       const device = gpu.device
@@ -1392,7 +1393,7 @@ async function ProbeRayDDA2DBegin() {
       return;
     }
 
-    document.querySelector("#poc").className += " has-webgpu"
+    rootEl.className += " has-webgpu"
 
     state.probeBuffer = state.gpu.device.createBuffer({
       label: 'ProbeBuffer',
