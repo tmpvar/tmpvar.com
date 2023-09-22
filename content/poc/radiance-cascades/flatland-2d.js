@@ -1455,6 +1455,16 @@ async function ProbeRayDDA2DBegin() {
     }, { passive: false })
   }
 
+  // Note: I'm using rgba16float because I'm being a bit lazy. The ideal case
+  //       is using a format like rg32uint where the packing is like
+  //         r = rgba8
+  //         g = radianceMultiplier
+  //       Converting to this format requires some changes
+  //       - instead of copyExternalTextureToTexture, we need to run a compute shader
+  //         to pack in the above format
+  //       - mipmapping needs to use the packed format
+  //       - raymarching needs to use the packed format
+
   // Create the world texture
   {
     state.worldTexture = state.gpu.device.createTexture({
@@ -1462,7 +1472,6 @@ async function ProbeRayDDA2DBegin() {
 
       size: [canvas.width, canvas.height, 1],
       dimension: '2d',
-      // r=rgba, b=emission
       format: 'rgba16float',
       usage: (
         GPUTextureUsage.TEXTURE_BINDING |
@@ -1481,7 +1490,6 @@ async function ProbeRayDDA2DBegin() {
       label: 'WorldAndBrushPreviewTexture',
       size: [canvas.width, canvas.height, 1],
       dimension: '2d',
-      // r=rgba, b=emission
       format: 'rgba16float',
       usage: (
         GPUTextureUsage.TEXTURE_BINDING |
