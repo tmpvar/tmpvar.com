@@ -871,7 +871,7 @@ click/drag to move the light
 
 ### Flatland (2D)
 
-<section id="flatland-2d-content">
+<section id="flatland-2d-content" class="has-webgpu">
   <section id="flatland-2d-controls" class="webgpu-required">
     <h4>Debug/Development</h4>
     <div class="indent">
@@ -1002,7 +1002,7 @@ click/drag to move the light
 
 ### Probe Ray Distribution (3D)
 (Work in progress)
-<section id="probe-ray-distribution-3d-content">
+<section id="probe-ray-distribution-3d-content" class="has-webgpu">
   <section class="controls">
 
   </section>
