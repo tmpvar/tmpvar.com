@@ -23,8 +23,8 @@
 
 ## Pending
 - radiance-cascades/3d: build orbit camera
-- radiance-cascades/3d: playground: ray distribution on a single probe
-                        - fibonacci
+- radiance-cascades/3d: playground: ray distribution on a single probe for a single level
+- radiance-cascades/3d: playground: ray distribution add multiple levels
 
 - radiance-cascades/3d: setup another webgpu instance
 - radiance-cascades/3d: create a 3d volume texture (rgba16float) and fill with some primitives

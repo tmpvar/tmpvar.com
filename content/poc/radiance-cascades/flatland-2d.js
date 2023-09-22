@@ -101,6 +101,7 @@ async function ProbeRayDDA2DBegin() {
       `;
 
       const shaderModule = device.createShaderModule({
+        label: "DebugWorldBlit - shader",
         code: source
       })
 
