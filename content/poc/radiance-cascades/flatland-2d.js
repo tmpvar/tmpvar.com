@@ -27,7 +27,7 @@ async function ProbeRayDDA2DBegin() {
         addressModeV: 'clamp-to-edge',
         magFilter: 'linear',
         minFilter: 'linear',
-        mipmapFilter: 'nearest',
+        mipmapFilter: 'linear',
       })
 
       const source = /* wgsl */`
@@ -243,7 +243,7 @@ async function ProbeRayDDA2DBegin() {
         "debugRaymarchMipmaps",
         "intervalAccumulationDecay",
         "debugRaymarchWithDDA",
-        "debugRaymarchFixedSizeStepMultiplier"
+        "debugRayMarchFixedStepSizeMultiplier"
       ]
 
       // TODO: if we go over 256 bytes then this needs to be updated
@@ -264,7 +264,7 @@ async function ProbeRayDDA2DBegin() {
         addressModeV: 'clamp-to-edge',
         magFilter: 'linear',
         minFilter: 'linear',
-        mipmapFilter: 'nearest',
+        mipmapFilter: 'linear',
       })
 
       const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
@@ -289,7 +289,7 @@ async function ProbeRayDDA2DBegin() {
           debugRaymarchMipmaps: u32,
           intervalAccumulationDecay: u32,
           debugRaymarchWithDDA: u32,
-          debugRaymarchFixedSizeStepMultiplier: u32
+          debugRayMarchFixedStepSizeMultiplier: u32
         };
 
         struct ProbeRayResult {
@@ -352,7 +352,7 @@ async function ProbeRayDDA2DBegin() {
               a0
             );
           } else {
-            let transparency = 1.0 - sample.a;
+            let transparency = (1.0 - sample.a) * decay;
             return vec4f(
               acc.rgb + acc.a * sample.rgb,
               acc.a * transparency
@@ -410,7 +410,7 @@ async function ProbeRayDDA2DBegin() {
           return acc;
         }
 
-        fn RayMarchFixedSize(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
+        fn RayMarchFixedStepSize(probeCenter: vec2f, rayOrigin: vec2f, rayDirection: vec2f, maxDistance: f32) -> vec4f {
           var levelDivisor = 1.0;
           var levelMip = 0.0;
           if (ubo.debugRaymarchMipmaps > 0) {
@@ -418,20 +418,17 @@ async function ProbeRayDDA2DBegin() {
             levelMip = f32(ubo.level);
           }
 
-          let levelRayOrigin = rayOrigin * levelDivisor;
-          let levelProbeCenter = probeCenter * levelDivisor;
-          let levelMaxDistance = maxDistance * levelDivisor;
           var acc = vec4f(0.0, 0.0, 0.0, 1.0);
           let dims = vec2f(f32(ubo.width), f32(ubo.height));
 
-          let decay = f32(ubo.intervalAccumulationDecay) / 100.0;
+          var decay = f32(ubo.intervalAccumulationDecay) / 100.0;
           var t = 0.0;
-          let stepSizeMultiplier = max(0.1, f32(ubo.debugRaymarchFixedSizeStepMultiplier) / 100.0);
+          let stepSizeMultiplier = max(0.1, f32(ubo.debugRayMarchFixedStepSizeMultiplier) / 100.0);
           let stepSize = pow(2.0, levelMip) * stepSizeMultiplier;
           while(true) {
             let pos = rayOrigin + rayDirection * t;
-
-            if (distance(pos, probeCenter) > maxDistance) {
+            let d = distance(pos, probeCenter);
+            if (d >= maxDistance) {
               break;
             }
 
@@ -444,6 +441,9 @@ async function ProbeRayDDA2DBegin() {
               break;
             }
 
+            var x = d/maxDistance;// - t/maxDistance;
+            var curve: f32 = pow(2, -10.0 * (1.0 - x));
+
             var sample = textureSampleLevel(
               worldTexture,
               worldSampler,
@@ -451,7 +451,20 @@ async function ProbeRayDDA2DBegin() {
               levelMip
             );
 
-            acc = AccumulateSample(acc, sample, decay);
+            // sample -= sample * (d/maxDistance);
+
+            // var curve = exp(-x * decay);
+            // sample *= (1.0 - (x * x));
+            // sample *= curve;
+            // acc *= curve;
+            let oldAcc = acc;
+            // acc = AccumulateSample(acc, sample, decay);
+
+            acc = vec4f(
+              acc.rgb + acc.a * sample.rgb,
+              acc.a * (1.0 - sample.a)
+            );
+            // acc -= (acc - oldAcc) * curve;
 
             t += stepSize;
           }
@@ -581,7 +594,7 @@ async function ProbeRayDDA2DBegin() {
               IntervalRadius
             );
           } else {
-            LowerResult = RayMarchFixedSize(
+            LowerResult = RayMarchFixedStepSize(
               RayOrigin,
               RayOrigin + RayDirection * LowerIntervalRadius,
               RayDirection,
@@ -706,7 +719,7 @@ async function ProbeRayDDA2DBegin() {
         debugRaymarchMipmaps,
         intervalAccumulationDecay,
         debugRaymarchWithDDA,
-        debugRaymarchFixedSizeStepMultiplier
+        debugRayMarchFixedStepSizeMultiplier
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
@@ -726,7 +739,7 @@ async function ProbeRayDDA2DBegin() {
         uboData[levelIndexOffset + 11] = debugRaymarchMipmaps
         uboData[levelIndexOffset + 12] = intervalAccumulationDecay
         uboData[levelIndexOffset + 13] = debugRaymarchWithDDA
-        uboData[levelIndexOffset + 14] = debugRaymarchFixedSizeStepMultiplier
+        uboData[levelIndexOffset + 14] = debugRayMarchFixedStepSizeMultiplier
 
         const byteOffset = level * alignedSize
         queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
@@ -1568,17 +1581,19 @@ async function ProbeRayDDA2DBegin() {
     state.dirty = true;
   }
 
-  // WorldTextureClear();
+  WorldTextureClear();
 
   // Fill with a demo image
-  if (true) {
+  if (false) {
     await DemoImage.decode();
-    const DemoImageBitmap = await createImageBitmap(DemoImage);
+    const DemoImageBitmap = await createImageBitmap(DemoImage, {
+      premultiplyAlpha: 'none',
+      imageOrientation: 'flipY',
+    });
 
     state.gpu.device.queue.copyExternalImageToTexture(
       {
         source: DemoImageBitmap,
-        flipY: true,
       },
       {
         texture: state.worldTexture,
@@ -1590,7 +1605,7 @@ async function ProbeRayDDA2DBegin() {
   }
 
   // Draw a bright light in the bottom left corner
-  if (false) {
+  if (true) {
     let commandEncoder = state.gpu.device.createCommandEncoder()
 
     state.gpu.programs.worldPaint(
@@ -1786,7 +1801,7 @@ Example on Windows:
       Param('debugRaymarchMipmaps', 'bool')
       Param('debugRaymarchWithDDA', 'bool', (parentEl, value) => {
         let stepSizeMultiplierEl = controlEl.querySelector(
-          '.debugRaymarchFixedSizeStepMultiplier-control input'
+          '.debugRaymarchFixedStepSizeMultiplier-control input'
         )
 
         if (value) {
@@ -1798,7 +1813,7 @@ Example on Windows:
       }
       )
 
-      Param('debugRaymarchFixedSizeStepMultiplier', 'i32', (parentEl, value) => {
+      Param('debugRaymarchFixedStepSizeMultiplier', 'i32', (parentEl, value) => {
         parentEl.querySelector('output').innerHTML = `${(value / 100).toFixed(2)}`
         return value
       })
@@ -1940,7 +1955,7 @@ Example on Windows:
               state.params.debugRaymarchMipmaps,
               state.params.intervalAccumulationDecay,
               state.params.debugRaymarchWithDDA,
-              state.params.debugRaymarchFixedSizeStepMultiplier
+              state.params.debugRayMarchFixedStepSizeMultiplier
             );
             pass.end()
           }

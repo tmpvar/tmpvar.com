@@ -901,7 +901,7 @@ click/drag to move the light
   </div>
 
   <div class="debugDisbleBrushPreview-control control">
-    disable brush preview <input type="checkbox" value="1" />
+    disable brush preview <input type="checkbox" value="1" checked />
   </div>
 
   <div class="debugRaymarchMipmaps-control control">
@@ -910,7 +910,7 @@ click/drag to move the light
   <div class="debugRaymarchWithDDA-control control">
     raymarch with dda<input type="checkbox" value="1" />
   </div>
-  <div class="debugRaymarchFixedSizeStepMultiplier-control control">
+  <div class="debugRaymarchFixedStepSizeMultiplier-control control">
     raymarch fixed size step multiplier: <input type="range" min="1" max="1000" value="100">
     <output></output>
   </div>
@@ -935,7 +935,7 @@ click/drag to move the light
   </div>
 
   <div class="intervalRadius-control control">
-    interval radius (level 0): <input type="range" min="0" max="1024" value="6">
+    interval radius (level 0): <input type="range" min="0" max="1024" value="120">
     <output></output>
   </div>
 
