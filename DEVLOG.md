@@ -22,9 +22,7 @@
 - radiance-cascades/2d: how to fix the ringing artifacts?
 
 ## Pending
-- radiance-cascades/3d: playground: wire up mouse to rotate controls
 - radiance-cascades/3d: playground: wire up wasd / arrow rotate controls
-
 
 - radiance-cascades/3d: setup another webgpu instance
 - radiance-cascades/3d: create a 3d volume texture (rgba16float) and fill with some primitives
@@ -50,6 +48,7 @@
 
 
 ## 2023-09-23
+- radiance-cascades/3d: playground: wire up mouse to rotate/zoom controls
 ## 2023-09-22
 - radiance-cascades/3d: playground: ray distribution add multiple levels
 - radiance-cascades/3d: playground: ray distribution on a single probe for a single level

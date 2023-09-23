@@ -1,5 +1,6 @@
 import CreateOrbitCamera from './orbit-camera.js'
 
+
 async function ProbeRayDistribution3dBegin() {
   const TAU = Math.PI * 2.0
   const LevelColors = [
@@ -11,6 +12,14 @@ async function ProbeRayDistribution3dBegin() {
     '#ec273f',
     '#de5d3a'
   ]
+
+  function Now() {
+    if (window.performance && window.performance.now) {
+      return window.performance.now()
+    } else {
+      return Time.now()
+    }
+  }
 
   const LevelColorFloats = LevelColors.map(value => {
     let v = parseInt(value.replace("#", ""), 16)
@@ -28,7 +37,14 @@ async function ProbeRayDistribution3dBegin() {
     dirty: true,
     rebuildLineBuffer: true,
     params: {},
-    camera: CreateOrbitCamera()
+    camera: CreateOrbitCamera(),
+    lastFrameTime: Now(),
+
+    mouse: {
+      pos: [0, 0],
+      lastPos: [0, 0],
+      down: false
+    },
   }
 
   try {
@@ -375,11 +391,12 @@ async function ProbeRayDistribution3dBegin() {
       }
     }
 
+    const oldValue = state.params[paramName]
     if (cb) {
-      value = cb(parentEl, value)
+      value = cb(parentEl, value, oldValue)
     }
 
-    if (state.params[paramName] != value) {
+    if (oldValue != value) {
       state.params[paramName] = value
       state.dirty = true
       return true
@@ -390,40 +407,98 @@ async function ProbeRayDistribution3dBegin() {
 
   function ReadParams() {
 
-    Param('rayPackingApproach', 'string', (parentEl, value) => {
-      state.rebuildLineBuffer = true
+    Param('rayPackingApproach', 'string', (parentEl, value, oldValue) => {
+      state.rebuildLineBuffer = value != oldValue
       return value
     })
-    Param('minLevel', 'i32', (parentEl, value) => {
-      state.rebuildLineBuffer = true
+    Param('minLevel', 'i32', (parentEl, value, oldValue) => {
+      state.rebuildLineBuffer = value != oldValue
       parentEl.querySelector('output').innerText = value
       return value
     })
-    Param('maxLevel', 'i32', (parentEl, value) => {
-      state.rebuildLineBuffer = true
+    Param('maxLevel', 'i32', (parentEl, value, oldValue) => {
+      state.rebuildLineBuffer = value != oldValue
       parentEl.querySelector('output').innerText = value
+      if (value != oldValue) {
+        state.camera.state.targetDistance = 2 << value
+        console.log(state.camera.state.targetDistance, value)
+      }
       return value
     })
   }
 
+  const MoveMouse = (x, y) => {
+    let ratioX = canvas.width / canvas.clientWidth
+    let ratioY = canvas.height / canvas.clientHeight
+    state.mouse.pos[0] = x * ratioX
+    state.mouse.pos[1] = y * ratioY
+    state.dirty = true;
+  }
+
+  window.addEventListener("mouseup", e => {
+    state.mouse.down = false
+  })
+
+  canvas.addEventListener("mousedown", (e) => {
+    state.mouse.down = true
+    MoveMouse(e.offsetX, e.offsetY);
+    state.mouse.lastPos[0] = state.mouse.pos[0]
+    state.mouse.lastPos[1] = state.mouse.pos[1]
+
+    e.preventDefault()
+  }, { passive: false })
+
+  canvas.addEventListener("mousemove", e => {
+    MoveMouse(e.offsetX, e.offsetY)
+    e.preventDefault()
+
+    if (state.mouse.down) {
+      let dx = state.mouse.pos[0] - state.mouse.lastPos[0]
+      let dy = state.mouse.pos[1] - state.mouse.lastPos[1]
+
+      state.mouse.lastPos[0] = state.mouse.pos[0]
+      state.mouse.lastPos[1] = state.mouse.pos[1]
+
+      if (Math.abs(dx) < 1.0 && Math.abs(dy) < 1.0) {
+        return;
+      }
+
+      state.camera.rotate(dx, -dy)
+    }
+  }, { passive: false })
+
+  canvas.addEventListener("wheel", e => {
+    console.log(e)
+    state.camera.zoom(e.deltaY)
+    state.dirty = true
+    e.preventDefault()
+  }, { passive: false })
+
+
 
 
   function RenderFrame() {
+    const now = Now()
+    const deltaTime = (now - state.lastFrameTime) / 1000.0
+    state.lastFrameTime = now
     ReadParams()
+
     if (state.rebuildLineBuffer) {
       RebuildLineBuffers();
-      state.rebuildLineBufer = false
+      state.rebuildLineBuffer = false
+      state.dirty = true;
+      console.log("rebuild")
+    }
+
+    // state.camera.state.yaw += deltaTime * TAU * 0.125;
+    if (state.camera.tick(canvas.width, canvas.height, deltaTime)) {
       state.dirty = true;
     }
-
     if (!state.dirty) {
       window.requestAnimationFrame(RenderFrame)
-      state.dirty = false
+      return;
     }
-
-    state.camera.state.targetDistance = 2<<state.params.maxLevel
-    state.camera.state.yaw += 0.001;
-    state.camera.tick(canvas.width, canvas.height);
+    state.dirty = false
 
     const commandEncoder = state.gpu.device.createCommandEncoder()
     state.gpu.programs.drawLines(
