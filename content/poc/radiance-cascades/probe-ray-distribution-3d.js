@@ -1,4 +1,25 @@
+import CreateOrbitCamera from './orbit-camera.js'
+
 async function ProbeRayDistribution3dBegin() {
+  const TAU = Math.PI * 2.0
+  const LevelColors = [
+    '#f3a833',
+    '#9de64e',
+    '#36c5f4',
+    '#ffa2ac',
+    '#cc99ff',
+    '#ec273f',
+    '#de5d3a'
+  ]
+
+  const LevelColorFloats = LevelColors.map(value => {
+    let v = parseInt(value.replace("#", ""), 16)
+    let r = (v >> 16) & 0xFF
+    let g = (v >> 8) & 0xFF
+    let b = (v >> 0) & 0xFF
+    return [r / 255.0, g / 255.0, b / 255.0]
+  })
+
   const rootEl = document.querySelector("#probe-ray-distribution-3d-content")
   const controlEl = rootEl.querySelector('.controls')
   const canvas = rootEl.querySelector('canvas')
@@ -6,6 +27,7 @@ async function ProbeRayDistribution3dBegin() {
   const state = {
     dirty: true,
     params: {},
+    camera: CreateOrbitCamera()
   }
 
   try {
@@ -21,7 +43,7 @@ async function ProbeRayDistribution3dBegin() {
   state.gpu.buffers = {}
 
   const shaders = {
-    DrawLines(gpu, linePositionBuffer) {
+    DrawLines(gpu, linePositionBuffer, lineColorBuffer) {
       const labelPrefix = gpu.labelPrefix + 'DrawLines/'
       const uboFields = [
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
@@ -44,7 +66,8 @@ async function ProbeRayDistribution3dBegin() {
         }
 
         struct VertexOut {
-          @builtin(position) position : vec4f
+          @builtin(position) position: vec4f,
+          @location(0) color: vec3f
         }
 
         @group(0) @binding(0) var<uniform> ubo: UBOParams;
@@ -52,17 +75,19 @@ async function ProbeRayDistribution3dBegin() {
         @vertex
         fn VertexMain(
           @builtin(vertex_index) vertexIndex: u32,
-          @location(0) pos: vec3f
+          @location(0) pos: vec3f,
+          @location(1) color: vec3f
         ) -> VertexOut {
           // TODO: transform with ubo.worldToScreen
           var output: VertexOut;
-          output.position = vec4f(pos, 1.0);
+          output.position = ubo.worldToScreen * vec4f(pos, 1.0);
+          output.color = color;
           return output;
         }
 
         @fragment
         fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
-          return vec4(1.0, 0.0, 1.0, 1.0);
+          return vec4(fragData.color, 1.0);
         }
       `
       const shaderModule = gpu.device.createShaderModule({
@@ -90,6 +115,19 @@ async function ProbeRayDistribution3dBegin() {
             shaderLocation: 0,
             offset: 0,
             format: 'float32x3'
+          },
+        ],
+        arrayStride: 12,
+        stepMode: 'vertex'
+      }
+
+      const colorBufferDesc = {
+        label: `${labelPrefix}PositionBufferDesc`,
+        attributes: [
+          {
+            shaderLocation: 1,
+            offset: 0,
+            format: 'float32x3'
           }
         ],
         arrayStride: 12,
@@ -101,7 +139,7 @@ async function ProbeRayDistribution3dBegin() {
         vertex: {
           module: shaderModule,
           entryPoint: 'VertexMain',
-          buffers: [positionBufferDesc]
+          buffers: [positionBufferDesc, colorBufferDesc]
         },
         fragment: {
           module: shaderModule,
@@ -170,6 +208,7 @@ async function ProbeRayDistribution3dBegin() {
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, bindGroup)
         pass.setVertexBuffer(0, linePositionBuffer);
+        pass.setVertexBuffer(1, lineColorBuffer);
         pass.setViewport(0, 0, width, height, 0, 1);
         pass.setScissorRect(0, 0, width, height);
         pass.draw(vertexCount);
@@ -179,7 +218,7 @@ async function ProbeRayDistribution3dBegin() {
     }
   }
 
-  // Create a line buffer
+  // Create line buffers
   {
     state.gpu.buffers.lineVertexPositions = state.gpu.device.createBuffer({
       label: "ProbeRayDistribution3D/Buffer/LineVertexPositions",
@@ -189,10 +228,23 @@ async function ProbeRayDistribution3dBegin() {
         GPUBufferUsage.VERTEX
       ),
     })
+
+    state.gpu.buffers.lineVertexColors = state.gpu.device.createBuffer({
+      label: "ProbeRayDistribution3D/Buffer/LineVertexColors",
+      size: 1024 * 1024 * 16,
+      usage: (
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.VERTEX
+      ),
+    })
   }
 
   state.gpu.programs = {
-    drawLines: shaders.DrawLines(state.gpu, state.gpu.buffers.lineVertexPositions),
+    drawLines: shaders.DrawLines(
+      state.gpu,
+      state.gpu.buffers.lineVertexPositions,
+      state.gpu.buffers.lineVertexColors
+    ),
   }
 
   window.requestAnimationFrame(RenderFrame)
@@ -216,9 +268,66 @@ async function ProbeRayDistribution3dBegin() {
     }
   }
 
+  function RebuildLineBuffers() {
+    let verts = []
+    let colors = []
+
+    // let directions = [
+    //   -1.0, -1.0,
+    //   1.0, -1.0,
+    //   -1.0, 1.0,
+    //   1.0, 1.0,
+    // ]
+    for (let level = 0; level < 3; level++) {
+      const hrings = 4 << level
+      const vrings = 4 << level
+
+      for (let a1 = 0; a1 < vrings; a1++) {
+        let angle1 = TAU * (a1 + 0.5) / vrings;
+
+        for (let a0 = 0; a0 < hrings; a0++) {
+          let angle0 = TAU * (a0 + 0.5) / hrings;
+
+          let x = Math.sin(angle0) * Math.sin(angle1)
+          let y = Math.sin(angle0) * Math.cos(angle1)
+          let z = Math.cos(angle0)
+
+          let l = Math.sqrt(x * x + y * y + z * z)
+          x /= l
+          y /= l
+          z /= l
+          let pd = level > 0 ? (1 << (level - 1)) : 0
+          let d = 1 << level
+          verts.push(x * pd, y * pd, z * pd)
+
+          verts.push(x * d, y * d, z * d);
+
+          Array.prototype.push.apply(colors, LevelColorFloats[level])
+          Array.prototype.push.apply(colors, LevelColorFloats[level])
+        }
+      }
+    }
+
+    state.params.computedLineVetexCount = verts.length / 3;
+
+    state.gpu.device.queue.writeBuffer(
+      state.gpu.buffers.lineVertexPositions,
+      0,
+      new Float32Array(verts),
+    );
+    state.gpu.device.queue.writeBuffer(
+      state.gpu.buffers.lineVertexColors,
+      0,
+      new Float32Array(colors),
+    );
+
+  }
+
   function ReadParams() {
 
   }
+
+
 
   function RenderFrame() {
     ReadParams()
@@ -228,38 +337,24 @@ async function ProbeRayDistribution3dBegin() {
       state.dirty = false
     }
 
+    state.camera.state.yaw += 0.001;
+    state.camera.tick(canvas.width, canvas.height);
 
-    state.params.computedLineVetexCount = 2;
-    let lines = new Float32Array([0.0, 0.0, 0.0, 100.0, 100.0, 100.0]);
-    state.gpu.device.queue.writeBuffer(
-      state.gpu.buffers.lineVertexPositions,
-      0,
-      lines
-    );
+    RebuildLineBuffers();
 
     const commandEncoder = state.gpu.device.createCommandEncoder()
-
-    const worldToScreen = [
-      1.0, 0.0, 0.0, 0.0,
-      0.0, 1.0, 0.0, 0.0,
-      0.0, 0.0, 1.0, 0.0,
-      0.0, 0.0, 0.0, 1.0,
-    ];
-
     state.gpu.programs.drawLines(
       state.gpu.device.queue,
       commandEncoder,
       ctx,
-      worldToScreen,
+      state.camera.state.worldToScreen,
       state.params.computedLineVetexCount,
       canvas.width,
       canvas.height
     )
 
-
     window.requestAnimationFrame(RenderFrame)
     state.gpu.device.queue.submit([commandEncoder.finish()])
-
   }
 
 

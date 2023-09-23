@@ -1011,7 +1011,7 @@ click/drag to move the light
     <canvas width="1024" height="1024"></canvas>
   </section>
 
-  <script src="probe-ray-distribution-3d.js" defer></script>
+  <script src="probe-ray-distribution-3d.js" defer type="module"></script>
 
   <section class="center-align webgpu-missing error-border">
     <img src="/img/webgpu-responsive.svg" width="768" height="768" />
