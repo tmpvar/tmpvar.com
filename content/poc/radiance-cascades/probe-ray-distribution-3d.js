@@ -26,6 +26,7 @@ async function ProbeRayDistribution3dBegin() {
   const ctx = canvas.getContext('webgpu')
   const state = {
     dirty: true,
+    rebuildLineBuffer: true,
     params: {},
     camera: CreateOrbitCamera()
   }
@@ -272,40 +273,40 @@ async function ProbeRayDistribution3dBegin() {
     let verts = []
     let colors = []
 
-    // let directions = [
-    //   -1.0, -1.0,
-    //   1.0, -1.0,
-    //   -1.0, 1.0,
-    //   1.0, 1.0,
-    // ]
-    for (let level = 0; level < 3; level++) {
-      const hrings = 4 << level
-      const vrings = 4 << level
+    switch (state.params.rayPackingApproach) {
+      case 'lat-lon-subdivision': {
+        for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+          const hrings = 4 << level
+          const vrings = 4 << level
 
-      for (let a1 = 0; a1 < vrings; a1++) {
-        let angle1 = TAU * (a1 + 0.5) / vrings;
+          for (let a0 = 0; a0 < hrings; a0++) {
+            let angle0 = TAU * (a0 + 0.5) / hrings;
+            for (let a1 = 0; a1 < vrings; a1++) {
+              let angle1 = TAU * (a1 + 0.5) / vrings;
 
-        for (let a0 = 0; a0 < hrings; a0++) {
-          let angle0 = TAU * (a0 + 0.5) / hrings;
+              let y = Math.sin(angle0) * Math.sin(angle1)
+              let x = Math.sin(angle0) * Math.cos(angle1)
+              let z = Math.cos(angle0)
 
-          let x = Math.sin(angle0) * Math.sin(angle1)
-          let y = Math.sin(angle0) * Math.cos(angle1)
-          let z = Math.cos(angle0)
+              // let l = Math.sqrt(x * x + y * y + z * z)
+              // x /= l
+              // y /= l
+              // z /= l
+              let pd = level == 0 ? 0 : (1 << (level - 1))
+              let d = 1 << level
+              verts.push(x * pd, y * pd, z * pd)
 
-          let l = Math.sqrt(x * x + y * y + z * z)
-          x /= l
-          y /= l
-          z /= l
-          let pd = level > 0 ? (1 << (level - 1)) : 0
-          let d = 1 << level
-          verts.push(x * pd, y * pd, z * pd)
+              verts.push(x * d, y * d, z * d);
 
-          verts.push(x * d, y * d, z * d);
-
-          Array.prototype.push.apply(colors, LevelColorFloats[level])
-          Array.prototype.push.apply(colors, LevelColorFloats[level])
+              Array.prototype.push.apply(colors, LevelColorFloats[level])
+              Array.prototype.push.apply(colors, LevelColorFloats[level])
+            }
+          }
         }
+        break;
       }
+
+
     }
 
     state.params.computedLineVetexCount = verts.length / 3;
@@ -315,32 +316,114 @@ async function ProbeRayDistribution3dBegin() {
       0,
       new Float32Array(verts),
     );
+
     state.gpu.device.queue.writeBuffer(
       state.gpu.buffers.lineVertexColors,
       0,
       new Float32Array(colors),
     );
+  }
+
+  const ParseColor = (value) => {
+    let v = parseInt(value.replace("#", ""), 16)
+
+    let r = (v >> 16) & 0xFF
+    let g = (v >> 8) & 0xFF
+    let b = (v >> 0) & 0xFF
+    return r | (g << 8) | (b << 16) | 0xFF000000
+  }
+
+  const Param = (paramName, paramType, cb) => {
+    let selector = `.${paramName}-control`
+    let parentEl = controlEl.querySelector(selector)
+    let el = parentEl.querySelector(['input', 'select'])
+    if (!el) {
+      console.warn("could not locate '%s input'", selector)
+      return false
+    }
+
+    let value = 0;
+    switch (el.type) {
+      case 'checkbox': {
+        if (el.checked) {
+          value = el.value
+        }
+        break;
+      }
+      default: {
+        value = el.value;
+        break;
+      }
+    }
+
+    switch (paramType) {
+      case 'f32': {
+        value = parseFloat(value);
+        break;
+      }
+      case 'i32': {
+        value = parseFloat(value) | 0;
+        break;
+      }
+      case 'bool': {
+        value = !!parseFloat(value) ? 1 : 0;
+        break;
+      }
+      case 'color': {
+        value = ParseColor(value)
+        break;
+      }
+    }
+
+    if (cb) {
+      value = cb(parentEl, value)
+    }
+
+    if (state.params[paramName] != value) {
+      state.params[paramName] = value
+      state.dirty = true
+      return true
+    }
+    return false
 
   }
 
   function ReadParams() {
 
+    Param('rayPackingApproach', 'string', (parentEl, value) => {
+      state.rebuildLineBuffer = true
+      return value
+    })
+    Param('minLevel', 'i32', (parentEl, value) => {
+      state.rebuildLineBuffer = true
+      parentEl.querySelector('output').innerText = value
+      return value
+    })
+    Param('maxLevel', 'i32', (parentEl, value) => {
+      state.rebuildLineBuffer = true
+      parentEl.querySelector('output').innerText = value
+      return value
+    })
   }
 
 
 
   function RenderFrame() {
     ReadParams()
+    if (state.rebuildLineBuffer) {
+      RebuildLineBuffers();
+      state.rebuildLineBufer = false
+      state.dirty = true;
+    }
 
     if (!state.dirty) {
       window.requestAnimationFrame(RenderFrame)
       state.dirty = false
     }
 
+    state.camera.state.targetDistance = 2<<state.params.maxLevel
     state.camera.state.yaw += 0.001;
     state.camera.tick(canvas.width, canvas.height);
-
-    RebuildLineBuffers();
 
     const commandEncoder = state.gpu.device.createCommandEncoder()
     state.gpu.programs.drawLines(
@@ -356,8 +439,6 @@ async function ProbeRayDistribution3dBegin() {
     window.requestAnimationFrame(RenderFrame)
     state.gpu.device.queue.submit([commandEncoder.finish()])
   }
-
-
 }
 
 if (document.readyState != 'complete') {
