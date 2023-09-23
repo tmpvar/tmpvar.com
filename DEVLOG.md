@@ -16,13 +16,13 @@
 - radiance-cascades/2d: consider adding an environment light to the 2d demo
 - radiance-cascades/2d: consider adding a dumb FPS counter when the "run continuously" without
                      timer queries
+- radiance-cascades/3d: add touch events when this works on any mobile device
 ## Next
 - radiance-cascades/2d: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades/2d: 'proper' transparency accumulation
 - radiance-cascades/2d: how to fix the ringing artifacts?
 
 ## Pending
-- radiance-cascades/3d: playground: wire up wasd / arrow rotate controls
 
 - radiance-cascades/3d: setup another webgpu instance
 - radiance-cascades/3d: create a 3d volume texture (rgba16float) and fill with some primitives
@@ -46,8 +46,10 @@
 
 - radiance-cascades/3d: mipmap only changed regions
 
-
 ## 2023-09-23
+- radiance-cascades/3d: playground: ~~wire up wasd / arrow rotate controls~~
+                        this has to be done at the document level which means it will effect all
+                        demos.
 - radiance-cascades/3d: playground: wire up mouse to rotate/zoom controls
 ## 2023-09-22
 - radiance-cascades/3d: playground: ray distribution add multiple levels
