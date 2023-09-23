@@ -234,7 +234,8 @@ export default function CreateOrbitCamera() {
     yaw: 0.0,
     pitch: 0.0,
     eye: [0.0, 2.0, 0.0],
-    distance: 20.0,
+    distance: 80.0,
+    targetDistance: 80.0,
     projection: new Float32Array(16),
     view: new Float32Array(16),
     worldToScreen: new Float32Array(16),
@@ -244,6 +245,8 @@ export default function CreateOrbitCamera() {
     state: state,
 
     tick(width, height) {
+      state.distance = (state.distance + state.targetDistance) * 0.5
+
       state.eye[0] = Math.cos(state.yaw) * state.distance
       state.eye[2] = Math.sin(state.yaw) * state.distance
       LookAt(state.view, state.eye, [0, 0, 0], [0, 1, 0])

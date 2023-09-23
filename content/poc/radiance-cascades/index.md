@@ -1001,10 +1001,23 @@ click/drag to move the light
 ## 3D
 
 ### Probe Ray Distribution (3D)
-(Work in progress)
+<span class="highlight-blue">(Work in progress)</span>
 <section id="probe-ray-distribution-3d-content" class="has-webgpu">
   <section class="controls">
-
+    <div class="rayPackingApproach-control control">
+      ray packing:
+      <select>
+        <option value="lat-lon-subdivision">lat/lon subdivision</option>
+      </select>
+    </div>
+    <div class="minLevel-control control">
+      min level: <input type="range" min="0" max="6" value="0">
+      <output></output>
+    </div>
+    <div class="maxLevel-control control">
+      max level: <input type="range" min="0" max="6" value="1">
+      <output></output>
+    </div>
   </section>
 
   <section class="center-align webgpu-required">
