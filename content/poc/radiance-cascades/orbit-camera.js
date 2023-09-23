@@ -230,28 +230,63 @@ export default function CreateOrbitCamera() {
     return out;
   }
 
+  function Lerp(x, y, a) {
+    return x * (1.0 - a) + y * a
+  }
+
   const state = {
+    EPS: 1e-5,
     yaw: 0.0,
-    pitch: 0.0,
+    pitch: Math.PI * 0.5,
     eye: [0.0, 2.0, 0.0],
     distance: 80.0,
     targetDistance: 80.0,
+    minDistance: 1,
+    maxDistance: 500,
     projection: new Float32Array(16),
     view: new Float32Array(16),
     worldToScreen: new Float32Array(16),
+    sensitivity: 0.01,
   }
 
   return {
     state: state,
 
-    tick(width, height) {
-      state.distance = (state.distance + state.targetDistance) * 0.5
+    rotate(dx, dy) {
+      dx *= state.sensitivity
+      dy *= state.sensitivity
 
-      state.eye[0] = Math.cos(state.yaw) * state.distance
-      state.eye[2] = Math.sin(state.yaw) * state.distance
+      state.yaw += dx
+      state.pitch = Math.max(0.1, Math.min(state.pitch + dy, Math.PI - 0.1))
+    },
+
+    zoom(delta) {
+      state.targetDistance = Math.max(
+        state.minDistance,
+        Math.min(state.targetDistance + delta * 0.01, state.maxDistance)
+      )
+    },
+
+    tick(width, height, deltaTime) {
+      let delta = (state.targetDistance - state.distance) * 9.9999999 * deltaTime
+
+      // if the camera is moving, let the caller know
+      let ret = false
+      if (Math.abs(delta) > 0.01) {
+        state.distance += delta
+        ret = true
+      } else {
+        state.distance = state.targetDistance
+      }
+
+      state.eye[2] = Math.sin(state.pitch) * Math.sin(state.yaw) * state.distance
+      state.eye[0] = Math.sin(state.pitch) * Math.cos(state.yaw) * state.distance
+      state.eye[1] = Math.cos(state.pitch) * state.distance
+
       LookAt(state.view, state.eye, [0, 0, 0], [0, 1, 0])
       PerspectiveNO(state.projection, 90 * DegreesToRadians, width/height, 0.1, 100.0)
       Multiply(state.worldToScreen, state.projection, state.view);
+      return ret
     }
   }
 }
