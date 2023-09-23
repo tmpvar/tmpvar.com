@@ -474,9 +474,6 @@ async function ProbeRayDistribution3dBegin() {
     e.preventDefault()
   }, { passive: false })
 
-
-
-
   function RenderFrame() {
     const now = Now()
     const deltaTime = (now - state.lastFrameTime) / 1000.0
