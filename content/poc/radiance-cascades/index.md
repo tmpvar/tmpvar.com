@@ -1036,4 +1036,24 @@ click/drag to move the light
   </section>
 </section>
 
+### Fuzz World (3D)
+<span class="highlight-blue">(Work in progress)</span>
+<section id="fuzz-world-3d-content" class="has-webgpu">
+  <section class="controls">
+  </section>
+
+  <section class="center-align webgpu-required">
+    <canvas width="1024" height="1024"></canvas>
+  </section>
+
+  <script src="fuzz-world-3d.js" defer type="module"></script>
+
+  <section class="center-align webgpu-missing error-border">
+    <img src="/img/webgpu-responsive.svg" width="768" height="768" />
+    <p class="error">
+      This demo requires <a href="https://en.wikipedia.org/wiki/WebGPU">WebGPU</a> - in other words, you should open this page in Chrome or Edge.
+    <p>
+  </section>
+</section>
+
 
