@@ -322,8 +322,7 @@ async function ProbeRayDistribution3dBegin() {
         break;
       }
 
-      // see:
-      //
+      // see: https://extremelearning.com.au/how-to-evenly-distribute-points-on-a-sphere-more-effectively-than-the-canonical-fibonacci-lattice/
       case 'golden-spiral': {
         let goldenRatio = (1 + Math.sqrt(5)) * 0.5
 
