@@ -24,7 +24,6 @@
 
 ## Pending
 
-- radiance-cascades/3d: setup another webgpu instance
 - radiance-cascades/3d: create a 3d volume texture (rgba16float) and fill with some primitives
 - radiance-cascades/3d: raymarch 3d volume from the screen
 
@@ -47,6 +46,8 @@
 - radiance-cascades/3d: mipmap only changed regions
 
 ## 2023-09-23
+- radiance-cascades/3d: fuzz world, trace rays against volume bounding box
+- radiance-cascades/3d: setup another webgpu instance (Fuzz World 3D)
 - radiance-cascades/3d: playground: ~~wire up wasd / arrow rotate controls~~
                         this has to be done at the document level which means it will effect all
                         demos.

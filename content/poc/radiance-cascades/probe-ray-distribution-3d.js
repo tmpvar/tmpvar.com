@@ -528,7 +528,6 @@ async function ProbeRayDistribution3dBegin() {
 
     if (state.rebuildLineBuffer) {
       RebuildLineBuffers();
-      console.log('rebuild line buffer')
       state.rebuildLineBuffer = false
       state.dirty = true;
     }
