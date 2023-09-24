@@ -1007,7 +1007,9 @@ click/drag to move the light
     <div class="rayPackingApproach-control control">
       ray packing:
       <select>
-        <option value="lat-lon-subdivision">lat/lon subdivision</option>
+        <option value="lat-lon-subdivision">Lat/Lon Subdivision</option>
+        <option value="golden-spiral" selected>Golden Spiral</option>
+        <option value="kogan-spiral">Kogan Spiral</option>
       </select>
     </div>
     <div class="minLevel-control control">

@@ -50,7 +50,7 @@ async function ProbeRayDistribution3dBegin() {
   try {
     state.gpu = await InitGPU(ctx);
   } catch (e) {
-    console.log(e)
+    console.error(e)
     rootEl.className = rootEl.className.replace('has-webgpu', '')
     return;
   }
@@ -289,34 +289,78 @@ async function ProbeRayDistribution3dBegin() {
     let verts = []
     let colors = []
 
+    const Add = (pos, level) => {
+      let pd = level == 0 ? 0 : (1 << (level - 1))
+      let d = 1 << level
+      verts.push(pos[0] * pd, pos[1] * pd, pos[2] * pd)
+      verts.push(pos[0] * d, pos[1] * d, pos[2] * d);
+
+      Array.prototype.push.apply(colors, LevelColorFloats[level])
+      Array.prototype.push.apply(colors, LevelColorFloats[level])
+    }
+
+    const pos = [0, 0, 0]
+
     switch (state.params.rayPackingApproach) {
       case 'lat-lon-subdivision': {
         for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
           const hrings = 4 << level
           const vrings = 4 << level
-
           for (let a0 = 0; a0 < hrings; a0++) {
             let angle0 = TAU * (a0 + 0.5) / hrings;
             for (let a1 = 0; a1 < vrings; a1++) {
               let angle1 = TAU * (a1 + 0.5) / vrings;
 
-              let y = Math.sin(angle0) * Math.sin(angle1)
-              let x = Math.sin(angle0) * Math.cos(angle1)
-              let z = Math.cos(angle0)
+              pos[0] = Math.sin(angle0) * Math.cos(angle1)
+              pos[1] = Math.sin(angle0) * Math.sin(angle1)
+              pos[2] = Math.cos(angle0)
 
-              // let l = Math.sqrt(x * x + y * y + z * z)
-              // x /= l
-              // y /= l
-              // z /= l
-              let pd = level == 0 ? 0 : (1 << (level - 1))
-              let d = 1 << level
-              verts.push(x * pd, y * pd, z * pd)
-
-              verts.push(x * d, y * d, z * d);
-
-              Array.prototype.push.apply(colors, LevelColorFloats[level])
-              Array.prototype.push.apply(colors, LevelColorFloats[level])
+              Add(pos, level)
             }
+          }
+        }
+        break;
+      }
+
+      // see:
+      //
+      case 'golden-spiral': {
+        let goldenRatio = (1 + Math.sqrt(5)) * 0.5
+
+        for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+          const rayCount = 8 << level
+          for (let rayIndex = 0; rayIndex < rayCount; rayIndex++) {
+            let a0 = TAU * rayIndex / goldenRatio
+            let a1 = Math.acos(1.0 - 2*(rayIndex + 0.5) / rayCount)
+            pos[0] = Math.cos(a0) * Math.sin(a1)
+            pos[1] = Math.sin(a0) * Math.sin(a1)
+            pos[2] = Math.cos(a1)
+
+            Add(pos, level)
+          }
+        }
+        break;
+      }
+
+      // see: A New Computationally Efficient Method for Spacing n Points on a Sphere
+      //      https://scholar.rose-hulman.edu/cgi/viewcontent.cgi?article=1387&context=rhumj
+      case 'kogan-spiral': {
+        for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+          const rayCount = 8 << level
+          const x = 0.1 + 1.2 * rayCount
+          const start = (-1.0 + 1.0 / (rayCount - 1.0))
+          const increment = (2.0 - 2.0 / (rayCount - 1.0)) / (rayCount - 1.0)
+          for (let rayIndex = 0; rayIndex < rayCount; rayIndex++) {
+            let s = start + rayIndex * increment;
+
+            const a0 = s * x
+            const a1 = Math.PI / 2.0 * Math.sign(s) * (1.0 - Math.sqrt(1.0 - Math.abs(s)))
+
+            pos[0] = Math.cos(a0) * Math.cos(a1)
+            pos[1] = Math.sin(a0) * Math.cos(a1)
+            pos[2] = Math.sin(a1)
+
+            Add(pos,  level)
           }
         }
         break;
@@ -408,21 +452,25 @@ async function ProbeRayDistribution3dBegin() {
   function ReadParams() {
 
     Param('rayPackingApproach', 'string', (parentEl, value, oldValue) => {
-      state.rebuildLineBuffer = value != oldValue
+      if (value !== oldValue) {
+        console.log('ray packing approach', value, oldValue)
+        state.rebuildLineBuffer = true
+      }
       return value
     })
     Param('minLevel', 'i32', (parentEl, value, oldValue) => {
-      state.rebuildLineBuffer = value != oldValue
+      if (value !== oldValue) {
+        state.rebuildLineBuffer = true
+      }
       parentEl.querySelector('output').innerText = value
       return value
     })
     Param('maxLevel', 'i32', (parentEl, value, oldValue) => {
-      state.rebuildLineBuffer = value != oldValue
-      parentEl.querySelector('output').innerText = value
-      if (value != oldValue) {
+      if (value !== oldValue) {
+        state.rebuildLineBuffer = true
         state.camera.state.targetDistance = 2 << value
-        console.log(state.camera.state.targetDistance, value)
       }
+      parentEl.querySelector('output').innerText = value
       return value
     })
   }
@@ -468,7 +516,6 @@ async function ProbeRayDistribution3dBegin() {
   }, { passive: false })
 
   canvas.addEventListener("wheel", e => {
-    console.log(e)
     state.camera.zoom(e.deltaY)
     state.dirty = true
     e.preventDefault()
@@ -482,9 +529,9 @@ async function ProbeRayDistribution3dBegin() {
 
     if (state.rebuildLineBuffer) {
       RebuildLineBuffers();
+      console.log('rebuild line buffer')
       state.rebuildLineBuffer = false
       state.dirty = true;
-      console.log("rebuild")
     }
 
     // state.camera.state.yaw += deltaTime * TAU * 0.125;
