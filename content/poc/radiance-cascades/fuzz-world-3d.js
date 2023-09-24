@@ -73,13 +73,91 @@ async function FuzzWorld3dBegin() {
   const shaders = {
     RaymarchPrimaryRays(gpu, outputTexture, workgroupSize) {
       const labelPrefix = gpu.labelPrefix + 'RaymarchPrimaryRays/'
+
+      const uboFields = [
+        ['worldToScreen', 'mat4x4<f32>', 16 * 4],
+        ['screenToWorld', 'mat4x4<f32>', 16 * 4],
+        ['eye', 'vec4f', 16],
+        ['width', 'i32', 4],
+        ['height', 'i32', 4],
+      ]
+
+      let uboBufferSize = uboFields.reduce((p, c) => {
+        return p + c[2]
+      }, 0)
+      uboBufferSize = Math.floor(uboBufferSize / 16 + 1) * 16
+      const uboBuffer = new ArrayBuffer(uboBufferSize)
+
+      const uboData = new DataView(uboBuffer)
+      const ubo = gpu.device.createBuffer({
+        label: `${labelPrefix}UBO`,
+        size: uboBuffer.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+
+
       const source =  /* wgsl */`
+        fn MinComponent(a: vec3f) -> f32 {
+          return min(a.x, min(a.y, a.z));
+        }
+
+        fn MaxComponent(a: vec3f) -> f32 {
+          return max(a.x, max(a.y, a.z));
+        }
+
+        fn RayAABB(p0: vec3f, p1: vec3f, rayOrigin: vec3f, invRaydir: vec3f) -> f32 {
+          let t0 = (p0 - rayOrigin) * invRaydir;
+          let t1 = (p1 - rayOrigin) * invRaydir;
+          let tmin = MaxComponent(min(t0, t1));
+          let tmax = MinComponent(max(t0, t1));
+          var hit = 0.0;
+          if (tmin <= tmax) {
+            return max(0.0, tmin);
+          } else {
+            return -1.0;
+          }
+        }
+
+        fn ComputeRayDir(ndc: vec2f, inv: mat4x4<f32>) -> vec3f {
+          var far = inv * vec4f(ndc.x, ndc.y, 0.1, 1.0);
+          far /= far.w;
+          var near = inv * vec4f(ndc.x, ndc.y, 0.0, 1.0);
+          near /= near.w;
+          return normalize(far.xyz - near.xyz);
+        }
+
+        struct UBOParams {
+          ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
+        };
+
         @group(0) @binding(0) var texture: texture_storage_2d<rgba8unorm, write>;
+        @group(0) @binding(1) var<uniform> ubo: UBOParams;
+
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
-          textureStore(texture, id.xy, vec4f(vec4(0.0, 0.0, 1.0, 1.0)));
+          let uv = vec2f(
+            f32(id.x) / f32(ubo.width),
+            f32(id.y) / f32(ubo.height),
+          );
+
+          let rayDir = ComputeRayDir(
+            uv * 2.0 - 1.0,
+            ubo.screenToWorld
+          );
+
+          let boxRadius = 32.0;
+          let aabbHit = RayAABB(vec3f(-boxRadius), vec3f(boxRadius), ubo.eye.xyz, 1.0 / rayDir);
+          if (aabbHit >= 0.0) {
+            let hitPos = ubo.eye.xyz + rayDir * aabbHit;
+            let uvw = (hitPos / boxRadius) * 0.5 + 0.5;
+            textureStore(texture, id.xy, vec4f(uvw, 1.0));
+          } else {
+            textureStore(texture, id.xy, vec4f(vec4(rayDir * 0.5 + 0.5, 1.0)));
+          }
+          // textureStore(texture, id.xy, vec4f(vec4(uv.x, uv.y, 0.0, 1.0)));
         }
       `
+      console.log(source)
 
       const shaderModule = gpu.device.createShaderModule({
         code: source
@@ -94,7 +172,14 @@ async function FuzzWorld3dBegin() {
             storageTexture: {
               format: "rgba8unorm"
             },
-          }
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'uniform',
+            }
+          },
         ]
       })
 
@@ -115,11 +200,54 @@ async function FuzzWorld3dBegin() {
         label: `${labelPrefix}BindGroup`,
         layout: pipeline.getBindGroupLayout(0),
         entries: [
-          { binding: 0, resource: outputTexture.createView() }
+          {
+            binding: 0,
+            resource: outputTexture.createView()
+          },
+          {
+            binding: 1,
+            resource: {
+              buffer: ubo
+            }
+          },
         ]
       })
 
-      return function RaymarchPrimaryRays(commandEncoder, width, height) {
+      return function RaymarchPrimaryRays(commandEncoder, width, height, eye, worldToScreen, screenToWorld) {
+
+        // update uniform buffer
+        {
+          let byteOffset = 0
+
+          worldToScreen.forEach(v => {
+            uboData.setFloat32(byteOffset, v, true)
+            byteOffset += 4;
+          })
+
+          screenToWorld.forEach(v => {
+            uboData.setFloat32(byteOffset, v, true)
+            byteOffset += 4;
+          })
+
+          eye.forEach(v => {
+            uboData.setFloat32(byteOffset, v, true)
+            byteOffset += 4;
+          })
+
+          // eye.w, unused
+          byteOffset += 4;
+
+          // width
+          uboData.setInt32(byteOffset, width, true)
+          byteOffset += 4
+
+          // height
+          uboData.setInt32(byteOffset, height, true)
+          byteOffset += 4
+
+          gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
+        }
+
         const computePass = commandEncoder.beginComputePass()
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup)
@@ -141,8 +269,6 @@ async function FuzzWorld3dBegin() {
       const uboFields = [
         "width",
         "height",
-        "probeRadius",
-        "debugRenderWorldMipLevel"
       ]
 
       const sampler = gpu.device.createSampler({
@@ -344,6 +470,52 @@ async function FuzzWorld3dBegin() {
 
   }
 
+  const MoveMouse = (x, y) => {
+    let ratioX = canvas.width / canvas.clientWidth
+    let ratioY = canvas.height / canvas.clientHeight
+    state.mouse.pos[0] = x * ratioX
+    state.mouse.pos[1] = y * ratioY
+    state.dirty = true;
+  }
+
+  window.addEventListener("mouseup", e => {
+    state.mouse.down = false
+  })
+
+  canvas.addEventListener("mousedown", (e) => {
+    state.mouse.down = true
+    MoveMouse(e.offsetX, e.offsetY);
+    state.mouse.lastPos[0] = state.mouse.pos[0]
+    state.mouse.lastPos[1] = state.mouse.pos[1]
+
+    e.preventDefault()
+  }, { passive: false })
+
+  canvas.addEventListener("mousemove", e => {
+    MoveMouse(e.offsetX, e.offsetY)
+    e.preventDefault()
+
+    if (state.mouse.down) {
+      let dx = state.mouse.pos[0] - state.mouse.lastPos[0]
+      let dy = state.mouse.pos[1] - state.mouse.lastPos[1]
+
+      state.mouse.lastPos[0] = state.mouse.pos[0]
+      state.mouse.lastPos[1] = state.mouse.pos[1]
+
+      if (Math.abs(dx) < 1.0 && Math.abs(dy) < 1.0) {
+        return;
+      }
+
+      state.camera.rotate(dx, -dy)
+    }
+  }, { passive: false })
+
+  canvas.addEventListener("wheel", e => {
+    state.camera.zoom(e.deltaY)
+    state.dirty = true
+    e.preventDefault()
+  }, { passive: false })
+
   function RenderFrame() {
     const now = Now()
     const deltaTime = (now - state.lastFrameTime) / 1000.0
@@ -360,11 +532,15 @@ async function FuzzWorld3dBegin() {
     }
     state.dirty = false
 
+
     const commandEncoder = state.gpu.device.createCommandEncoder()
     state.gpu.programs.raymarchPrimaryRays(
       commandEncoder,
       canvas.width,
-      canvas.height
+      canvas.height,
+      state.camera.state.eye,
+      state.camera.state.worldToScreen,
+      state.camera.state.screenToWorld
     )
 
     state.gpu.programs.blit(

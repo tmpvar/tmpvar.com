@@ -35,9 +35,9 @@ export default function CreateOrbitCamera() {
 
 
   /**
-   * Generates a perspective projection matrix with the given bounds.
-   * The near/far clip planes correspond to a normalized device coordinate Z range of [-1, 1],
-   * which matches WebGL/OpenGL's clip volume.
+   * Generates a perspective projection matrix suitable for WebGPU with the given bounds.
+   * The near/far clip planes correspond to a normalized device coordinate Z range of [0, 1],
+   * which matches WebGPU/Vulkan/DirectX/Metal's clip volume.
    * Passing null/undefined/no value for far will generate infinite projection matrix.
    *
    * @param {mat4} out mat4 frustum matrix will be written into
@@ -47,7 +47,7 @@ export default function CreateOrbitCamera() {
    * @param {number} far Far bound of the frustum, can be null or Infinity
    * @returns {mat4} out
    */
-  function PerspectiveNO(out, fovy, aspect, near, far) {
+  function PerspectiveZO(out, fovy, aspect, near, far) {
     const f = 1.0 / Math.tan(fovy / 2);
     out[0] = f / aspect;
     out[1] = 0;
@@ -65,11 +65,11 @@ export default function CreateOrbitCamera() {
     out[15] = 0;
     if (far != null && far !== Infinity) {
       const nf = 1 / (near - far);
-      out[10] = (far + near) * nf;
-      out[14] = 2 * far * near * nf;
+      out[10] = far * nf;
+      out[14] = far * near * nf;
     } else {
       out[10] = -1;
-      out[14] = -2 * near;
+      out[14] = -near;
     }
     return out;
   }
@@ -166,13 +166,13 @@ export default function CreateOrbitCamera() {
   }
 
   /**
- * Multiplies two mat4s
- *
- * @param {mat4} out the receiving matrix
- * @param {ReadonlyMat4} a the first operand
- * @param {ReadonlyMat4} b the second operand
- * @returns {mat4} out
- */
+  * Multiplies two mat4s
+  *
+  * @param {mat4} out the receiving matrix
+  * @param {ReadonlyMat4} a the first operand
+  * @param {ReadonlyMat4} b the second operand
+  * @returns {mat4} out
+  */
   function Multiply(out, a, b) {
     let a00 = a[0],
       a01 = a[1],
@@ -297,15 +297,13 @@ export default function CreateOrbitCamera() {
     return out;
   }
 
-  function Lerp(x, y, a) {
-    return x * (1.0 - a) + y * a
-  }
-
   const state = {
     EPS: 1e-5,
     yaw: 0.0,
     pitch: Math.PI * 0.5,
     eye: [0.0, 2.0, 0.0],
+    target: [0.0, 0.0, 0.0],
+    up: [0.0, 1.0, 0.0],
     distance: 80.0,
     targetDistance: 80.0,
     minDistance: 1,
@@ -351,9 +349,9 @@ export default function CreateOrbitCamera() {
       state.eye[0] = Math.sin(state.pitch) * Math.cos(state.yaw) * state.distance
       state.eye[1] = Math.cos(state.pitch) * state.distance
 
-      LookAt(state.view, state.eye, [0, 0, 0], [0, 1, 0])
-      PerspectiveNO(state.projection, 90 * DegreesToRadians, width/height, 0.1, 100.0)
-      Multiply(state.worldToScreen, state.projection, state.view);
+      LookAt(state.view, state.eye, state.target, state.up)
+      PerspectiveZO(state.projection, 90 * DegreesToRadians, width / height, 0.1, 100.0)
+      Multiply(state.worldToScreen, state.projection, state.view)
       Invert(state.screenToWorld, state.worldToScreen)
       return ret
     }
