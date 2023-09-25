@@ -100,6 +100,21 @@ async function FuzzWorld3dBegin() {
           return length( pa - ba*h ) - r;
         }
 
+        // lifted from: https://jbaker.graphics/writings/DEC.html
+        fn de( pos: vec3f ) -> f32{
+            var s=4.;
+            var p = abs(pos);
+            let off=p*4.6;
+            for (var i=0.0; i<8.0; i+=1.0){
+              p=1.-abs(abs(p-2.)-1.);
+              var r=-13.*clamp(.38*max(1.3/dot(p,p),.7),0.,3.3);
+              s*=r;
+              p*=r;
+              p+=off;
+            }
+            return length(cross(p,normalize(vec3(1,3,3))))/s-.006;
+          }
+
         @group(0) @binding(0) var texture: texture_storage_3d<rgba16float, write>;
 
         @compute @workgroup_size(${workgroupSize.join(',')})
@@ -118,9 +133,12 @@ async function FuzzWorld3dBegin() {
             )
           );
 
+          d = min(d, de(pos * 0.01));
+
           if (d < 0.0) {
-            let falloff = 100.0;
-            let alpha = clamp(sqrt(-d), 0.0, falloff) / falloff * 0.05;
+
+            let falloff = 10.0;
+            let alpha = clamp(sqrt(-d), 0.0, falloff) / falloff * 0.1;
             textureStore(
               texture,
               id.xyz,

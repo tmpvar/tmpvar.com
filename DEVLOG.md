@@ -24,8 +24,6 @@
 
 ## Pending
 
-- radiance-cascades/3d: create a 3d volume texture (rgba16float) and fill with some primitives
-- radiance-cascades/3d: raymarch 3d volume from the screen
 
 - radiance-cascades/3d: add probe buffer
 - radiance-cascades/3d: trace cascade 0 probe rays, collecting into probe buffer
@@ -45,6 +43,9 @@
 
 - radiance-cascades/3d: mipmap only changed regions
 
+## 2023-09-24
+- radiance-cascades/3d: create a 3d volume texture (rgba16float) and fill with some primitives
+- radiance-cascades/3d: raymarch 3d volume from the screen
 ## 2023-09-23
 - radiance-cascades/3d: fuzz world, trace rays against volume bounding box
 - radiance-cascades/3d: setup another webgpu instance (Fuzz World 3D)
