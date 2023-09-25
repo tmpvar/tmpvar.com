@@ -27,19 +27,22 @@
 - radiance-cascades/3d: trace cascade 0 probe rays, collecting into probe buffer
 - radiance-cascades/3d: debug render probes
 
-- radiance-cascades/3d: texture wrapper that tracks version - will be used for resizing the
+- radiance-cascades/3d: texture wrapper that tracks version
+                        will be used for resizing the
                         volume via a slider, and we'll want to rebuild the bindGroup when
                         that happens
 
-
-- radiance-cascades/3d: mipmap volume whenever it changes
-- radiance-cascades/3d: cone trace the volume
+- radiance-cascades/3d: mipmap volume whenever it changes, instead
+                        of every frame
 - radiance-cascades/3d: render a mesh
 - radiance-cascades/3d: render an analytic primitive
-- radiance-cascades/3d: render a sdf
 
 - radiance-cascades/3d: mipmap only changed regions
 
+## 2023-09-25
+- radiance-cascades/3d: fix t so that it always starts at 0.0
+- radiance-cascades/3d: cone trace the volume
+- radiance-cascades/3d: mipmap volume
 ## 2023-09-24
 - radiance-cascades/3d: fill 3d volume with data - a fractal from jb
 - radiance-cascades/3d: create a 3d volume texture (rgba16float) and fill with some primitives

@@ -313,6 +313,8 @@ export default function CreateOrbitCamera() {
     worldToScreen: new Float32Array(16),
     screenToWorld: new Float32Array(16),
     sensitivity: 0.01,
+    scrollSensitivity: 0.01,
+    fov: 90 * DegreesToRadians,
   }
 
   return {
@@ -329,7 +331,7 @@ export default function CreateOrbitCamera() {
     zoom(delta) {
       state.targetDistance = Math.max(
         state.minDistance,
-        Math.min(state.targetDistance + delta * 0.01, state.maxDistance)
+        Math.min(state.targetDistance + delta * state.scrollSensitivity, state.maxDistance)
       )
     },
 
@@ -350,7 +352,7 @@ export default function CreateOrbitCamera() {
       state.eye[1] = Math.cos(state.pitch) * state.distance
 
       LookAt(state.view, state.eye, state.target, state.up)
-      PerspectiveZO(state.projection, 90 * DegreesToRadians, width / height, 0.1, 100.0)
+      PerspectiveZO(state.projection, state.fov, width / height, 0.1, 100.0)
       Multiply(state.worldToScreen, state.projection, state.view)
       Invert(state.screenToWorld, state.worldToScreen)
       return ret
