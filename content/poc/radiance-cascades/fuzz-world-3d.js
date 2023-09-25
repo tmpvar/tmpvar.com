@@ -58,6 +58,16 @@ async function FuzzWorld3dBegin() {
 
   state.gpu.buffers = {}
   state.gpu.textures = {
+    volume: state.gpu.device.createTexture({
+      label: `${state.gpu.labelPrefix}Texture/volume`,
+      size: [256, 256, 256],
+      dimension: '3d',
+      format: 'rgba16float',
+      usage: (
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING
+      ),
+    }),
     output: state.gpu.device.createTexture({
       label: `${state.gpu.labelPrefix}Texture/output`,
       size: [canvas.width, canvas.height, 1],
@@ -67,11 +77,79 @@ async function FuzzWorld3dBegin() {
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.STORAGE_BINDING
       ),
-    })
+    }),
   }
 
   const shaders = {
-    RaymarchPrimaryRays(gpu, outputTexture, workgroupSize) {
+    FillVolumeWithSphere(gpu, volumeTexture, workgroupSize) {
+      const labelPrefix = gpu.labelPrefix + 'FillVolumeWithSphere/'
+      const source =  /* wgsl */`
+        @group(0) @binding(0) var texture: texture_storage_3d<rgba16float, write>;
+
+        @compute @workgroup_size(${workgroupSize.join(',')})
+        fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
+          let dims = vec3f(textureDimensions(texture));
+          textureStore(texture, id.xyz, vec4f(vec3f(id.xyz) / dims, 1.0));
+        }
+      `
+
+      const shaderModule = gpu.device.createShaderModule({
+        code: source
+      })
+
+      const bindGroupLayout = gpu.device.createBindGroupLayout({
+        label: `${labelPrefix}BindGroupLayout`,
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+            storageTexture: {
+              format: "rgba16float",
+              viewDimension: '3d',
+            },
+          },
+        ]
+      })
+
+      const pipeline = gpu.device.createComputePipeline({
+        label: `${labelPrefix}ComputePipeline`,
+        compute: {
+          module: shaderModule,
+          entryPoint: 'ComputeMain',
+        },
+        layout: gpu.device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout
+          ]
+        }),
+      })
+
+      const bindGroup = gpu.device.createBindGroup({
+        label: `${labelPrefix}BindGroup`,
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: volumeTexture.createView({
+              dimension: '3d',
+            })
+          },
+        ]
+      })
+
+      return function FillVolumeWithSphere(commandEncoder) {
+        const computePass = commandEncoder.beginComputePass()
+        computePass.setPipeline(pipeline)
+        computePass.setBindGroup(0, bindGroup)
+        computePass.dispatchWorkgroups(
+          Math.floor(volumeTexture.width / workgroupSize[0] + 1),
+          Math.floor(volumeTexture.height / workgroupSize[1] + 1),
+          Math.floor(volumeTexture.depthOrArrayLayers / workgroupSize[2] + 1),
+        )
+        computePass.end()
+      }
+    },
+    RaymarchPrimaryRays(gpu, volumeTexture, outputTexture, workgroupSize) {
       const labelPrefix = gpu.labelPrefix + 'RaymarchPrimaryRays/'
 
       const uboFields = [
@@ -95,6 +173,14 @@ async function FuzzWorld3dBegin() {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       })
 
+      const sampler = gpu.device.createSampler({
+        label: `${labelPrefix}Sampler`,
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        magFilter: 'nearest',
+        minFilter: 'nearest',
+        mipmapFilter: 'nearest',
+      })
 
       const source =  /* wgsl */`
         fn MinComponent(a: vec3f) -> f32 {
@@ -130,8 +216,10 @@ async function FuzzWorld3dBegin() {
           ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
         };
 
-        @group(0) @binding(0) var texture: texture_storage_2d<rgba8unorm, write>;
+        @group(0) @binding(0) var outputTexture: texture_storage_2d<rgba8unorm, write>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
+        @group(0) @binding(2) var volumeTexture: texture_3d<f32>;
+        @group(0) @binding(3) var volumeSampler: sampler;
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -150,9 +238,14 @@ async function FuzzWorld3dBegin() {
           if (aabbHit >= 0.0) {
             let hitPos = ubo.eye.xyz + rayDir * aabbHit;
             let uvw = (hitPos / boxRadius) * 0.5 + 0.5;
-            textureStore(texture, id.xy, vec4f(uvw, 1.0));
+
+            let c = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0.0);
+
+            // textureStore(outputTexture, id.xy, vec4f(uvw, 1.0));
+            textureStore(outputTexture, id.xy, vec4f(1.0, 0.0, 1.0, 1.0));
+            textureStore(outputTexture, id.xy, c);
           } else {
-            textureStore(texture, id.xy, vec4f(vec4(rayDir * 0.5 + 0.5, 1.0)));
+            textureStore(outputTexture, id.xy, vec4f(vec4(rayDir * 0.5 + 0.5, 1.0)));
           }
           // textureStore(texture, id.xy, vec4f(vec4(uv.x, uv.y, 0.0, 1.0)));
         }
@@ -178,6 +271,21 @@ async function FuzzWorld3dBegin() {
             buffer: {
               type: 'uniform',
             }
+          },
+          {
+            binding: 2,
+            visibility: GPUShaderStage.COMPUTE,
+            texture: {
+              sampleType: 'float',
+              viewDimension: '3d',
+            },
+          },
+          {
+            binding: 3,
+            visibility: GPUShaderStage.COMPUTE,
+            sampler: {
+              type: "filtering"
+            },
           },
         ]
       })
@@ -208,6 +316,16 @@ async function FuzzWorld3dBegin() {
             resource: {
               buffer: ubo
             }
+          },
+          {
+            binding: 2,
+            resource: volumeTexture.createView({
+              dimension: '3d',
+            })
+          },
+          {
+            binding: 3,
+            resource: sampler,
           },
         ]
       })
@@ -434,8 +552,14 @@ async function FuzzWorld3dBegin() {
   }
 
   state.gpu.programs = {
+    fillVolume: shaders.FillVolumeWithSphere(
+      state.gpu,
+      state.gpu.textures.volume,
+      [16, 4, 4]
+    ),
     raymarchPrimaryRays: shaders.RaymarchPrimaryRays(
       state.gpu,
+      state.gpu.textures.volume,
       state.gpu.textures.output,
       [16, 16, 1]
     ),
@@ -532,6 +656,9 @@ async function FuzzWorld3dBegin() {
 
 
     const commandEncoder = state.gpu.device.createCommandEncoder()
+
+    state.gpu.programs.fillVolume(commandEncoder)
+
     state.gpu.programs.raymarchPrimaryRays(
       commandEncoder,
       canvas.width,
