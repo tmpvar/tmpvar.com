@@ -119,9 +119,9 @@ async function FuzzWorld3dBegin() {
         }
 
         fn ComputeRayDir(ndc: vec2f, inv: mat4x4<f32>) -> vec3f {
-          var far = inv * vec4f(ndc.x, ndc.y, 0.1, 1.0);
+          var far = inv * vec4f(-ndc.x, ndc.y, 0.1, 1.0);
           far /= far.w;
-          var near = inv * vec4f(ndc.x, ndc.y, 0.0, 1.0);
+          var near = inv * vec4f(-ndc.x, ndc.y, 0.0, 1.0);
           near /= near.w;
           return normalize(far.xyz - near.xyz);
         }
@@ -157,7 +157,6 @@ async function FuzzWorld3dBegin() {
           // textureStore(texture, id.xy, vec4f(vec4(uv.x, uv.y, 0.0, 1.0)));
         }
       `
-      console.log(source)
 
       const shaderModule = gpu.device.createShaderModule({
         code: source
@@ -214,7 +213,6 @@ async function FuzzWorld3dBegin() {
       })
 
       return function RaymarchPrimaryRays(commandEncoder, width, height, eye, worldToScreen, screenToWorld) {
-
         // update uniform buffer
         {
           let byteOffset = 0
@@ -506,7 +504,7 @@ async function FuzzWorld3dBegin() {
         return;
       }
 
-      state.camera.rotate(dx, -dy)
+      state.camera.rotate(-dx, -dy)
     }
   }, { passive: false })
 
