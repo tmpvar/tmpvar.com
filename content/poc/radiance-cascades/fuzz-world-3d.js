@@ -84,12 +84,51 @@ async function FuzzWorld3dBegin() {
     FillVolumeWithSphere(gpu, volumeTexture, workgroupSize) {
       const labelPrefix = gpu.labelPrefix + 'FillVolumeWithSphere/'
       const source =  /* wgsl */`
+        fn SDFSphere(pos: vec3f, center: vec3f, radius: f32) -> f32 {
+          return distance(pos, center) - radius;
+        }
+
+        fn SDFBox( p: vec3f, b: vec3f ) -> f32 {
+          let q = abs(p) - b;
+          return length(max(q,vec3f(0.0))) + min(max(q.x,max(q.y,q.z)),0.0);
+        }
+
+        fn SDFSegment( p: vec3f, a: vec3f, b: vec3f, r: f32 ) -> f32 {
+          let pa = p - a;
+          let ba = b - a;
+          let h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+          return length( pa - ba*h ) - r;
+        }
+
         @group(0) @binding(0) var texture: texture_storage_3d<rgba16float, write>;
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           let dims = vec3f(textureDimensions(texture));
-          textureStore(texture, id.xyz, vec4f(vec3f(id.xyz) / dims, 1.0));
+          let pos = vec3f(id.xyz);
+          let radius = 64.0;
+          var d = max(
+            -SDFBox(pos - dims * 0.5, vec3f(radius * 0.35, radius * 0.35, radius * 2.0)),
+            max(
+              -SDFBox(pos - dims * 0.5, vec3f(radius * 0.35, radius * 2.0, radius * 0.35)),
+              max(
+                -SDFBox(pos - dims * 0.5, vec3f(radius * 2.0, radius * 0.35, radius * 0.35)),
+                SDFSphere(pos, dims * 0.5, radius)
+              )
+            )
+          );
+
+          if (d < 0.0) {
+            let falloff = 100.0;
+            let alpha = clamp(sqrt(-d), 0.0, falloff) / falloff * 0.05;
+            textureStore(
+              texture,
+              id.xyz,
+              vec4f(vec3(1.0f), alpha)
+            );
+          } else {
+            textureStore(texture, id.xyz, vec4f(0.0, 0.0, 0.0, 0.0));
+          }
         }
       `
 
@@ -235,19 +274,56 @@ async function FuzzWorld3dBegin() {
 
           let boxRadius = 32.0;
           let aabbHit = RayAABB(vec3f(-boxRadius), vec3f(boxRadius), ubo.eye.xyz, 1.0 / rayDir);
+          var acc = vec4f(0.0);
+          var energy = 1.0;
           if (aabbHit >= 0.0) {
-            let hitPos = ubo.eye.xyz + rayDir * aabbHit;
-            let uvw = (hitPos / boxRadius) * 0.5 + 0.5;
 
-            let c = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0.0);
+            let dims = vec3f(textureDimensions(volumeTexture));
+            // TODO: improve this by sampling mips and increasing the step size
+            var steps = 300;
+            var t = aabbHit;
+            var stepSize = 0.5;
 
-            // textureStore(outputTexture, id.xy, vec4f(uvw, 1.0));
-            textureStore(outputTexture, id.xy, vec4f(1.0, 0.0, 1.0, 1.0));
-            textureStore(outputTexture, id.xy, c);
-          } else {
-            textureStore(outputTexture, id.xy, vec4f(vec4(rayDir * 0.5 + 0.5, 1.0)));
+            while(steps > 0) {
+              steps--;
+
+              let hitPos = ubo.eye.xyz + rayDir * t;
+              t += stepSize;
+              let uvw = (hitPos / boxRadius) * 0.5 + 0.5;
+
+              if (
+                (uvw.x < 0.0 || uvw.x > 1.0) ||
+                (uvw.y < 0.0 || uvw.y > 1.0) ||
+                (uvw.z < 0.0 || uvw.z > 1.0)
+              ) {
+                continue;
+              }
+
+              let c = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0.0);
+              let a0 = acc.a + c.a * (1.0 - acc.a);
+              if (a0 > 0.0) {
+                energy -= a0;
+                acc = vec4f(
+                  (acc.rgb * acc.a + c.rgb * c.a * (1.0 - acc.a)) / a0,
+                  a0
+                );
+              }
+
+              if (energy < 0.0) {
+                break;
+              }
+            }
           }
-          // textureStore(texture, id.xy, vec4f(vec4(uv.x, uv.y, 0.0, 1.0)));
+
+          textureStore(
+            outputTexture,
+            id.xy,
+            vec4(mix(
+              acc.rgb,
+              rayDir * 0.5 + 0.5,
+              energy
+            ), 1.0)
+          );
         }
       `
 
