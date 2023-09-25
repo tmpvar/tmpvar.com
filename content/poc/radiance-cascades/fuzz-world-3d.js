@@ -122,7 +122,7 @@ async function FuzzWorld3dBegin() {
           let dims = vec3f(textureDimensions(texture));
           let pos = vec3f(id.xyz);
           let radius = 64.0;
-          var d = max(
+          var d0 = max(
             -SDFBox(pos - dims * 0.5, vec3f(radius * 0.35, radius * 0.35, radius * 2.0)),
             max(
               -SDFBox(pos - dims * 0.5, vec3f(radius * 0.35, radius * 2.0, radius * 0.35)),
@@ -133,8 +133,18 @@ async function FuzzWorld3dBegin() {
             )
           );
 
-          d = min(d, de(pos * 0.01));
+          var d1 = de(pos * 0.01);
 
+          var color = vec3(1.0, 1.0, 0.0);
+          if (d1 < 0.0) {
+            color = vec3(0.0, 1.0,  0.0);
+          }
+
+          if (d0 < 0.0) {
+            color = vec3(1.0, 0.0,  0.0);
+          }
+
+          let d = min(d0, d1);
           if (d < 0.0) {
 
             let falloff = 10.0;
@@ -142,7 +152,7 @@ async function FuzzWorld3dBegin() {
             textureStore(
               texture,
               id.xyz,
-              vec4f(vec3(1.0f), alpha)
+              vec4f(color, alpha)
             );
           } else {
             textureStore(texture, id.xyz, vec4f(0.0, 0.0, 0.0, 0.0));
@@ -333,12 +343,15 @@ async function FuzzWorld3dBegin() {
             }
           }
 
+          // let backgroundColor = rayDir * 0.5 + 0.5;
+          let backgroundColor = vec3f(0.1, 0.1, 0.1);
+
           textureStore(
             outputTexture,
             id.xy,
             vec4(mix(
               acc.rgb,
-              rayDir * 0.5 + 0.5,
+              backgroundColor,
               energy
             ), 1.0)
           );
