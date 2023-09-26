@@ -22,11 +22,14 @@
 - radiance-cascades/2d: 'proper' transparency accumulation
 - radiance-cascades/2d: suslik's blend between cascades
 - radiance-cascades/2d: how to fix the ringing artifacts?
+- radiance-cascades/2d: rename irradiance to fluence
 
 ## Pending
+- radiance-cascades/3d: compute fluence texture
+- radiance-cascades/3d: raymarch primary rays through the fluence texture
 - radiance-cascades/3d: trace cascade 0 probe rays, collecting into probe buffer
 - radiance-cascades/3d: debug render probes
-- radiance-cascades/3d: raymarch primary rays through the fluence texture
+- radiance-cascades/3d: transparent objects are darker the further away they are..
 
 - radiance-cascades/3d: texture wrapper that tracks version
                         will be used for resizing the
@@ -40,6 +43,7 @@
 
 - radiance-cascades/3d: mipmap only changed regions
 
+## 2023-09-26
 ## 2023-09-25
 - radiance-cascades/3d: add probe buffer
 - radiance-cascades/3d: fix t so that it always starts at 0.0
