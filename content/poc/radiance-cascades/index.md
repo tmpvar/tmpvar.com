@@ -1017,7 +1017,7 @@ click/drag to move the light
       <output></output>
     </div>
     <div class="maxLevel-control control">
-      max level: <input type="range" min="0" max="6" value="1">
+      max level: <input type="range" min="0" max="6" value="0">
       <output></output>
     </div>
   </section>
@@ -1040,6 +1040,24 @@ click/drag to move the light
 <span class="highlight-blue">(Work in progress)</span>
 <section id="fuzz-world-3d-content" class="has-webgpu">
   <section class="controls">
+    <h4>Debug/Development</h4>
+    <div class="indent">
+      <div class="debugRaymarchFixedSizeStepMultiplier-control control">
+        raymarch fixed size step multiplier: <input type="range" min="0.1" max="100.0" step="0.01" value="1.0">
+        <output></output>
+      </div>
+    </div>
+    <h4>Radiance Cascade Parameters</h4>
+    <div class="indent">
+      <div class="probeRayCount-control control">
+        2<sup>r</sup> raycount (level 0): <input type="range" min="3" max="5" value="3">
+        <output></output>
+      </div>
+      <div class="intervalRadius-control control">
+        interval radius (level 0): <input type="range" min="0" max="256" value="6">
+        <output></output>
+      </div>
+    </div>
   </section>
 
   <section class="center-align webgpu-required">
