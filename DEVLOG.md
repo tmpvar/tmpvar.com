@@ -26,6 +26,7 @@
 ## Pending
 - radiance-cascades/3d: trace cascade 0 probe rays, collecting into probe buffer
 - radiance-cascades/3d: debug render probes
+- radiance-cascades/3d: raymarch primary rays through the fluence texture
 
 - radiance-cascades/3d: texture wrapper that tracks version
                         will be used for resizing the

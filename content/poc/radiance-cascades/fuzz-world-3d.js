@@ -74,6 +74,17 @@ async function FuzzWorld3dBegin() {
         GPUTextureUsage.STORAGE_BINDING
       ),
     }),
+    fluence: state.gpu.device.createTexture({
+      label: `${state.gpu.labelPrefix}Texture/fluence`,
+      size: [volumeDiameter, volumeDiameter, volumeDiameter],
+      mipLevelCount: Math.log2(volumeDiameter),
+      dimension: '3d',
+      format: 'rgba16float',
+      usage: (
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING
+      ),
+    }),
     output: state.gpu.device.createTexture({
       label: `${state.gpu.labelPrefix}Texture/output`,
       size: [canvas.width, canvas.height, 1],
@@ -90,7 +101,8 @@ async function FuzzWorld3dBegin() {
   const level0RaysPerProbe = 8
   const level0BytesPerProbeRay = 16
   const level0ProbeCount = Math.pow(level0ProbeLatticeDiameter, 3)
-  const probeBufferByteSize = level0ProbeCount * level0RaysPerProbe * level0BytesPerProbeRay * 2
+  const level0ProbeRayCount = level0RaysPerProbe * level0ProbeCount
+  const probeBufferByteSize = level0ProbeRayCount * level0BytesPerProbeRay * 2
 
   state.gpu.buffers = {
     probes: state.gpu.device.createBuffer({
@@ -371,8 +383,189 @@ async function FuzzWorld3dBegin() {
       }
     },
 
-    RaymarchPrimaryRays(gpu, volumeTexture, outputTexture, workgroupSize) {
+    RaymarchProbeRays(
+      gpu,
+      volumeTexture,
+      probeBuffer,
+      workgroupSize,
+      level0ProbeLatticeDiameter,
+      level0ProbeRayCount
+    ) {
+      const labelPrefix = gpu.labelPrefix + 'RaymarchProbeRays/'
+
+      const uboFields = [
+        ['level', 'i32', 4],
+      ]
+
+      let uboBufferSize = uboFields.reduce((p, c) => {
+        return p + c[2]
+      }, 0)
+      uboBufferSize = Math.floor(uboBufferSize / 16 + 1) * 16
+      const uboBuffer = new ArrayBuffer(uboBufferSize)
+
+      const uboData = new DataView(uboBuffer)
+      const ubo = gpu.device.createBuffer({
+        label: `${labelPrefix}UBO`,
+        size: uboBuffer.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+
+      const sampler = gpu.device.createSampler({
+        label: `${labelPrefix}Sampler`,
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        magFilter: 'linear',
+        minFilter: 'linear',
+        mipmapFilter: 'linear',
+      })
+
+      const source =  /* wgsl */`
+        const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
+        const level0ProbeRayCount: u32 = ${level0ProbeRayCount};
+
+        struct UBOParams {
+          ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
+        };
+
+        @group(0) @binding(0) var<storage, read_write> probes: array<vec4f>;
+        @group(0) @binding(1) var<uniform> ubo: UBOParams;
+        @group(0) @binding(2) var volumeTexture: texture_3d<f32>;
+        @group(0) @binding(3) var volumeSampler: sampler;
+
+        @compute @workgroup_size(${workgroupSize.join(',')})
+        fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
+          let dims = vec3f(textureDimensions(volumeTexture));
+
+          let RayIndex = id.x + id.y * ${workgroupSize[0]} + id.z * ${workgroupSize[0] * workgroupSize[1]};
+          let ProbeRayIndex = RayIndex % level0ProbeRayCount;
+          // color based on ray index
+          {
+            var col = i32(RayIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+            col = col % vec3<i32>(255, 253, 127);
+            probes[RayIndex] = vec4(vec3f(col), 1.0);
+          }
+        }
+      `
+
+      const shaderModule = gpu.device.createShaderModule({
+        code: source
+      })
+
+      const bindGroupLayout = gpu.device.createBindGroupLayout({
+        label: `${labelPrefix}BindGroupLayout`,
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'storage'
+            },
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'uniform',
+            }
+          },
+          {
+            binding: 2,
+            visibility: GPUShaderStage.COMPUTE,
+            texture: {
+              sampleType: 'float',
+              viewDimension: '3d',
+            },
+          },
+          {
+            binding: 3,
+            visibility: GPUShaderStage.COMPUTE,
+            sampler: {
+              type: "filtering"
+            },
+          },
+        ]
+      })
+
+      const pipeline = gpu.device.createComputePipeline({
+        label: `${labelPrefix}ComputePipeline`,
+        compute: {
+          module: shaderModule,
+          entryPoint: 'ComputeMain',
+        },
+        layout: gpu.device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout
+          ]
+        }),
+      })
+
+      const bindGroup = gpu.device.createBindGroup({
+        label: `${labelPrefix}BindGroup`,
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: {
+              buffer: probeBuffer
+            }
+          },
+          {
+            binding: 1,
+            resource: {
+              buffer: ubo
+            }
+          },
+          {
+            binding: 2,
+            resource: volumeTexture.createView({
+              dimension: '3d',
+              baseMipLevel: 0,
+              mipLevelCount: volumeTexture.mipLevelCount,
+            })
+          },
+          {
+            binding: 3,
+            resource: sampler,
+          },
+        ]
+      })
+
+      return function RaymarchPrimaryRays(
+        commandEncoder,
+      ) {
+        // update uniform buffer
+        {
+          let byteOffset = 0
+          // TODO: prepopulate a ubo section for each level
+          // level
+          const level = 0
+          uboData.setInt32(byteOffset, level, true)
+          byteOffset += 4
+
+          gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
+        }
+
+        const computePass = commandEncoder.beginComputePass()
+        computePass.setPipeline(pipeline)
+        computePass.setBindGroup(0, bindGroup)
+        computePass.dispatchWorkgroups(
+          Math.floor(level0ProbeLatticeDiameter / workgroupSize[0] + 1),
+          Math.floor(level0ProbeLatticeDiameter / workgroupSize[1] + 1),
+          Math.floor(level0ProbeLatticeDiameter / workgroupSize[2] + 1),
+        )
+        computePass.end()
+      }
+    },
+
+    RaymarchPrimaryRays(
+      gpu,
+      volumeTexture,
+      outputTexture,
+      workgroupSize,
+      level0ProbeLatticeDiameter
+    ) {
       const labelPrefix = gpu.labelPrefix + 'RaymarchPrimaryRays/'
+
 
       const uboFields = [
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
@@ -406,6 +599,8 @@ async function FuzzWorld3dBegin() {
       })
 
       const source =  /* wgsl */`
+        const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
+
         fn MinComponent(a: vec3f) -> f32 {
           return min(a.x, min(a.y, a.z));
         }
@@ -900,11 +1095,20 @@ async function FuzzWorld3dBegin() {
       state.gpu.textures.volume,
       [16, 4, 4]
     ),
+    raymarchProbeRays: shaders.RaymarchProbeRays(
+      state.gpu,
+      state.gpu.textures.volume,
+      state.gpu.buffers.probes,
+      [256, 1, 1],
+      level0ProbeLatticeDiameter,
+      level0ProbeRayCount
+    ),
     raymarchPrimaryRays: shaders.RaymarchPrimaryRays(
       state.gpu,
       state.gpu.textures.volume,
       state.gpu.textures.output,
-      [16, 16, 1]
+      [16, 16, 1],
+      level0ProbeLatticeDiameter
     ),
     blit: shaders.Blit(
       state.gpu,
@@ -1003,6 +1207,8 @@ async function FuzzWorld3dBegin() {
     state.gpu.programs.fillVolume(commandEncoder)
 
     state.gpu.programs.mipmapVolume(commandEncoder)
+
+    state.gpu.programs.raymarchProbeRays(commandEncoder)
 
     state.gpu.programs.raymarchPrimaryRays(
       commandEncoder,
