@@ -757,7 +757,6 @@ async function FuzzWorld3dBegin() {
 
       const uboFields = [
         ['probeRayCount', 'i32', 4],
-        ['debugRenderRawFluence', 'i32', 4],
       ];
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -795,7 +794,6 @@ async function FuzzWorld3dBegin() {
             Index.y * level0ProbeLatticeDiameter *  ubo.probeRayCount +
             Index.z * (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter) * ubo.probeRayCount
           );
-          let debugFluence = ubo.debugRenderRawFluence == 1;
 
           var volumeSample = textureLoad(volumeTexture, id, 0);
           var acc = vec4f(0.0);
@@ -909,9 +907,6 @@ async function FuzzWorld3dBegin() {
           uboData.setInt32(byteOffset, params.probeRayCount, true)
           byteOffset += 4;
 
-          uboData.setInt32(byteOffset, params.debugRenderRawFluence ? 1 : 0, true)
-          byteOffset += 4;
-
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
         }
 
@@ -945,6 +940,7 @@ async function FuzzWorld3dBegin() {
         ['width', 'i32', 4],
         ['height', 'i32', 4],
         ['fov', 'f32', 4],
+        ['debugRenderRawFluence', 'i32', 4],
       ]
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -1104,16 +1100,20 @@ async function FuzzWorld3dBegin() {
               level = percent * levelCount;
 
               stepSize = 0.0125 * level;
-
-              var albedo = textureSampleLevel(albedoTexture, volumeSampler, uvw, level);
-              if (albedo.a > 0.0) {
+              if (ubo.debugRenderRawFluence == 1) {
                 let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
-                var c = vec4(
-                  albedo.rgb * fluence.rgb * (1.0 - fluence.a),
-                  albedo.a
-                );
+                acc = Accumulate(acc, fluence);
+              } else {
+                var albedo = textureSampleLevel(albedoTexture, volumeSampler, uvw, level);
+                if (albedo.a > 0.0) {
+                  let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
+                  var c = vec4(
+                    albedo.rgb * fluence.rgb * (1.0 - fluence.a),
+                    albedo.a
+                  );
 
-                acc = Accumulate(acc , c);
+                  acc = Accumulate(acc , c);
+                }
               }
             }
           }
@@ -1237,7 +1237,8 @@ async function FuzzWorld3dBegin() {
         eye,
         worldToScreen,
         screenToWorld,
-        fov
+        fov,
+        params
       ) {
         // update uniform buffer
         {
@@ -1269,9 +1270,13 @@ async function FuzzWorld3dBegin() {
           uboData.setInt32(byteOffset, height, true)
           byteOffset += 4
 
-          // height
+          // fov
           uboData.setFloat32(byteOffset, fov, true)
           byteOffset += 4
+
+          // debugRenderRawFluence
+          uboData.setInt32(byteOffset, params.debugRenderRawFluence ? 1 : 0, true)
+          byteOffset += 4;
 
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
         }
@@ -1706,7 +1711,8 @@ async function FuzzWorld3dBegin() {
       state.camera.state.eye,
       state.camera.state.worldToScreen,
       state.camera.state.screenToWorld,
-      state.camera.state.fov
+      state.camera.state.fov,
+      state.params
     )
 
     state.gpu.programs.blit(
