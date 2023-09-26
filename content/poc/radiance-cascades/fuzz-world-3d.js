@@ -101,8 +101,8 @@ async function FuzzWorld3dBegin() {
   const level0RaysPerProbe = 8
   const level0BytesPerProbeRay = 16
   const level0ProbeCount = Math.pow(level0ProbeLatticeDiameter, 3)
-  const level0ProbeRayCount = level0RaysPerProbe * level0ProbeCount
-  const probeBufferByteSize = level0ProbeRayCount * level0BytesPerProbeRay * 2
+  const level0RayCount = level0RaysPerProbe * level0ProbeCount
+  const probeBufferByteSize = level0RayCount * level0BytesPerProbeRay * 2
 
   state.gpu.buffers = {
     probes: state.gpu.device.createBuffer({
@@ -392,6 +392,7 @@ async function FuzzWorld3dBegin() {
       level0ProbeRayCount
     ) {
       const labelPrefix = gpu.labelPrefix + 'RaymarchProbeRays/'
+      const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
 
       const uboFields = [
         ['level', 'i32', 4],
@@ -555,11 +556,24 @@ async function FuzzWorld3dBegin() {
         const computePass = commandEncoder.beginComputePass()
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup)
-        computePass.dispatchWorkgroups(
-          Math.floor(level0ProbeLatticeDiameter / workgroupSize[0] + 1),
-          Math.floor(level0ProbeLatticeDiameter / workgroupSize[1] + 1),
-          Math.floor(level0ProbeLatticeDiameter / workgroupSize[2] + 1),
-        )
+
+        const totalRays = Math.pow(level0ProbeLatticeDiameter, 3) * level0RaysPerProbe
+        const totalWorkGroups = totalRays / workgroupSize[0];
+        let x = totalWorkGroups
+        let y = 1
+        let z = 1
+
+        if (x > maxWorkgroupsPerDimension) {
+          y = x / maxWorkgroupsPerDimension
+          x = maxWorkgroupsPerDimension
+        }
+
+        if (y > maxWorkgroupsPerDimension) {
+          z = y / maxWorkgroupsPerDimension
+          y = maxWorkgroupsPerDimension
+        }
+
+        computePass.dispatchWorkgroups(x, y, z)
         computePass.end()
       }
     },
@@ -1341,6 +1355,9 @@ async function FuzzWorld3dBegin() {
     state.gpu.programs.mipmapVolume(commandEncoder)
 
     state.gpu.programs.raymarchProbeRays(commandEncoder)
+
+    state.gpu.programs.computeFluence(commandEncoder)
+    state.gpu.programs.mipmapFluence(commandEncoder)
 
     state.gpu.programs.raymarchPrimaryRays(
       commandEncoder,
