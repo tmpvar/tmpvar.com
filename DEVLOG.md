@@ -39,6 +39,8 @@
 - radiance-cascades/3d: merge upper cascade
 - radiance-cascades/3d: debug render probes
 - radiance-cascades/3d: fix erroneous darkening for distant objects
+- radiance-cascades/3d: add albedo texture (rgb8) so we can color objects separate
+                        to their emissive value (e.g., white smoke without emission)
 
 ## 2023-09-26
 - radiance-cascades/3d: compute fluence texture
