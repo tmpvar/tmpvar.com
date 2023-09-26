@@ -436,13 +436,20 @@ async function FuzzWorld3dBegin() {
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           let dims = vec3f(textureDimensions(volumeTexture));
 
-          let RayIndex = id.x + id.y * ${workgroupSize[0]} + id.z * ${workgroupSize[0] * workgroupSize[1]};
+          let RayIndex = (
+            id.x +
+            id.y * ${workgroupSize[0]} +
+            id.z * ${workgroupSize[0] * workgroupSize[0]}
+          );
+
           let ProbeRayIndex = RayIndex % level0ProbeRayCount;
+          let ProbeIndex = RayIndex / level0ProbeRayCount;
           // color based on ray index
           {
-            var col = i32(RayIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+            var col = i32(ProbeIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
             col = col % vec3<i32>(255, 253, 127);
             probes[RayIndex] = vec4(vec3f(col), 1.0);
+            // probes[RayIndex] = vec4(0.0, 1.0, 0.0, 1.0);
           }
         }
       `
@@ -530,7 +537,7 @@ async function FuzzWorld3dBegin() {
         ]
       })
 
-      return function RaymarchPrimaryRays(
+      return function RaymarchProbeRays(
         commandEncoder,
       ) {
         // update uniform buffer
@@ -545,6 +552,118 @@ async function FuzzWorld3dBegin() {
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
         }
 
+        const computePass = commandEncoder.beginComputePass()
+        computePass.setPipeline(pipeline)
+        computePass.setBindGroup(0, bindGroup)
+        computePass.dispatchWorkgroups(
+          Math.floor(level0ProbeLatticeDiameter / workgroupSize[0] + 1),
+          Math.floor(level0ProbeLatticeDiameter / workgroupSize[1] + 1),
+          Math.floor(level0ProbeLatticeDiameter / workgroupSize[2] + 1),
+        )
+        computePass.end()
+      }
+    },
+
+    ComputeFluence(
+      gpu,
+      fluenceTexture,
+      probeBuffer,
+      workgroupSize,
+      level0ProbeLatticeDiameter,
+      level0RaysPerProbe
+    ) {
+      const labelPrefix = gpu.labelPrefix + 'RaymarchProbeRays/'
+      const source =  /* wgsl */`
+        const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
+        const level0RaysPerProbe: i32 = ${level0RaysPerProbe};
+        const otherDimStride: i32 = ${level0RaysPerProbe * level0ProbeLatticeDiameter};
+        const otherDimStride2: i32 = ${Math.pow(level0RaysPerProbe * level0ProbeLatticeDiameter, 2)};
+
+        @group(0) @binding(0) var<storage, read_write> probes: array<vec4f>;
+        @group(0) @binding(1) var outTexture: texture_storage_3d<rgba16float, write>;
+
+        @compute @workgroup_size(${workgroupSize.join(',')})
+        fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
+          let dims = vec3f(textureDimensions(outTexture));
+          let uvw = vec3f(id) / dims;
+          let Index = vec3<i32>(uvw * f32(level0ProbeLatticeDiameter));
+          let StartIndex = (
+            Index.x * level0RaysPerProbe +
+            Index.y * otherDimStride +
+            Index.z * otherDimStride * otherDimStride
+          );
+
+          var acc = vec4f(0.0);
+          for (var probeRayIndex = 0; probeRayIndex<level0RaysPerProbe; probeRayIndex++) {
+            acc += probes[StartIndex + probeRayIndex];
+          }
+          textureStore(outTexture, id, acc / f32(level0RaysPerProbe));
+        }
+      `
+
+      const shaderModule = gpu.device.createShaderModule({
+        label: `${labelPrefix}ShaderModule`,
+        code: source
+      })
+
+      const bindGroupLayout = gpu.device.createBindGroupLayout({
+        label: `${labelPrefix}BindGroupLayout`,
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'storage'
+            },
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            storageTexture: {
+              format: "rgba16float",
+              viewDimension: '3d',
+            },
+          },
+        ]
+      })
+
+      const pipeline = gpu.device.createComputePipeline({
+        label: `${labelPrefix}ComputePipeline`,
+        compute: {
+          module: shaderModule,
+          entryPoint: 'ComputeMain',
+        },
+        layout: gpu.device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout
+          ]
+        }),
+      })
+
+      const bindGroup = gpu.device.createBindGroup({
+        label: `${labelPrefix}BindGroup`,
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: {
+              buffer: probeBuffer
+            }
+          },
+          {
+            binding: 1,
+            resource: fluenceTexture.createView({
+              dimension: '3d',
+              baseMipLevel: 0,
+              mipLevelCount: 1,
+            })
+          },
+        ]
+      })
+
+      return function ComputeFluence(
+        commandEncoder,
+      ) {
         const computePass = commandEncoder.beginComputePass()
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup)
@@ -1095,13 +1214,26 @@ async function FuzzWorld3dBegin() {
       state.gpu.textures.volume,
       [16, 4, 4]
     ),
+    mipmapFluence: shaders.MipmapVolume(
+      state.gpu,
+      state.gpu.textures.fluence,
+      [16, 4, 4]
+    ),
+    computeFluence: shaders.ComputeFluence(
+      state.gpu,
+      state.gpu.textures.fluence,
+      state.gpu.buffers.probes,
+      [16, 4, 4],
+      level0ProbeLatticeDiameter,
+      level0RaysPerProbe
+    ),
     raymarchProbeRays: shaders.RaymarchProbeRays(
       state.gpu,
       state.gpu.textures.volume,
       state.gpu.buffers.probes,
       [256, 1, 1],
       level0ProbeLatticeDiameter,
-      level0ProbeRayCount
+      level0RaysPerProbe
     ),
     raymarchPrimaryRays: shaders.RaymarchPrimaryRays(
       state.gpu,
