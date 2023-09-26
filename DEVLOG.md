@@ -17,33 +17,35 @@
 - radiance-cascades/2d: consider adding a dumb FPS counter when the "run continuously" without
                      timer queries
 - radiance-cascades/3d: add touch events when this works on any mobile device
+- radiance-cascades/3d: texture wrapper that tracks version
+                        will be used for resizing the
+                        volume via a slider, and we'll want to rebuild the bindGroup when
+                        that happens
 ## Next
+- radiance-cascades/3d: mipmap volume whenever it changes, instead
+                        of every frame (pending perf timers)
 - radiance-cascades/2d: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades/2d: 'proper' transparency accumulation
 - radiance-cascades/2d: suslik's blend between cascades
 - radiance-cascades/2d: how to fix the ringing artifacts?
 - radiance-cascades/2d: rename irradiance to fluence
-
-## Pending
-- radiance-cascades/3d: compute fluence texture
-- radiance-cascades/3d: raymarch primary rays through the fluence texture
-- radiance-cascades/3d: trace cascade 0 probe rays, collecting into probe buffer
-- radiance-cascades/3d: debug render probes
-- radiance-cascades/3d: transparent objects are darker the further away they are..
-
-- radiance-cascades/3d: texture wrapper that tracks version
-                        will be used for resizing the
-                        volume via a slider, and we'll want to rebuild the bindGroup when
-                        that happens
-
-- radiance-cascades/3d: mipmap volume whenever it changes, instead
-                        of every frame
 - radiance-cascades/3d: render a mesh
 - radiance-cascades/3d: render an analytic primitive
-
 - radiance-cascades/3d: mipmap only changed regions
 
+## Pending
+- radiance-cascades: convert #flatland-2d-controls to `.controls`
+- radiance-cascades/3d: trace cascade N probe rays, collecting into probe buffer
+- radiance-cascades/3d: merge upper cascade
+- radiance-cascades/3d: debug render probes
+- radiance-cascades/3d: fix erroneous darkening for distant objects
+
 ## 2023-09-26
+- radiance-cascades/3d: compute fluence texture
+- radiance-cascades/3d: trace cascade 0 probe rays, collecting into probe buffer
+- radiance-cascades/3d: compute fluence on occupied cells only + toggle
+- radiance-cascades/3d: raymarch primary rays through the fluence texture
+
 ## 2023-09-25
 - radiance-cascades/3d: add probe buffer
 - radiance-cascades/3d: fix t so that it always starts at 0.0
