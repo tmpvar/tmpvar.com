@@ -20,7 +20,6 @@ async function FuzzWorld3dBegin() {
     let b = (v >> 0) & 0xFF
     return [r / 255.0, g / 255.0, b / 255.0]
   })
-  console.log(LevelColorFloats)
 
   function Now() {
     if (window.performance && window.performance.now) {
@@ -449,9 +448,12 @@ async function FuzzWorld3dBegin() {
           {
             var col = i32(ProbeIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
             col = col % vec3<i32>(255, 253, 127);
-            probes[RayIndex] = vec4(vec3f(col), 1.0);
-            // probes[RayIndex] = vec4(0.0, 1.0, 0.0, 1.0);
+            probes[RayIndex] = vec4(vec3f(col), 0.00001);
+            // probes[RayIndex] = vec4(0.0, 1.0, 0.0, 0.01);
+            return;
           }
+
+          // TODO: actually fire some rays
         }
       `
 
@@ -586,32 +588,31 @@ async function FuzzWorld3dBegin() {
       level0ProbeLatticeDiameter,
       level0RaysPerProbe
     ) {
-      const labelPrefix = gpu.labelPrefix + 'RaymarchProbeRays/'
+      const labelPrefix = gpu.labelPrefix + 'ComputeFluence/'
       const source =  /* wgsl */`
         const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
         const level0RaysPerProbe: i32 = ${level0RaysPerProbe};
-        const otherDimStride: i32 = ${level0RaysPerProbe * level0ProbeLatticeDiameter};
-        const otherDimStride2: i32 = ${Math.pow(level0RaysPerProbe * level0ProbeLatticeDiameter, 2)};
 
         @group(0) @binding(0) var<storage, read_write> probes: array<vec4f>;
-        @group(0) @binding(1) var outTexture: texture_storage_3d<rgba16float, write>;
+        @group(0) @binding(1) var fluenceTexture: texture_storage_3d<rgba16float, write>;
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
-          let dims = vec3f(textureDimensions(outTexture));
+          let dims = vec3f(textureDimensions(fluenceTexture));
           let uvw = vec3f(id) / dims;
           let Index = vec3<i32>(uvw * f32(level0ProbeLatticeDiameter));
           let StartIndex = (
-            Index.x * level0RaysPerProbe +
-            Index.y * otherDimStride +
-            Index.z * otherDimStride * otherDimStride
+            Index.x * ${level0RaysPerProbe} +
+            Index.y * ${level0ProbeLatticeDiameter * level0RaysPerProbe} +
+            Index.z * ${Math.pow(level0ProbeLatticeDiameter, 2) * level0RaysPerProbe}
           );
 
           var acc = vec4f(0.0);
           for (var probeRayIndex = 0; probeRayIndex<level0RaysPerProbe; probeRayIndex++) {
             acc += probes[StartIndex + probeRayIndex];
           }
-          textureStore(outTexture, id, acc / f32(level0RaysPerProbe));
+          textureStore(fluenceTexture, id, acc / f32(level0RaysPerProbe));
+          // textureStore(fluenceTexture, id, vec4(uvw, 0.001));
         }
       `
 
@@ -682,9 +683,9 @@ async function FuzzWorld3dBegin() {
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup)
         computePass.dispatchWorkgroups(
-          Math.floor(level0ProbeLatticeDiameter / workgroupSize[0] + 1),
-          Math.floor(level0ProbeLatticeDiameter / workgroupSize[1] + 1),
-          Math.floor(level0ProbeLatticeDiameter / workgroupSize[2] + 1),
+          Math.floor(fluenceTexture.width / workgroupSize[0] + 1),
+          Math.floor(fluenceTexture.height / workgroupSize[1] + 1),
+          Math.floor(fluenceTexture.depthOrArrayLayers / workgroupSize[2] + 1),
         )
         computePass.end()
       }
@@ -801,6 +802,14 @@ async function FuzzWorld3dBegin() {
 
           // Direct output of the first hit
           if (false) {
+            if (aabbHitT < 0.0) {
+              textureStore(
+                outputTexture,
+                id.xy,
+                vec4f(0.0)
+              );
+              return;
+            }
             let uvw = (ubo.eye.xyz + rayDir * aabbHitT) / boxRadius * 0.5 + 0.5;
             var c = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0);
             textureStore(
@@ -1255,7 +1264,7 @@ async function FuzzWorld3dBegin() {
     ),
     raymarchPrimaryRays: shaders.RaymarchPrimaryRays(
       state.gpu,
-      state.gpu.textures.volume,
+      state.gpu.textures.fluence,
       state.gpu.textures.output,
       [16, 16, 1],
       level0ProbeLatticeDiameter
