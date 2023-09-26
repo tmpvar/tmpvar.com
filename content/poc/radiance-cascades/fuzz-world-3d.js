@@ -1066,8 +1066,6 @@ async function FuzzWorld3dBegin() {
           var steps = 256;
           if (aabbHitT >= 0.0) {
             let aabbHit = ubo.eye.xyz + rayDir * aabbHitT;
-
-            // TODO: improve this by sampling mips and increasing the step size
             var t = 0.0;
             var stepSize = 0.001;
             let levelCount = f32(log2(dims.x));
@@ -1076,11 +1074,6 @@ async function FuzzWorld3dBegin() {
               steps--;
               if (steps < 0) {
                 acc = vec4(1.0, 0.0, 0.0, 1.0);
-                // textureStore(
-                //   outputTexture,
-                //   id.xy,
-                //   vec4(1.0, 0.0, 0.0, 1.0)
-                // );
                 break;
               }
 
@@ -1119,11 +1112,7 @@ async function FuzzWorld3dBegin() {
           }
 
           let backgroundColor = vec4f(0.1, 0.1, 0.1, 1.0);
-          let alpha = 1.0 - acc.a;
-          let color = vec4(
-            acc.rgb * acc.a + backgroundColor.rgb * alpha,
-            1.0
-          );
+          let color = Accumulate(acc, backgroundColor);
 
           textureStore(
             outputTexture,
