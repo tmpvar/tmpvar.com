@@ -1108,7 +1108,7 @@ async function FuzzWorld3dBegin() {
                 if (albedo.a > 0.0) {
                   let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
                   var c = vec4(
-                    albedo.rgb * fluence.rgb * (1.0 - fluence.a),
+                    albedo.rgb * fluence.rgb,
                     albedo.a
                   );
 

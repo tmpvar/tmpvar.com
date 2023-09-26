@@ -1051,7 +1051,7 @@ click/drag to move the light
         <output></output>
       </div>
       <div class="debugRenderRawFluence-control control">
-        render raw fluence <input type="checkbox" value="1" checked />
+        render raw fluence <input type="checkbox" value="1" />
       </div>
     </div>
     <h4>Radiance Cascade Parameters</h4>
