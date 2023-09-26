@@ -20,10 +20,10 @@
 ## Next
 - radiance-cascades/2d: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades/2d: 'proper' transparency accumulation
+- radiance-cascades/2d: suslik's blend between cascades
 - radiance-cascades/2d: how to fix the ringing artifacts?
 
 ## Pending
-- radiance-cascades/3d: add probe buffer
 - radiance-cascades/3d: trace cascade 0 probe rays, collecting into probe buffer
 - radiance-cascades/3d: debug render probes
 
@@ -40,6 +40,7 @@
 - radiance-cascades/3d: mipmap only changed regions
 
 ## 2023-09-25
+- radiance-cascades/3d: add probe buffer
 - radiance-cascades/3d: fix t so that it always starts at 0.0
 - radiance-cascades/3d: cone trace the volume
 - radiance-cascades/3d: mipmap volume
