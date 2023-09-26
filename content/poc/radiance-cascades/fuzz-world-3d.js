@@ -60,8 +60,6 @@ async function FuzzWorld3dBegin() {
 
   state.gpu.labelPrefix = "FuzzWorld3D/"
 
-  state.gpu.buffers = {}
-
 
   const volumeDiameter = 256;
   state.gpu.textures = {
@@ -86,6 +84,21 @@ async function FuzzWorld3dBegin() {
         GPUTextureUsage.STORAGE_BINDING
       ),
     }),
+  }
+
+  const level0ProbeLatticeDiameter = 64
+  const level0RaysPerProbe = 8
+  const level0BytesPerProbeRay = 16
+  const level0ProbeCount = Math.pow(level0ProbeLatticeDiameter, 3)
+  const probeBufferByteSize = level0ProbeCount * level0RaysPerProbe * level0BytesPerProbeRay * 2
+
+  state.gpu.buffers = {
+    probes: state.gpu.device.createBuffer({
+      label: 'ProbeBuffer',
+      // Note: we need to ping-pong so the buffer needs to be doubled in size
+      size: probeBufferByteSize,
+      usage: GPUBufferUsage.STORAGE
+    })
   }
 
   const shaders = {
