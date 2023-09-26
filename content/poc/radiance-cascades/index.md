@@ -1043,8 +1043,11 @@ click/drag to move the light
     <h4>Debug/Development</h4>
     <div class="indent">
       <div class="debugRaymarchFixedSizeStepMultiplier-control control">
-        raymarch fixed size step multiplier: <input type="range" min="0.1" max="100.0" step="0.01" value="1.0">
+        raymarch fixed size step multiplier: <input type="range" min="0.1" max="100.0" step="0.01" value="2.0">
         <output></output>
+      </div>
+      <div class="debugRenderRawFluence-control control">
+        render raw fluence <input type="checkbox" value="1" checked />
       </div>
     </div>
     <h4>Radiance Cascade Parameters</h4>

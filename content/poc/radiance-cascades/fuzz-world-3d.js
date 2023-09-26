@@ -721,6 +721,7 @@ async function FuzzWorld3dBegin() {
 
     ComputeFluence(
       gpu,
+      volumeTexture,
       fluenceTexture,
       probeBuffer,
       workgroupSize,
@@ -730,6 +731,7 @@ async function FuzzWorld3dBegin() {
 
       const uboFields = [
         ['probeRayCount', 'i32', 4],
+        ['debugRenderRawFluence', 'i32', 4],
       ];
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -755,6 +757,7 @@ async function FuzzWorld3dBegin() {
         @group(0) @binding(0) var<storage, read_write> probes: array<vec4f>;
         @group(0) @binding(1) var fluenceTexture: texture_storage_3d<rgba16float, write>;
         @group(0) @binding(2) var<uniform> ubo: UBOParams;
+        @group(0) @binding(3) var volumeTexture: texture_3d<f32>;
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -767,12 +770,16 @@ async function FuzzWorld3dBegin() {
             Index.z * (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter) * ubo.probeRayCount
           );
 
-          var acc = vec4f(0.0);
-          for (var probeRayIndex = 0; probeRayIndex < ubo.probeRayCount; probeRayIndex++) {
-            acc += probes[StartIndex + probeRayIndex];
+          if (ubo.debugRenderRawFluence == 1 || textureLoad(volumeTexture, id, 0).a > 0.0) {
+            var acc = vec4f(0.0);
+            for (var probeRayIndex = 0; probeRayIndex < ubo.probeRayCount; probeRayIndex++) {
+              acc += probes[StartIndex + probeRayIndex];
+            }
+            textureStore(fluenceTexture, id, acc / f32(ubo.probeRayCount));
+          } else {
+            textureStore(fluenceTexture, id, vec4(0.0));
           }
-          textureStore(fluenceTexture, id, acc / f32(ubo.probeRayCount));
-          // textureStore(fluenceTexture, id, vec4(uvw, 0.001));
+            // textureStore(fluenceTexture, id, vec4(uvw, 0.001));
         }
       `
 
@@ -805,6 +812,15 @@ async function FuzzWorld3dBegin() {
             buffer: {
               type: 'uniform',
             }
+          },
+          {
+            binding: 3,
+            visibility: GPUShaderStage.COMPUTE,
+            texture: {
+              format: "rgba16float",
+              sampleType: 'float',
+              viewDimension: '3d',
+            },
           },
         ]
       })
@@ -846,6 +862,15 @@ async function FuzzWorld3dBegin() {
               buffer: ubo
             }
           },
+          {
+            binding: 3,
+            resource: volumeTexture.createView({
+              label: `${labelPrefix}/Volume/View`,
+              dimension: '3d',
+              baseMipLevel: 0,
+              mipLevelCount: 1
+            })
+          }
         ]
       })
 
@@ -858,6 +883,9 @@ async function FuzzWorld3dBegin() {
           let byteOffset = 0
 
           uboData.setInt32(byteOffset, params.probeRayCount, true)
+          byteOffset += 4;
+
+          uboData.setInt32(byteOffset, params.debugRenderRawFluence ? 1 : 0, true)
           byteOffset += 4;
 
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
@@ -1431,6 +1459,7 @@ async function FuzzWorld3dBegin() {
     ),
     computeFluence: shaders.ComputeFluence(
       state.gpu,
+      state.gpu.textures.volume,
       state.gpu.textures.fluence,
       state.gpu.buffers.probes,
       [16, 4, 4],
@@ -1542,6 +1571,7 @@ async function FuzzWorld3dBegin() {
       parentEl.querySelector('output').innerHTML = value;
       return value;
     })
+    Param('debugRenderRawFluence', 'f32')
 
     Param('intervalRadius', 'i32', (parentEl, value, oldValue) => {
       parentEl.querySelector('output').innerHTML = value;
