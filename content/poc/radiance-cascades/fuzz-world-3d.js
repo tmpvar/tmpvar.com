@@ -792,20 +792,24 @@ async function FuzzWorld3dBegin() {
           let boxRadius = dims * 0.5;
           var aabbHitT = 0.0;
           if (
-            (ubo.eye.x > -boxRadius.x && ubo.eye.x < boxRadius.x) &&
-            (ubo.eye.y > -boxRadius.y && ubo.eye.y < boxRadius.y) &&
-            (ubo.eye.z > -boxRadius.z && ubo.eye.z < boxRadius.z)
+            (ubo.eye.x < -boxRadius.x || ubo.eye.x >= boxRadius.x) ||
+            (ubo.eye.y < -boxRadius.y || ubo.eye.y >= boxRadius.y) ||
+            (ubo.eye.z < -boxRadius.z || ubo.eye.z >= boxRadius.z)
           ) {
-            textureStore(
-              outputTexture,
-              id.xy,
-              vec4f(1.0, 1.0, 1.0, 1.0)
-            );
-            // return;
-          } else {
             aabbHitT = RayAABB(-boxRadius, boxRadius, ubo.eye.xyz, 1.0 / rayDir);
           }
 
+          // Direct output of the first hit
+          if (false) {
+            let uvw = (ubo.eye.xyz + rayDir * aabbHitT) / boxRadius * 0.5 + 0.5;
+            var c = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0);
+            textureStore(
+              outputTexture,
+              id.xy,
+              c
+            );
+            return;
+          }
 
           var acc = vec4f(0.0);
           var energy = 1.0;
