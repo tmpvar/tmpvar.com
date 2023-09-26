@@ -290,8 +290,8 @@ async function ProbeRayDistribution3dBegin() {
     let colors = []
 
     const Add = (pos, level) => {
-      let pd = level == 0 ? 0 : (1 << (level - 1))
-      let d = 1 << level
+      let pd = 0.0//level == 0 ? 0 : (1 << (level - 1))
+      let d = 2.0// << level
       verts.push(pos[0] * pd, pos[1] * pd, pos[2] * pd)
       verts.push(pos[0] * d, pos[1] * d, pos[2] * d);
 
@@ -303,14 +303,33 @@ async function ProbeRayDistribution3dBegin() {
 
     switch (state.params.rayPackingApproach) {
       case 'lat-lon-subdivision': {
-        for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
-          const hrings = 4 << level
-          const vrings = 4 << level
-          for (let a0 = 0; a0 < hrings; a0++) {
-            let angle0 = TAU * (a0 + 0.5) / hrings;
-            for (let a1 = 0; a1 < vrings; a1++) {
-              let angle1 = TAU * (a1 + 0.5) / vrings;
 
+        if (false) {
+          for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+            const hrings = 4 << level
+            const vrings = 4 << level
+            for (let a0 = 0; a0 < hrings; a0++) {
+              let angle0 = TAU * (a0 + 0.5) / hrings;
+              for (let a1 = 0; a1 < vrings; a1++) {
+                let angle1 = TAU * (a1 + 0.5) / vrings;
+
+                pos[0] = Math.sin(angle0) * Math.cos(angle1)
+                pos[1] = Math.sin(angle0) * Math.sin(angle1)
+                pos[2] = Math.cos(angle0)
+
+                Add(pos, level)
+              }
+            }
+          }
+        } else {
+          for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+            const hrings = 2 << level
+            const vrings = 4 << level
+            const rayCount = 8 << level
+            for (let rayIndex = 0; rayIndex < rayCount; rayIndex++) {
+
+              let angle0 = TAU * ((rayIndex % vrings + 0.5) / vrings)
+              let angle1 = TAU * (Math.floor(rayIndex / vrings) / hrings) / hrings
               pos[0] = Math.sin(angle0) * Math.cos(angle1)
               pos[1] = Math.sin(angle0) * Math.sin(angle1)
               pos[2] = Math.cos(angle0)
@@ -330,7 +349,7 @@ async function ProbeRayDistribution3dBegin() {
           const rayCount = 8 << level
           for (let rayIndex = 0; rayIndex < rayCount; rayIndex++) {
             let a0 = TAU * rayIndex / goldenRatio
-            let a1 = Math.acos(1.0 - 2*(rayIndex + 0.5) / rayCount)
+            let a1 = Math.acos(1.0 - 2 * (rayIndex + 0.5) / rayCount)
             pos[0] = Math.cos(a0) * Math.sin(a1)
             pos[1] = Math.sin(a0) * Math.sin(a1)
             pos[2] = Math.cos(a1)
@@ -359,7 +378,7 @@ async function ProbeRayDistribution3dBegin() {
             pos[1] = Math.sin(a0) * Math.cos(a1)
             pos[2] = Math.sin(a1)
 
-            Add(pos,  level)
+            Add(pos, level)
           }
         }
         break;

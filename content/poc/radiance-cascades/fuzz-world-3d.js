@@ -49,8 +49,20 @@ async function FuzzWorld3dBegin() {
   state.camera.state.targetDistance = 200
   state.camera.state.scrollSensitivity = 0.1;
 
+
+  const level0ProbeLatticeDiameter = 64
+  const maxRaysPerLevel0Probe = Math.pow(
+    2,
+    parseFloat(document.querySelector('#fuzz-world-3d-content .controls .probeRayCount-control input').max)
+  )
+
+  const level0BytesPerProbeRay = 16
+  const level0ProbeCount = Math.pow(level0ProbeLatticeDiameter, 3)
+  const level0RayCount = maxRaysPerLevel0Probe * level0ProbeCount
+  const probeBufferByteSize = level0RayCount * level0BytesPerProbeRay * 2
+
   try {
-    state.gpu = await InitGPU(ctx);
+    state.gpu = await InitGPU(ctx, probeBufferByteSize);
   } catch (e) {
     console.error(e)
     rootEl.className = rootEl.className.replace('has-webgpu', '')
@@ -95,13 +107,6 @@ async function FuzzWorld3dBegin() {
       ),
     }),
   }
-
-  const level0ProbeLatticeDiameter = 64
-  const level0RaysPerProbe = 8
-  const level0BytesPerProbeRay = 16
-  const level0ProbeCount = Math.pow(level0ProbeLatticeDiameter, 3)
-  const level0RayCount = level0RaysPerProbe * level0ProbeCount
-  const probeBufferByteSize = level0RayCount * level0BytesPerProbeRay * 2
 
   state.gpu.buffers = {
     probes: state.gpu.device.createBuffer({
@@ -169,41 +174,50 @@ async function FuzzWorld3dBegin() {
           textureStore(texture, id.xyz, vec4f(0.0, 0.0, 0.0, 0.0));
           let dims = vec3f(textureDimensions(texture));
           let pos = vec3f(id.xyz);
-          var d0 = SampleSDF(pos, dims);
 
-          var d1 = de(pos * 0.01) * 100.0;
+          if (false) {
 
-          var color = vec3(0.0, 0.0, 0.0);
-          var falloff = 10.0;
-          var opacity = 0.1;
-          var alpha = 1.0;
-          if (abs(d1) <= 0.3) {
-            falloff = 1.0;
-            opacity = 0.25;
-            color = vec3(1.0, 0.0, 0.4);
-            // alpha = clamp(sqrt(-d1), 0.0, falloff) / falloff * opacity;
-            // alpha = 0.015;
-            alpha = opacity;
-            textureStore(
-              texture,
-              id.xyz,
-              vec4f(color, alpha)
-            );
-          }
+            let d = SDFSphere(pos, dims * 0.5, 8);
+            if (d < 0.0) {
+              textureStore(texture, id, vec4f(vec3f(40.0), 1.0));
+            }
+          } else {
+            var d0 = SampleSDF(pos, dims);
 
-          d0 = max(d0, -(d1 - 3.0));
-          if (d0 <= 2.0) {
-            color = vec3(1.0);
-            opacity = 1.0;
-            falloff = 1.0;
-            alpha = opacity;
-            // alpha = clamp(sqrt(d0), 0.0, falloff) / falloff * opacity;
-            // alpha = (2.0 - max(0.0, d0)) * 0.5;
-            textureStore(
-              texture,
-              id.xyz,
-              vec4f(color, alpha)
-            );
+            var d1 = de(pos * 0.01) * 100.0;
+
+            var color = vec3(0.0, 0.0, 0.0);
+            var falloff = 10.0;
+            var opacity = 0.1;
+            var alpha = 1.0;
+            if (abs(d1) <= 0.3) {
+              falloff = 1.0;
+              opacity = 0.25;
+              color = vec3(1.0, 0.0, 0.4);
+              // alpha = clamp(sqrt(-d1), 0.0, falloff) / falloff * opacity;
+              // alpha = 0.015;
+              alpha = opacity;
+              textureStore(
+                texture,
+                id.xyz,
+                vec4f(color, alpha)
+              );
+            }
+
+            d0 = max(d0, -(d1 - 3.0));
+            if (d0 <= 2.0) {
+              color = vec3(1.0);
+              opacity = 1.0;
+              falloff = 1.0;
+              alpha = opacity;
+              // alpha = clamp(sqrt(d0), 0.0, falloff) / falloff * opacity;
+              // alpha = (2.0 - max(0.0, d0)) * 0.5;
+              textureStore(
+                texture,
+                id.xyz,
+                vec4f(color, alpha)
+              );
+            }
           }
         }
       `
@@ -394,7 +408,12 @@ async function FuzzWorld3dBegin() {
       const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
 
       const uboFields = [
-        ['level', 'i32', 4],
+        ['level', 'u32', 4],
+        ['probeRadius', 'i32', 4],
+        ['level0ProbeRayCount', 'i32', 4],
+        ['intervalStartRadius', 'f32', 4],
+        ['intervalEndRadius', 'f32', 4],
+        ['debugRaymarchFixedSizeStepMultiplier', 'f32', 4],
       ]
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -420,12 +439,63 @@ async function FuzzWorld3dBegin() {
       })
 
       const source =  /* wgsl */`
+        const PI: f32 = ${Math.PI};
+        const TAU: f32 = ${Math.PI * 2.0};
         const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
-        const level0ProbeRayCount: u32 = ${level0ProbeRayCount};
 
         struct UBOParams {
           ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
         };
+
+        fn RayMarchFixedSize(probeCenter: vec3f, rayOrigin: vec3f, rayDirection: vec3f, maxDistance: f32) -> vec4f {
+          let levelDivisor = 1.0 / f32(1<<u32(ubo.level));
+          let levelMip = f32(ubo.level);
+          let levelRayOrigin = rayOrigin * levelDivisor;
+          let levelProbeCenter = probeCenter * levelDivisor;
+          let levelMaxDistance = maxDistance * levelDivisor;
+          var acc = vec4f(0.0, 0.0, 0.0, 0.0);
+          let dims = vec3f(textureDimensions(volumeTexture));
+
+          var t = 0.0;
+          let stepSizeMultiplier = max(0.1, ubo.debugRaymarchFixedSizeStepMultiplier);
+          let stepSize = pow(2.0, levelMip) * stepSizeMultiplier;
+          while(true) {
+            let pos = rayOrigin + rayDirection * t;
+
+            if (distance(pos, probeCenter) > maxDistance) {
+              break;
+            }
+
+            if (
+              pos.x < 0 ||
+              pos.y < 0 ||
+              pos.x >= dims.x ||
+              pos.y >= dims.y
+            ) {
+              break;
+            }
+
+            var sample = textureSampleLevel(
+              volumeTexture,
+              volumeSampler,
+              pos / dims,
+              levelMip
+            );
+
+            if (sample.a > 0.0) {
+              let a0 = acc.a + sample.a * (1.0 - acc.a);
+              acc = vec4(
+                (acc.rgb * acc.a + sample.rgb * sample.a * (1.0 - acc.a)) / a0,
+                a0
+              );
+            }
+              // acc = AccumulateSample(acc, sample, decay);
+            // acc += sample;
+            t += stepSize;
+          }
+
+          return acc;
+        }
 
         @group(0) @binding(0) var<storage, read_write> probes: array<vec4f>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
@@ -436,22 +506,70 @@ async function FuzzWorld3dBegin() {
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           let dims = vec3f(textureDimensions(volumeTexture));
 
-          let RayIndex = (
+          let RayIndex: i32 = i32(
             id.x +
             id.y * ${workgroupSize[0]} +
             id.z * ${workgroupSize[0] * workgroupSize[0]}
           );
 
-          let ProbeRayIndex = RayIndex % level0ProbeRayCount;
-          let ProbeIndex = RayIndex / level0ProbeRayCount;
+          let ProbeRayIndex = RayIndex % ubo.level0ProbeRayCount;
+          let ProbeIndex = RayIndex / ubo.level0ProbeRayCount;
           // color based on ray index
-          {
-            var col = i32(ProbeIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-            col = col % vec3<i32>(255, 253, 127);
-            probes[RayIndex] = vec4(vec3f(col), 0.00001);
-            // probes[RayIndex] = vec4(0.0, 1.0, 0.0, 0.01);
-            return;
-          }
+          // {
+          //   var col = i32(ProbeIndex/1000 + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+          //   col = col % vec3<i32>(255, 253, 127);
+          //   probes[RayIndex] = vec4(vec3f(col), 1.00001);
+          //   // probes[RayIndex] = vec4(0.0, 1.0, 0.0, 0.01);
+          //   return;
+          // }
+
+          // TODO: use a more appropriate curve
+          let GoldenRatio = (1.0 + sqrt(5.0)) * 0.5;
+          let a0 = TAU * f32(ProbeRayIndex) / GoldenRatio;
+          let a1 = acos(1.0 - 2.0 * (f32(ProbeRayIndex) + 0.5) / f32(ubo.level0ProbeRayCount));
+          let RayDirection = vec3f(
+            cos(a0) * sin(a1),
+            sin(a0) * sin(a1),
+            cos(a1),
+          );
+          // let hrings = f32(4 << ubo.level);
+          // let vrings = f32(4 << ubo.level);
+          // let angle0 = TAU * (modf(f32(ProbeRayIndex) / vrings).whole + 0.5) / vrings;
+          // let angle1 = TAU * (floor(f32(ProbeRayIndex) / vrings) + 0.5) / hrings;
+          // let RayDirection = vec3f(
+          //   sin(angle0) * cos(angle1),
+          //   sin(angle0) * sin(angle1),
+          //   cos(angle0)
+          // );
+
+          var idx = ProbeIndex;
+          let z = idx / (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter);
+          idx -= z * (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter);
+          let LatticePosition = vec3f(
+            f32(idx % level0ProbeLatticeDiameter),
+            f32(idx / level0ProbeLatticeDiameter),
+            f32(z)
+          );
+
+          let IntervalRadius = f32(ubo.intervalEndRadius);
+          let LowerIntervalRadius = f32(ubo.intervalStartRadius);
+
+          // TODO: pull this from ubo
+          let ProbeRadius = f32(ubo.probeRadius);
+          let ProbeDiameter = ProbeRadius * 2.0;
+          let RayOrigin = LatticePosition * ProbeDiameter + ProbeRadius;
+
+          let LowerResult = RayMarchFixedSize(
+            RayOrigin,
+            RayOrigin + RayDirection * LowerIntervalRadius,
+            RayDirection,
+            IntervalRadius
+          );
+
+          probes[RayIndex] = LowerResult;
+          // probes[RayIndex] = vec4(LowerResult.rgb, 0.01);
+          // probes[RayIndex] = vec4(RayOrigin / dims, 0.1);
+          // probes[RayIndex] = vec4(RayDirection * 0.5 + 0.5, 0.01);
 
           // TODO: actually fire some rays
         }
@@ -542,7 +660,13 @@ async function FuzzWorld3dBegin() {
 
       return function RaymarchProbeRays(
         commandEncoder,
+        params
       ) {
+        const probeRadius = 2
+        const intervalStartRadius = 0
+        const intervalEndRadius = params.intervalRadius
+        const level0ProbeRayCount = params.probeRayCount
+
         // update uniform buffer
         {
           let byteOffset = 0
@@ -552,6 +676,21 @@ async function FuzzWorld3dBegin() {
           uboData.setInt32(byteOffset, level, true)
           byteOffset += 4
 
+          uboData.setInt32(byteOffset, probeRadius, true)
+          byteOffset += 4
+
+          uboData.setInt32(byteOffset, level0ProbeRayCount, true)
+          byteOffset += 4
+
+          uboData.setFloat32(byteOffset, intervalStartRadius, true)
+          byteOffset += 4
+
+          uboData.setFloat32(byteOffset, intervalEndRadius, true)
+          byteOffset += 4
+
+          uboData.setFloat32(byteOffset, params.debugRaymarchFixedSizeStepMultiplier, true)
+          byteOffset += 4
+
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
         }
 
@@ -559,7 +698,7 @@ async function FuzzWorld3dBegin() {
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup)
 
-        const totalRays = Math.pow(level0ProbeLatticeDiameter, 3) * level0RaysPerProbe
+        const totalRays = Math.pow(level0ProbeLatticeDiameter, 3) * state.params.probeRayCount
         const totalWorkGroups = totalRays / workgroupSize[0];
         let x = totalWorkGroups
         let y = 1
@@ -586,15 +725,36 @@ async function FuzzWorld3dBegin() {
       probeBuffer,
       workgroupSize,
       level0ProbeLatticeDiameter,
-      level0RaysPerProbe
     ) {
       const labelPrefix = gpu.labelPrefix + 'ComputeFluence/'
+
+      const uboFields = [
+        ['probeRayCount', 'i32', 4],
+      ];
+
+      let uboBufferSize = uboFields.reduce((p, c) => {
+        return p + c[2]
+      }, 0)
+      uboBufferSize = Math.floor(uboBufferSize / 16 + 1) * 16
+      const uboBuffer = new ArrayBuffer(uboBufferSize)
+
+      const uboData = new DataView(uboBuffer)
+      const ubo = gpu.device.createBuffer({
+        label: `${labelPrefix}UBO`,
+        size: uboBuffer.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+
       const source =  /* wgsl */`
+        struct UBOParams {
+          ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
+        };
+
         const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
-        const level0RaysPerProbe: i32 = ${level0RaysPerProbe};
 
         @group(0) @binding(0) var<storage, read_write> probes: array<vec4f>;
         @group(0) @binding(1) var fluenceTexture: texture_storage_3d<rgba16float, write>;
+        @group(0) @binding(2) var<uniform> ubo: UBOParams;
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -602,16 +762,16 @@ async function FuzzWorld3dBegin() {
           let uvw = vec3f(id) / dims;
           let Index = vec3<i32>(uvw * f32(level0ProbeLatticeDiameter));
           let StartIndex = (
-            Index.x * ${level0RaysPerProbe} +
-            Index.y * ${level0ProbeLatticeDiameter * level0RaysPerProbe} +
-            Index.z * ${Math.pow(level0ProbeLatticeDiameter, 2) * level0RaysPerProbe}
+            Index.x * ubo.probeRayCount +
+            Index.y * level0ProbeLatticeDiameter *  ubo.probeRayCount +
+            Index.z * (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter) * ubo.probeRayCount
           );
 
           var acc = vec4f(0.0);
-          for (var probeRayIndex = 0; probeRayIndex<level0RaysPerProbe; probeRayIndex++) {
+          for (var probeRayIndex = 0; probeRayIndex < ubo.probeRayCount; probeRayIndex++) {
             acc += probes[StartIndex + probeRayIndex];
           }
-          textureStore(fluenceTexture, id, acc / f32(level0RaysPerProbe));
+          textureStore(fluenceTexture, id, acc / f32(ubo.probeRayCount));
           // textureStore(fluenceTexture, id, vec4(uvw, 0.001));
         }
       `
@@ -638,6 +798,13 @@ async function FuzzWorld3dBegin() {
               format: "rgba16float",
               viewDimension: '3d',
             },
+          },
+          {
+            binding: 2,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'uniform',
+            }
           },
         ]
       })
@@ -673,12 +840,29 @@ async function FuzzWorld3dBegin() {
               mipLevelCount: 1,
             })
           },
+          {
+            binding: 2,
+            resource: {
+              buffer: ubo
+            }
+          },
         ]
       })
 
       return function ComputeFluence(
         commandEncoder,
+        params
       ) {
+        // update uniform buffer
+        {
+          let byteOffset = 0
+
+          uboData.setInt32(byteOffset, params.probeRayCount, true)
+          byteOffset += 4;
+
+          gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
+        }
+
         const computePass = commandEncoder.beginComputePass()
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup)
@@ -789,7 +973,6 @@ async function FuzzWorld3dBegin() {
             uv * 2.0 - 1.0,
             ubo.screenToWorld
           );
-
           let boxRadius = dims * 0.5;
           var aabbHitT = 0.0;
           if (
@@ -1252,7 +1435,7 @@ async function FuzzWorld3dBegin() {
       state.gpu.buffers.probes,
       [16, 4, 4],
       level0ProbeLatticeDiameter,
-      level0RaysPerProbe
+      state.params.probeRayCount
     ),
     raymarchProbeRays: shaders.RaymarchProbeRays(
       state.gpu,
@@ -1260,7 +1443,7 @@ async function FuzzWorld3dBegin() {
       state.gpu.buffers.probes,
       [256, 1, 1],
       level0ProbeLatticeDiameter,
-      level0RaysPerProbe
+      state.params.probeRayCount
     ),
     raymarchPrimaryRays: shaders.RaymarchPrimaryRays(
       state.gpu,
@@ -1275,9 +1458,14 @@ async function FuzzWorld3dBegin() {
     ),
   }
 
-  async function InitGPU(ctx) {
+  async function InitGPU(ctx, probeBufferByteSize) {
     let adapter = await navigator.gpu.requestAdapter()
-    let device = await adapter.requestDevice()
+    let device = await adapter.requestDevice({
+      requiredLimits: {
+        maxStorageBufferBindingSize: probeBufferByteSize,
+        maxBufferSize: probeBufferByteSize,
+      },
+    })
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
     ctx.configure({
@@ -1294,7 +1482,78 @@ async function FuzzWorld3dBegin() {
     }
   }
 
+  const Param = (paramName, paramType, cb) => {
+    let selector = `.${paramName}-control`
+    let parentEl = controlEl.querySelector(selector)
+    let el = parentEl.querySelector(['input', 'select'])
+    if (!el) {
+      console.warn("could not locate '%s input'", selector)
+      return false
+    }
+
+    let value = 0;
+    switch (el.type) {
+      case 'checkbox': {
+        if (el.checked) {
+          value = el.value
+        }
+        break;
+      }
+      default: {
+        value = el.value;
+        break;
+      }
+    }
+
+    switch (paramType) {
+      case 'f32': {
+        value = parseFloat(value);
+        break;
+      }
+      case 'i32': {
+        value = parseFloat(value) | 0;
+        break;
+      }
+      case 'bool': {
+        value = !!parseFloat(value) ? 1 : 0;
+        break;
+      }
+      case 'color': {
+        value = ParseColor(value)
+        break;
+      }
+    }
+
+    if (cb) {
+      value = cb(parentEl, value)
+    }
+
+    if (state.params[paramName] != value) {
+      state.params[paramName] = value
+      state.dirty = true
+      return true
+    }
+    return false
+  }
+
   function ReadParams() {
+
+    Param('debugRaymarchFixedSizeStepMultiplier', 'f32', (parentEl, value, oldValue) => {
+      parentEl.querySelector('output').innerHTML = value;
+      return value;
+    })
+
+    Param('intervalRadius', 'i32', (parentEl, value, oldValue) => {
+      parentEl.querySelector('output').innerHTML = value;
+      return value;
+    })
+
+    Param('probeRayCount', 'i32', (parentEl, value) => {
+      let newValue = Math.pow(2, value)
+      parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = <span class="highlight-orange">${newValue}</span>`
+      return newValue
+    })
+
 
   }
 
@@ -1367,9 +1626,13 @@ async function FuzzWorld3dBegin() {
 
     state.gpu.programs.mipmapVolume(commandEncoder)
 
-    state.gpu.programs.raymarchProbeRays(commandEncoder)
+    const debugRaymarchFixedSizeStepMultiplier = 1.0;
+    state.gpu.programs.raymarchProbeRays(
+      commandEncoder,
+      state.params
+    )
 
-    state.gpu.programs.computeFluence(commandEncoder)
+    state.gpu.programs.computeFluence(commandEncoder, state.params)
     state.gpu.programs.mipmapFluence(commandEncoder)
 
     state.gpu.programs.raymarchPrimaryRays(
