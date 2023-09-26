@@ -38,16 +38,16 @@
 - radiance-cascades/3d: trace cascade N probe rays, collecting into probe buffer
 - radiance-cascades/3d: merge upper cascade
 - radiance-cascades/3d: debug render probes
+- radiance-cascades/3d: rename volumeTexture to radianceTexture
 - radiance-cascades/3d: fix erroneous darkening for distant objects
-- radiance-cascades/3d: add albedo texture (rgb8) so we can color objects separate
-                        to their emissive value (e.g., white smoke without emission)
 
 ## 2023-09-26
+- radiance-cascades/3d: add albedo texture (rgb8) so we can color objects separate
+                        to their emissive value (e.g., white smoke without emission)
 - radiance-cascades/3d: compute fluence texture
 - radiance-cascades/3d: trace cascade 0 probe rays, collecting into probe buffer
 - radiance-cascades/3d: compute fluence on occupied cells only + toggle
 - radiance-cascades/3d: raymarch primary rays through the fluence texture
-
 ## 2023-09-25
 - radiance-cascades/3d: add probe buffer
 - radiance-cascades/3d: fix t so that it always starts at 0.0

@@ -74,6 +74,17 @@ async function FuzzWorld3dBegin() {
 
   const volumeDiameter = 256;
   state.gpu.textures = {
+    albedo: state.gpu.device.createTexture({
+      label: `${state.gpu.labelPrefix}Texture/albedo`,
+      size: [volumeDiameter, volumeDiameter, volumeDiameter],
+      mipLevelCount: Math.log2(volumeDiameter),
+      dimension: '3d',
+      format: 'rgba8unorm',
+      usage: (
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING
+      ),
+    }),
     volume: state.gpu.device.createTexture({
       label: `${state.gpu.labelPrefix}Texture/volume`,
       size: [volumeDiameter, volumeDiameter, volumeDiameter],
@@ -118,7 +129,7 @@ async function FuzzWorld3dBegin() {
   }
 
   const shaders = {
-    FillVolumeWithSphere(gpu, volumeTexture, workgroupSize) {
+    FillVolumeWithSphere(gpu, volumeTexture, albedoTexture, workgroupSize) {
       const labelPrefix = gpu.labelPrefix + 'FillVolumeWithSphere/'
       const source =  /* wgsl */`
         fn SDFSphere(pos: vec3f, center: vec3f, radius: f32) -> f32 {
@@ -152,7 +163,8 @@ async function FuzzWorld3dBegin() {
             return length(cross(p,normalize(vec3(1,3,3))))/s-.006;
           }
 
-        @group(0) @binding(0) var texture: texture_storage_3d<rgba16float, write>;
+        @group(0) @binding(0) var volumeTexture: texture_storage_3d<rgba16float, write>;
+        @group(0) @binding(1) var albedoTexture: texture_storage_3d<rgba8unorm, write>;
 
         fn SampleSDF(pos: vec3f, dims: vec3f) -> f32 {
           let radius = 64.0;
@@ -171,15 +183,16 @@ async function FuzzWorld3dBegin() {
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
-          textureStore(texture, id.xyz, vec4f(0.0, 0.0, 0.0, 0.0));
-          let dims = vec3f(textureDimensions(texture));
+          textureStore(volumeTexture, id.xyz, vec4f(0.0, 0.0, 0.0, 0.0));
+          textureStore(albedoTexture, id.xyz, vec4f(0.0, 0.0, 0.0, 0.0));
+          let dims = vec3f(textureDimensions(volumeTexture));
           let pos = vec3f(id.xyz);
 
           if (false) {
-
             let d = SDFSphere(pos, dims * 0.5, 8);
             if (d < 0.0) {
-              textureStore(texture, id, vec4f(vec3f(40.0), 1.0));
+              textureStore(volumeTexture, id, vec4f(vec3f(10.0), 1.0));
+              textureStore(albedoTexture, id, vec4f(1.0, 0.0, 0.0, 1.0));
             }
           } else {
             var d0 = SampleSDF(pos, dims);
@@ -188,7 +201,7 @@ async function FuzzWorld3dBegin() {
 
             var color = vec3(0.0, 0.0, 0.0);
             var falloff = 10.0;
-            var opacity = 0.1;
+            var opacity = 1.0;
             var alpha = 1.0;
             if (abs(d1) <= 0.3) {
               falloff = 1.0;
@@ -197,26 +210,29 @@ async function FuzzWorld3dBegin() {
               // alpha = clamp(sqrt(-d1), 0.0, falloff) / falloff * opacity;
               // alpha = 0.015;
               alpha = opacity;
-              textureStore(
-                texture,
-                id.xyz,
-                vec4f(color, alpha)
-              );
+              // textureStore(
+              //   volumeTexture,
+              //   id.xyz,
+              //   vec4f(color, alpha)
+              // );
+
+              textureStore(albedoTexture, id, vec4f(color, 0.6));
             }
 
             d0 = max(d0, -(d1 - 3.0));
             if (d0 <= 2.0) {
-              color = vec3(2.0, 2.0, 2.0);
+              let emission = vec3(10.0);
               opacity = 1.0;
               falloff = 1.0;
               alpha = opacity;
               // alpha = clamp(sqrt(d0), 0.0, falloff) / falloff * opacity;
               // alpha = (2.0 - max(0.0, d0)) * 0.5;
               textureStore(
-                texture,
+                volumeTexture,
                 id.xyz,
-                vec4f(color, alpha)
+                vec4f(emission, alpha)
               );
+              textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
             }
           }
         }
@@ -234,6 +250,14 @@ async function FuzzWorld3dBegin() {
             visibility: GPUShaderStage.COMPUTE,
             storageTexture: {
               format: "rgba16float",
+              viewDimension: '3d',
+            },
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            storageTexture: {
+              format: "rgba8unorm",
               viewDimension: '3d',
             },
           },
@@ -265,6 +289,14 @@ async function FuzzWorld3dBegin() {
               mipLevelCount: 1,
             })
           },
+          {
+            binding: 1,
+            resource: albedoTexture.createView({
+              dimension: '3d',
+              baseMipLevel: 0,
+              mipLevelCount: 1,
+            })
+          },
         ]
       })
 
@@ -285,7 +317,7 @@ async function FuzzWorld3dBegin() {
       const labelPrefix = gpu.labelPrefix + 'MipmapVolume/'
       const source =  /* wgsl */`
         @group(0) @binding(0) var src: texture_3d<f32>;
-        @group(0) @binding(1) var dst: texture_storage_3d<rgba16float, write>;
+        @group(0) @binding(1) var dst: texture_storage_3d<${volumeTexture.format}, write>;
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -326,7 +358,7 @@ async function FuzzWorld3dBegin() {
             binding: 0,
             visibility: GPUShaderStage.COMPUTE,
             texture: {
-              format: "rgba16float",
+              format: volumeTexture.format,
               sampleType: 'float',
               viewDimension: '3d',
             },
@@ -335,7 +367,7 @@ async function FuzzWorld3dBegin() {
             binding: 1,
             visibility: GPUShaderStage.COMPUTE,
             storageTexture: {
-              format: "rgba16float",
+              format: volumeTexture.format,
               viewDimension: '3d',
             },
           }
@@ -402,7 +434,7 @@ async function FuzzWorld3dBegin() {
       probeBuffer,
       workgroupSize,
       level0ProbeLatticeDiameter,
-      level0ProbeRayCount
+      level0RayCount
     ) {
       const labelPrefix = gpu.labelPrefix + 'RaymarchProbeRays/'
       const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
@@ -442,6 +474,7 @@ async function FuzzWorld3dBegin() {
         const PI: f32 = ${Math.PI};
         const TAU: f32 = ${Math.PI * 2.0};
         const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
+        const level0RayCount: i32 = ${level0RayCount};
 
         struct UBOParams {
           ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
@@ -537,15 +570,6 @@ async function FuzzWorld3dBegin() {
             sin(a0) * sin(a1),
             cos(a1),
           );
-          // let hrings = f32(4 << ubo.level);
-          // let vrings = f32(4 << ubo.level);
-          // let angle0 = TAU * (modf(f32(ProbeRayIndex) / vrings).whole + 0.5) / vrings;
-          // let angle1 = TAU * (floor(f32(ProbeRayIndex) / vrings) + 0.5) / hrings;
-          // let RayDirection = vec3f(
-          //   sin(angle0) * cos(angle1),
-          //   sin(angle0) * sin(angle1),
-          //   cos(angle0)
-          // );
 
           var idx = ProbeIndex;
           let z = idx / (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter);
@@ -559,7 +583,6 @@ async function FuzzWorld3dBegin() {
           let IntervalRadius = f32(ubo.intervalEndRadius);
           let LowerIntervalRadius = f32(ubo.intervalStartRadius);
 
-          // TODO: pull this from ubo
           let ProbeRadius = f32(ubo.probeRadius);
           let ProbeDiameter = ProbeRadius * 2.0;
           let RayOrigin = LatticePosition * ProbeDiameter + ProbeRadius;
@@ -571,12 +594,9 @@ async function FuzzWorld3dBegin() {
             IntervalRadius
           );
 
-          probes[RayIndex] = LowerResult;
-          // probes[RayIndex] = vec4(LowerResult.rgb, 0.01);
-          // probes[RayIndex] = vec4(RayOrigin / dims, 0.1);
-          // probes[RayIndex] = vec4(RayDirection * 0.5 + 0.5, 0.01);
+          let OutputIndex = (i32(ubo.level) % 2) * level0RayCount;
 
-          // TODO: actually fire some rays
+          probes[OutputIndex + RayIndex] = LowerResult;
         }
       `
 
@@ -783,20 +803,7 @@ async function FuzzWorld3dBegin() {
             acc += probes[StartIndex + probeRayIndex];
           }
           acc /= f32(ubo.probeRayCount);
-
-          if (debugFluence || volumeSample.a > 0.0) {
-            if (debugFluence) {
-              textureStore(fluenceTexture, id, acc);
-            } else {
-              textureStore(
-                fluenceTexture,
-                id,
-                acc * volumeSample
-              );
-            }
-          } else {
-            textureStore(fluenceTexture, id, vec4(0.0));
-          }
+          textureStore(fluenceTexture, id, acc);
         }
       `
 
@@ -922,6 +929,7 @@ async function FuzzWorld3dBegin() {
 
     RaymarchPrimaryRays(
       gpu,
+      albedoTexture,
       volumeTexture,
       outputTexture,
       workgroupSize,
@@ -1001,10 +1009,19 @@ async function FuzzWorld3dBegin() {
           ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
         };
 
+        fn Accumulate(a: vec4f, b: vec4f) -> vec4f {
+          let a0 = a.a + b.a * (1.0 - a.a);
+          return vec4(
+            a.rgb * a.a + b.rgb * b.a * (1.0 - a.a),
+            a0
+          );
+        }
+
         @group(0) @binding(0) var outputTexture: texture_storage_2d<rgba8unorm, write>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
-        @group(0) @binding(2) var volumeTexture: texture_3d<f32>;
-        @group(0) @binding(3) var volumeSampler: sampler;
+        @group(0) @binding(2) var albedoTexture: texture_3d<f32>;
+        @group(0) @binding(3) var volumeTexture: texture_3d<f32>;
+        @group(0) @binding(4) var volumeSampler: sampler;
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -1083,64 +1100,36 @@ async function FuzzWorld3dBegin() {
                 break;
               }
 
-              // var c = (
-              //   textureSampleLevel(volumeTexture, volumeSampler, uvw, level + 0)
-              //   + textureSampleLevel(volumeTexture, volumeSampler, uvw, level + 0.5)
-              // //   // + textureSampleLevel(volumeTexture, volumeSampler, uvw, level + 2)
-              // ) / 2.0;
-
-              // c.a *= stepSize;
-
               let percent = 0.125 * t * tan(ubo.fov * 0.5) / f32(dims.x / 2);
               level = percent * levelCount;
 
-              // stepSize = percent * percent * percent * dims.x;
               stepSize = 0.0125 * level;
-              // stepSize = 1.0 / (level + 2);
-              // stepSize = 0.0125;//t * level;//tan(ubo.fov * 0.5) / f32(dims.x / 2);//0.0125 * t * tan(ubo.fov * 0.5) / f32(dims.x / 2);
-              // stepSize = max(0.1, f32(dims.x * 0.05) * percent * max(1.0, level));
-              // stepSize = 0.5;
 
-              var c = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
-              if (c.a > 0.0) {
-                var a0 = acc.a + c.a * (1.0 - acc.a);
-                acc = vec4f(
-                  (acc.rgb * acc.a + c.rgb * c.a * (1.0 - acc.a)) / a0,
-                  a0
+              var albedo = textureSampleLevel(albedoTexture, volumeSampler, uvw, level);
+              if (albedo.a > 0.0) {
+                let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
+                var c = vec4(
+                  albedo.rgb * fluence.rgb * (1.0 - fluence.a),
+                  albedo.a
                 );
+
+                acc = Accumulate(acc , c);
               }
-
-              // var alpha = acc.a + (1.0 - acc.a) * c.a;
-              // acc = vec4(
-              //   acc.rgb * alpha + (1.0 - alpha) * c.a * c.rgb,
-              //   alpha
-              // );
-
             }
           }
 
-
-          // let backgroundColor = rayDir * 0.5 + 0.5;
           let backgroundColor = vec4f(0.1, 0.1, 0.1, 1.0);
-          // if (energy >= 1.0) {
-          //   textureStore(
-          //     outputTexture,
-          //     id.xy,
-          //     backgroundColor
-          //   );
-          // } else {
-            let alpha = 1.0 - acc.a;
-            let color = vec4(
-              acc.rgb * acc.a + backgroundColor.rgb * alpha,
-              1.0
-            );
+          let alpha = 1.0 - acc.a;
+          let color = vec4(
+            acc.rgb * acc.a + backgroundColor.rgb * alpha,
+            1.0
+          );
 
-            textureStore(
-              outputTexture,
-              id.xy,
-              color
-            );
-          // }
+          textureStore(
+            outputTexture,
+            id.xy,
+            color
+          );
         }
       `
 
@@ -1175,6 +1164,14 @@ async function FuzzWorld3dBegin() {
           },
           {
             binding: 3,
+            visibility: GPUShaderStage.COMPUTE,
+            texture: {
+              sampleType: 'float',
+              viewDimension: '3d',
+            },
+          },
+          {
+            binding: 4,
             visibility: GPUShaderStage.COMPUTE,
             sampler: {
               type: "filtering"
@@ -1212,7 +1209,7 @@ async function FuzzWorld3dBegin() {
           },
           {
             binding: 2,
-            resource: volumeTexture.createView({
+            resource: albedoTexture.createView({
               dimension: '3d',
               baseMipLevel: 0,
               mipLevelCount: volumeTexture.mipLevelCount,
@@ -1220,6 +1217,14 @@ async function FuzzWorld3dBegin() {
           },
           {
             binding: 3,
+            resource: volumeTexture.createView({
+              dimension: '3d',
+              baseMipLevel: 0,
+              mipLevelCount: volumeTexture.mipLevelCount,
+            })
+          },
+          {
+            binding: 4,
             resource: sampler,
           },
         ]
@@ -1462,11 +1467,17 @@ async function FuzzWorld3dBegin() {
     fillVolume: shaders.FillVolumeWithSphere(
       state.gpu,
       state.gpu.textures.volume,
+      state.gpu.textures.albedo,
       [16, 4, 4]
     ),
     mipmapVolume: shaders.MipmapVolume(
       state.gpu,
       state.gpu.textures.volume,
+      [16, 4, 4]
+    ),
+    mipmapAlbedo: shaders.MipmapVolume(
+      state.gpu,
+      state.gpu.textures.albedo,
       [16, 4, 4]
     ),
     mipmapFluence: shaders.MipmapVolume(
@@ -1489,10 +1500,11 @@ async function FuzzWorld3dBegin() {
       state.gpu.buffers.probes,
       [256, 1, 1],
       level0ProbeLatticeDiameter,
-      state.params.probeRayCount
+      level0RayCount
     ),
     raymarchPrimaryRays: shaders.RaymarchPrimaryRays(
       state.gpu,
+      state.gpu.textures.albedo,
       state.gpu.textures.fluence,
       state.gpu.textures.output,
       [16, 16, 1],
@@ -1676,6 +1688,7 @@ async function FuzzWorld3dBegin() {
     state.gpu.programs.fillVolume(commandEncoder)
 
     state.gpu.programs.mipmapVolume(commandEncoder)
+    state.gpu.programs.mipmapAlbedo(commandEncoder)
 
     const debugRaymarchFixedSizeStepMultiplier = 1.0;
     state.gpu.programs.raymarchProbeRays(
