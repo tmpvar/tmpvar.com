@@ -321,27 +321,27 @@ async function ProbeRayDistribution3dBegin() {
         }
 
         const branchingFactor = 4
+
         for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
           let raysPerFace = Math.pow(branchingFactor, level)
+          let totalRayCount = raysPerFace * 6
           let diameter = Math.sqrt(raysPerFace)
-          for (let face = 0; face<6; face++) {
-            let sign = face % 2 == 0 ? -1  : 1
+
+          for (let rayIndex = 0; rayIndex < totalRayCount; rayIndex++) {
+            let face = Math.floor(rayIndex / raysPerFace)
+            let sign = face % 2 == 0 ? -1 : 1
             // -x, x, -y, y, -z, z
             let axis = Math.floor(face / 2)
+            let faceRayIndex = rayIndex % raysPerFace
 
-            for (let i=0; i<raysPerFace; i++) {
-              let u = (MortonDecodeX(i) + 0.5) / diameter
-              let v = (MortonDecodeY(i) + 0.5) / diameter
-              pos[axis] = sign
-              pos[(axis + 1) % 3] = u * 2.0 - 1.0
-              pos[(axis + 2) % 3] = v * 2.0 - 1.0
+            let u = (MortonDecodeX(faceRayIndex) + 0.5) / diameter * 2.0 - 1.0
+            let v = (MortonDecodeY(faceRayIndex) + 0.5) / diameter * 2.0 - 1.0
+            let l = Math.sqrt(1 + u*u + v*v)
+            pos[axis] = sign / l
+            pos[(axis + 1) % 3] = u / l
+            pos[(axis + 2) % 3] = v / l
 
-              let l = Math.sqrt(pos[0]*pos[0] + pos[1]*pos[1] + pos[2]*pos[2])
-              pos[0] /= l
-              pos[1] /= l
-              pos[2] /= l
-              Add(pos, level)
-            }
+            Add(pos, level)
           }
         }
 
