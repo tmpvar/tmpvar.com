@@ -209,8 +209,7 @@ async function FuzzWorld3dBegin() {
               textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
             }
 
-
-            let light = SDFSphere(pos, vec3f(32, dims.y * 0.125, dims.z * 0.5), 32);
+            let light = SDFSphere(pos, vec3f(32, dims.y * 0.125 + 32, dims.z * 0.5  - 64), 16);
             if (light < 0.0) {
               textureStore(volumeTexture, id, vec4f(vec3f(10.0), 1.0));
               textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
@@ -460,7 +459,7 @@ async function FuzzWorld3dBegin() {
       const labelPrefix = gpu.labelPrefix + 'RaymarchProbeRays/'
       const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
 
-      const maxLevelCount = Math.log2(level0ProbeLatticeDiameter)
+      const maxLevelCount = Math.log2(level0ProbeLatticeDiameter) + 1
 
       const uboFields = [
         ['level', 'u32', 4],
@@ -520,7 +519,7 @@ async function FuzzWorld3dBegin() {
           let pos = clamp(rawPos, vec3<i32>(0), vec3<i32>(cascadeWidth - 1));
 
           let index = (
-            raysPerProbe * pos.x +
+            pos.x * raysPerProbe +
             pos.y * cascadeWidth * raysPerProbe +
             pos.z * cascadeWidth * cascadeWidth * raysPerProbe
           );
@@ -672,15 +671,12 @@ async function FuzzWorld3dBegin() {
               pos / dims,
               levelMip
             );
+            acc = Accumulate(acc, sample);
 
-            if (sample.a > 0.0) {
-              occlusion += sample.a;
-            }
-              acc = Accumulate(acc, sample);
-
-            if (occlusion > 1.0) {
-              break;
-            }
+            // occlusion += sample.a;
+            // if (occlusion > 0.001) {
+            //   break;
+            // }
 
             t += stepSize;
           }
