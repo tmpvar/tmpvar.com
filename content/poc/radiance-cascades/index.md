@@ -1047,7 +1047,7 @@ click/drag to move the light
         <output></output>
       </div>
       <div class="debugMaxProbeLevel-control control">
-        max probe level: <input type="range" min="0" max="6" step="1" value="0">
+        max probe level: <input type="range" min="0" max="6" step="1" value="1">
         <output></output>
       </div>
       <div class="debugRenderRawFluence-control control">
@@ -1061,7 +1061,7 @@ click/drag to move the light
         <output></output>
       </div> -->
       <div class="intervalRadius-control control">
-        interval radius (level 0): <input type="range" min="0" max="256" value="131">
+        interval radius (level 0): <input type="range" min="0" max="256" value="70">
         <output></output>
       </div>
     </div>

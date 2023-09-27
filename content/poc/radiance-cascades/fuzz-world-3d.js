@@ -190,7 +190,7 @@ async function FuzzWorld3dBegin() {
           let pos = vec3f(id.xyz);
 
           // a singular emissive sphere
-          if (false) {
+          if (true) {
             let light = SDFSphere(pos, dims * 0.5, 16);
             if (light < 0.0) {
               textureStore(volumeTexture, id, vec4f(vec3f(10.0), 1.0));
@@ -199,7 +199,7 @@ async function FuzzWorld3dBegin() {
             return;
           }
 
-          if (true) {
+          if (false) {
             let floor = SDFBox(
               pos - vec3f(dims.x * 0.5, 0.0, dims.z * 0.5),
               vec3f(dims.x * 0.5, 15.0, dims.z * 0.5)
@@ -631,15 +631,12 @@ async function FuzzWorld3dBegin() {
         }
 
         fn Accumulate(a: vec4f, b: vec4f) -> vec4f {
-          if (b.a > 0.0) {
-            let a0 = a.a + b.a * (1.0 - a.a);
-            return vec4(
-              (a.rgb * a.a + b.rgb * b.a * (1.0 - a.a)) / a0,
-              a0
-            );
-          } else {
-            return a;
-          }
+          let a0 = a.a + b.a * (1.0 - a.a);
+          return select(
+            a,
+            vec4((a.rgb * a.a + b.rgb * b.a * (1.0 - a.a)) / a0, a0),
+            a0 > 0
+          );
         }
 
         fn RayMarchFixedSize(
@@ -682,6 +679,7 @@ async function FuzzWorld3dBegin() {
               pos / dims,
               levelMip
             );
+
             acc = Accumulate(acc, sample);
 
             // occlusion += sample.a;
@@ -994,13 +992,13 @@ async function FuzzWorld3dBegin() {
           let dims = vec3f(textureDimensions(fluenceTexture));
           let uvw = vec3f(id) / dims;
           let Index = vec3<i32>(uvw * f32(level0ProbeLatticeDiameter));
-          let StartIndex = (
-            Index.x * ubo.probeRayCount +
-            Index.y * level0ProbeLatticeDiameter *  ubo.probeRayCount +
-            Index.z * (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter) * ubo.probeRayCount
-          );
 
-          var volumeSample = textureLoad(volumeTexture, id, 0);
+          let StartIndex = (
+            Index.x +
+            Index.y * level0ProbeLatticeDiameter +
+            Index.z * (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter)
+          ) * ubo.probeRayCount;
+
           var acc = vec4f(0.0);
           for (var probeRayIndex = 0; probeRayIndex < ubo.probeRayCount; probeRayIndex++) {
             acc += probes[StartIndex + probeRayIndex];
@@ -1111,7 +1109,6 @@ async function FuzzWorld3dBegin() {
 
           uboData.setInt32(byteOffset, params.probeRayCount, true)
           byteOffset += 4;
-
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
         }
 
@@ -1257,7 +1254,7 @@ async function FuzzWorld3dBegin() {
             let percent = 0.125 * t * tan(ubo.fov * 0.5) / f32(boxRadius.x);
             level = percent * levelCount;
 
-            stepSize = 0.0125 * level;
+            stepSize = 0.00125 * level;
             if (ubo.debugRenderRawFluence == 1) {
               let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
               acc = Accumulate(acc, fluence);
@@ -1280,9 +1277,9 @@ async function FuzzWorld3dBegin() {
         fn MarchRay(rayOrigin: vec3f, rayDirection: vec3f, boxRadius: vec3f) -> vec4f {
           var acc = vec4f(0.0);
           var t = 0.0;
-          var stepSize = 2.0;
+          var stepSize = 1.0;
           let levelCount = f32(log2(boxRadius.x * 2.0));
-          var steps = 350;
+          var steps = 512;
           while(true) {
             steps--;
             if (steps < 0) {
@@ -1304,9 +1301,6 @@ async function FuzzWorld3dBegin() {
 
             let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0);
             acc = Accumulate(acc, fluence);
-            if (fluence.a >= 1.0) {
-              break;
-            }
           }
           return acc;
         }
