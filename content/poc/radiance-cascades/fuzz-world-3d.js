@@ -446,6 +446,8 @@ async function FuzzWorld3dBegin() {
         ['intervalStartRadius', 'f32', 4],
         ['intervalEndRadius', 'f32', 4],
         ['debugRaymarchFixedSizeStepMultiplier', 'f32', 4],
+        ['branchingFactor', 'u32', 4],
+        ['levelCount', 'u32', 4],
       ]
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -479,6 +481,121 @@ async function FuzzWorld3dBegin() {
         struct UBOParams {
           ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
         };
+
+
+        fn SampleUpperProbe(rawPos: vec3<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> vec4f {
+          // TODO: rawPos can be out of the scene bounds, intentionally.
+          //       this is a bit of a hack, that reuses an in-bounds probe multiple times
+          //       instead of going out of bounds to a probe that doesn't exist or simply
+          //       returning transparent black.
+          //
+          //       The real fix is to add another ring of probes for every level that live
+          //       just out of bounds to add coverage for lower corner/edge probes
+
+          let pos = clamp(rawPos, vec3<i32>(0), vec3<i32>(cascadeWidth - 1));
+
+          let index = raysPerProbe * pos.x + pos.y * cascadeWidth * raysPerProbe;
+          let rayCount = 1<<ubo.branchingFactor;
+          var accColor = vec4(0.0);
+          var accRadiance = 0.0;
+          for (var offset=0; offset<rayCount; offset++) {
+            accColor += probes[bufferStartIndex + index + offset];
+          }
+          return accColor / f32(rayCount);
+        }
+
+        // given: world space sample pos, angle
+        // - sample each probe in the neighborhood (4)
+        // - interpolate
+        fn SampleUpperProbes(lowerProbeCenter: vec3f, rayIndex: i32) -> vec4f {
+          let UpperLevel = i32(ubo.level + 1);
+
+          if (UpperLevel >= i32(ubo.levelCount)) {
+            return vec4f(0.0, 0.0, 0.0, 1.0);
+          }
+
+          let UpperRaysPerProbe = ubo.probeRayCount << ubo.branchingFactor;
+          let UpperLevelRayIndex = rayIndex << ubo.branchingFactor;
+          let UpperLevelBufferOffset = level0RayCount * (UpperLevel % 2);
+          let UpperProbeDiameter = 2 * (ubo.probeRadius << 1);
+          let UpperCascadeWidth = ${volumeTexture.width} / UpperProbeDiameter;
+
+          let uv = (lowerProbeCenter/f32(UpperProbeDiameter)) / f32(UpperCascadeWidth);
+          let index = uv * f32(UpperCascadeWidth) - 0.5;
+
+          var basePos = vec3<i32>(floor(index));
+
+          let bufferStartIndex = UpperLevelBufferOffset + UpperLevelRayIndex;
+          let samples = array(
+            SampleUpperProbe(
+              basePos + vec3<i32>(0, 0, 0),
+              UpperRaysPerProbe,
+              bufferStartIndex,
+              UpperCascadeWidth
+            ),
+            SampleUpperProbe(
+              basePos + vec3<i32>(1, 0, 0),
+              UpperRaysPerProbe,
+              bufferStartIndex,
+              UpperCascadeWidth
+            ),
+            SampleUpperProbe(
+              basePos + vec3<i32>(0, 1, 0),
+              UpperRaysPerProbe,
+              bufferStartIndex,
+              UpperCascadeWidth
+            ),
+            SampleUpperProbe(
+              basePos + vec3<i32>(1, 1, 0),
+              UpperRaysPerProbe,
+              bufferStartIndex,
+              UpperCascadeWidth
+            ),
+            SampleUpperProbe(
+              basePos + vec3<i32>(0, 0, 1),
+              UpperRaysPerProbe,
+              bufferStartIndex,
+              UpperCascadeWidth
+            ),
+            SampleUpperProbe(
+              basePos + vec3<i32>(1, 0, 1),
+              UpperRaysPerProbe,
+              bufferStartIndex,
+              UpperCascadeWidth
+            ),
+            SampleUpperProbe(
+              basePos + vec3<i32>(0, 1, 1),
+              UpperRaysPerProbe,
+              bufferStartIndex,
+              UpperCascadeWidth
+            ),
+            SampleUpperProbe(
+              basePos + vec3<i32>(1, 1, 1),
+              UpperRaysPerProbe,
+              bufferStartIndex,
+              UpperCascadeWidth
+            ),
+          );
+
+          let factor = fract(index);
+          let invFactor = 1.0 - factor;
+
+          let r1 = samples[0] * invFactor.x + samples[1] * factor.x;
+          let r2 = samples[2] * invFactor.x + samples[3] * factor.x;
+          return r1 * invFactor.y + r2 * factor.y;
+        }
+
+        fn Accumulate(a: vec4f, b: vec4f) -> vec4f {
+          if (b.a > 0.0) {
+            let a0 = a.a + b.a * (1.0 - a.a);
+            return vec4(
+              (a.rgb * a.a + b.rgb * b.a * (1.0 - a.a)) / a0,
+              a0
+            );
+          } else {
+            return a;
+          }
+        }
 
         fn RayMarchFixedSize(probeCenter: vec3f, rayOrigin: vec3f, rayDirection: vec3f, maxDistance: f32) -> vec4f {
           let levelDivisor = 1.0 / f32(1<<u32(ubo.level));
@@ -518,11 +635,7 @@ async function FuzzWorld3dBegin() {
 
             if (sample.a > 0.0) {
               occlusion += sample.a;
-              let a0 = acc.a + sample.a * (1.0 - acc.a);
-              acc = vec4(
-                (acc.rgb * acc.a + sample.rgb * sample.a * (1.0 - acc.a)) / a0,
-                a0
-              );
+              acc = Accumulate(acc, sample);
             }
 
             if (occlusion > 1.0) {
@@ -594,9 +707,23 @@ async function FuzzWorld3dBegin() {
             IntervalRadius
           );
 
+          let UpperResult = SampleUpperProbes(
+            RayOrigin,
+            ProbeRayIndex
+          );
+
           let OutputIndex = (i32(ubo.level) % 2) * level0RayCount;
 
-          probes[OutputIndex + RayIndex] = LowerResult;
+          // probes[OutputIndex + RayIndex] = LowerResult;
+          // probes[OutputIndex + RayIndex] = vec4f(
+          //   LowerResult.rgb + LowerResult.a * UpperResult.rgb,
+          //   LowerResult.a * UpperResult.a
+          // );
+          probes[OutputIndex + RayIndex] = Accumulate(
+            LowerResult,
+            UpperResult
+          );
+
         }
       `
 
@@ -715,6 +842,14 @@ async function FuzzWorld3dBegin() {
           byteOffset += 4
 
           uboData.setFloat32(byteOffset, params.debugRaymarchFixedSizeStepMultiplier, true)
+          byteOffset += 4
+
+          const branchingFactor = 4
+          uboData.setUint32(byteOffset, branchingFactor, true)
+          byteOffset += 4
+
+          const levelCount = Math.log2(volumeTexture.width)
+          uboData.setInt32(byteOffset, levelCount, true)
           byteOffset += 4
 
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
@@ -1006,11 +1141,15 @@ async function FuzzWorld3dBegin() {
         };
 
         fn Accumulate(a: vec4f, b: vec4f) -> vec4f {
-          let a0 = a.a + b.a * (1.0 - a.a);
-          return vec4(
-            a.rgb * a.a + b.rgb * b.a * (1.0 - a.a),
-            a0
-          );
+          if (b.a > 0.0) {
+            let a0 = a.a + b.a * (1.0 - a.a);
+            return vec4(
+              (a.rgb * a.a + b.rgb * b.a * (1.0 - a.a)) / a0,
+              a0
+            );
+          } else {
+            return a;
+          }
         }
 
         @group(0) @binding(0) var outputTexture: texture_storage_2d<rgba8unorm, write>;
