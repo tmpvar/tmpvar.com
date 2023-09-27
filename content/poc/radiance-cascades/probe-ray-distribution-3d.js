@@ -290,8 +290,8 @@ async function ProbeRayDistribution3dBegin() {
     let colors = []
 
     const Add = (pos, level) => {
-      let pd = 0.0//level == 0 ? 0 : (1 << (level - 1))
-      let d = 2.0// << level
+      let pd = level == 0 ? 0 : (1 << (level - 1))
+      let d = 2.0 << level
       verts.push(pos[0] * pd, pos[1] * pd, pos[2] * pd)
       verts.push(pos[0] * d, pos[1] * d, pos[2] * d);
 
@@ -304,7 +304,7 @@ async function ProbeRayDistribution3dBegin() {
     switch (state.params.rayPackingApproach) {
       case 'lat-lon-subdivision': {
 
-        if (false) {
+        if (true) {
           for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
             const hrings = 4 << level
             const vrings = 4 << level
