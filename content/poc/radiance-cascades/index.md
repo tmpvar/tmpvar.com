@@ -1001,7 +1001,6 @@ click/drag to move the light
 ## 3D
 
 ### Probe Ray Distribution (3D)
-<span class="highlight-blue">(Work in progress)</span>
 <section id="probe-ray-distribution-3d-content" class="has-webgpu">
   <section class="controls">
     <div class="rayPackingApproach-control control">
