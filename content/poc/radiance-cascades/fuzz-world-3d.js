@@ -51,10 +51,11 @@ async function FuzzWorld3dBegin() {
 
 
   const level0ProbeLatticeDiameter = 64
-  const maxRaysPerLevel0Probe = Math.pow(
-    2,
-    parseFloat(document.querySelector('#fuzz-world-3d-content .controls .probeRayCount-control input').max)
-  )
+  const maxRaysPerLevel0Probe = 6
+  // const maxRaysPerLevel0Probe = Math.pow(
+  //   2,
+  //   parseFloat(document.querySelector('#fuzz-world-3d-content .controls .probeRayCount-control input').max)
+  // )
 
   const level0BytesPerProbeRay = 16
   const level0ProbeCount = Math.pow(level0ProbeLatticeDiameter, 3)
@@ -187,6 +188,16 @@ async function FuzzWorld3dBegin() {
           textureStore(albedoTexture, id.xyz, vec4f(0.0, 0.0, 0.0, 0.0));
           let dims = vec3f(textureDimensions(volumeTexture));
           let pos = vec3f(id.xyz);
+
+          // a singular emissive sphere
+          if (false) {
+            let light = SDFSphere(pos, dims * 0.5, 16);
+            if (light < 0.0) {
+              textureStore(volumeTexture, id, vec4f(vec3f(10.0), 1.0));
+              textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
+            }
+            return;
+          }
 
           if (true) {
             let floor = SDFBox(
@@ -684,6 +695,24 @@ async function FuzzWorld3dBegin() {
           return acc;
         }
 
+        fn Compact1By1(x: u32) -> u32{
+          var ret = x & 0x55555555;                 // x = -f-e -d-c -b-a -9-8 -7-6 -5-4 -3-2 -1-0
+          ret = (ret ^ (ret >> 1)) & 0x33333333; // x = --fe --dc --ba --98 --76 --54 --32 --10
+          ret = (ret ^ (ret >> 2)) & 0x0f0f0f0f; // x = ---- fedc ---- ba98 ---- 7654 ---- 3210
+          ret = (ret ^ (ret >> 4)) & 0x00ff00ff; // x = ---- ---- fedc ba98 ---- ---- 7654 3210
+          ret = (ret ^ (ret >> 8)) & 0x0000ffff; // x = ---- ---- ---- ---- fedc ba98 7654 3210
+          return ret;
+        }
+
+        fn MortonDecodeX(code: u32) -> u32{
+          return Compact1By1(code >> 0);
+        }
+
+        fn MortonDecodeY(code: u32) -> u32 {
+          return Compact1By1(code >> 1);
+        }
+
+
         @group(0) @binding(0) var<storage, read_write> probes: array<vec4f>;
         @group(0) @binding(1) var<uniform> ubo: UBOParams;
         @group(0) @binding(2) var volumeTexture: texture_3d<f32>;
@@ -703,15 +732,30 @@ async function FuzzWorld3dBegin() {
           let ProbeIndex = RayIndex / ubo.probeRayCount;
           let LatticeDiameter = level0ProbeLatticeDiameter >> ubo.level;
 
-          // TODO: use a more appropriate curve
-          let GoldenRatio = (1.0 + sqrt(5.0)) * 0.5;
-          let a0 = TAU * f32(ProbeRayIndex) / GoldenRatio;
-          let a1 = acos(1.0 - 2.0 * (f32(ProbeRayIndex) + 0.5) / f32(ubo.probeRayCount));
-          let RayDirection = vec3f(
-            cos(a0) * sin(a1),
-            sin(a0) * sin(a1),
-            cos(a1),
-          );
+          var rayDirection: vec3f;
+          // Cube Face Subdivision
+          {
+            const branchingFactor = 4;
+            let level = ubo.level;
+            // pow(branchingFactor, level)
+            let raysPerFace = 1 << ((branchingFactor/2) * level);
+            let totalRayCount = raysPerFace * 6;
+            let diameter = sqrt(f32(raysPerFace));
+
+            let face = ProbeRayIndex / raysPerFace;
+            var sign = select(-1.0, 1.0, face % 2 == 1);
+            // -x, x, -y, y, -z, z
+            let axis: i32 = face / 2;
+            let FaceRayIndex = u32(ProbeRayIndex % raysPerFace);
+
+            let u = (f32(MortonDecodeX(FaceRayIndex)) + 0.5) / diameter * 2.0 - 1.0;
+            let v = (f32(MortonDecodeY(FaceRayIndex)) + 0.5) / diameter * 2.0 - 1.0;
+
+            rayDirection[axis] = sign;
+            rayDirection[(axis + 1) % 3] = u;
+            rayDirection[(axis + 2) % 3] = v;
+            rayDirection = normalize(rayDirection);
+          }
 
           var idx = ProbeIndex;
           let z = idx / (LatticeDiameter * LatticeDiameter);
@@ -731,8 +775,8 @@ async function FuzzWorld3dBegin() {
 
           let LowerResult = RayMarchFixedSize(
             ProbeCenter,
-            ProbeCenter + RayDirection * LowerIntervalRadius,
-            RayDirection,
+            ProbeCenter + rayDirection * LowerIntervalRadius,
+            rayDirection,
             IntervalRadius
           );
 
@@ -879,10 +923,11 @@ async function FuzzWorld3dBegin() {
           const computePass = commandEncoder.beginComputePass()
           computePass.setPipeline(pipeline)
           computePass.setBindGroup(0, bindGroup, [byteOffset])
-
+          const branchingFactor = 4
           const totalRays = (
             Math.pow(level0ProbeLatticeDiameter >> level, 3) *
-            (state.params.probeRayCount << (2 * level))
+            // (state.params.probeRayCount << (2 * level))
+            state.params.probeRayCount * Math.pow(branchingFactor, level)
           )
           const totalWorkGroups = totalRays / workgroupSize[0];
           let x = totalWorkGroups
@@ -1751,11 +1796,13 @@ async function FuzzWorld3dBegin() {
       return value;
     })
 
-    Param('probeRayCount', 'i32', (parentEl, value) => {
-      let newValue = Math.pow(2, value)
-      parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = <span class="highlight-orange">${newValue}</span>`
-      return newValue
-    })
+    // Param('probeRayCount', 'i32', (parentEl, value) => {
+    //   let newValue = Math.pow(2, value)
+    //   parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = <span class="highlight-orange">${newValue}</span>`
+    //   return newValue
+    // })
+
+    state.params.probeRayCount = 6;
 
 
   }

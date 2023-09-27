@@ -39,6 +39,8 @@
 - radiance-cascades/3d: debug render probes
 - radiance-cascades/3d: rename volumeTexture to radianceTexture
 - radiance-cascades/3d: fix erroneous darkening for distant objects
+- radiance-cascades/3d: re-enable level 0 ray count, but based on 6 instead of 8
+
 
 ## 2023-09-27
 - radiance-cascades/3d: find a better ray distribution function
