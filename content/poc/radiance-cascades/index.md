@@ -1047,7 +1047,7 @@ click/drag to move the light
         <output></output>
       </div>
       <div class="debugMaxProbeLevel-control control">
-        max probe level: <input type="range" min="0" max="6" step="1" value="1">
+        max probe level: <input type="range" min="0" max="6" step="1" value="5">
         <output></output>
       </div>
       <div class="debugRenderRawFluence-control control">
