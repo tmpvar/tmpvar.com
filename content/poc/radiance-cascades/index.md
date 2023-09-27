@@ -1007,7 +1007,8 @@ click/drag to move the light
     <div class="rayPackingApproach-control control">
       ray packing:
       <select>
-        <option value="lat-lon-subdivision" selected>Lat/Lon Subdivision</option>
+        <option value="cube-face-subdivision" selected>Cube Face Subdivision</option>
+        <option value="lat-lon-subdivision">Lat/Lon Subdivision</option>
         <option value="golden-spiral">Golden Spiral</option>
         <option value="kogan-spiral">Kogan Spiral</option>
       </select>
@@ -1017,7 +1018,7 @@ click/drag to move the light
       <output></output>
     </div>
     <div class="maxLevel-control control">
-      max level: <input type="range" min="0" max="6" value="0">
+      max level: <input type="range" min="0" max="6" value="1">
       <output></output>
     </div>
   </section>
