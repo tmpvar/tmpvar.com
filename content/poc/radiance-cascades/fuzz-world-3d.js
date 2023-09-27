@@ -698,17 +698,17 @@ async function FuzzWorld3dBegin() {
 
           let ProbeRadius = f32(ubo.probeRadius);
           let ProbeDiameter = ProbeRadius * 2.0;
-          let RayOrigin = LatticePosition * ProbeDiameter + ProbeRadius;
+          let ProbeCenter = LatticePosition * ProbeDiameter + ProbeRadius;
 
           let LowerResult = RayMarchFixedSize(
-            RayOrigin,
-            RayOrigin + RayDirection * LowerIntervalRadius,
+            ProbeCenter,
+            ProbeCenter + RayDirection * LowerIntervalRadius,
             RayDirection,
             IntervalRadius
           );
 
           let UpperResult = SampleUpperProbes(
-            RayOrigin,
+            ProbeCenter,
             ProbeRayIndex
           );
 
@@ -1733,10 +1733,12 @@ async function FuzzWorld3dBegin() {
       parentEl.querySelector('output').innerHTML = value;
       return value;
     })
-    Param('debugProbeLevel', 'i32', (parentEl, value, oldValue) => {
+
+    Param('debugMaxProbeLevel', 'i32', (parentEl, value, oldValue) => {
       parentEl.querySelector('output').innerHTML = value;
       return value;
     })
+
     Param('debugRenderRawFluence', 'f32')
 
     Param('intervalRadius', 'i32', (parentEl, value, oldValue) => {
