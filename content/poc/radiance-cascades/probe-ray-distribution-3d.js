@@ -291,7 +291,7 @@ async function ProbeRayDistribution3dBegin() {
 
     const Add = (pos, level) => {
       let pd = level == 0 ? 0 : (1 << (level - 1))
-      let d = 2.0 << level
+      let d = 1 << level
       verts.push(pos[0] * pd, pos[1] * pd, pos[2] * pd)
       verts.push(pos[0] * d, pos[1] * d, pos[2] * d);
 
@@ -302,6 +302,52 @@ async function ProbeRayDistribution3dBegin() {
     const pos = [0, 0, 0]
 
     switch (state.params.rayPackingApproach) {
+      case 'cube-face-subdivision': {
+        function Compact1By1(x) {
+          x &= 0x55555555;                 // x = -f-e -d-c -b-a -9-8 -7-6 -5-4 -3-2 -1-0
+          x = (x ^ (x >> 1)) & 0x33333333; // x = --fe --dc --ba --98 --76 --54 --32 --10
+          x = (x ^ (x >> 2)) & 0x0f0f0f0f; // x = ---- fedc ---- ba98 ---- 7654 ---- 3210
+          x = (x ^ (x >> 4)) & 0x00ff00ff; // x = ---- ---- fedc ba98 ---- ---- 7654 3210
+          x = (x ^ (x >> 8)) & 0x0000ffff; // x = ---- ---- ---- ---- fedc ba98 7654 3210
+          return x;
+        }
+
+        function MortonDecodeX(code) {
+          return Compact1By1(code >> 0);
+        }
+
+        function MortonDecodeY(code) {
+          return Compact1By1(code >> 1);
+        }
+
+        const branchingFactor = 4
+        for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+          let raysPerFace = Math.pow(branchingFactor, level)
+          let diameter = Math.sqrt(raysPerFace)
+          for (let face = 0; face<6; face++) {
+            let sign = face % 2 == 0 ? -1  : 1
+            // -x, x, -y, y, -z, z
+            let axis = Math.floor(face / 2)
+
+            for (let i=0; i<raysPerFace; i++) {
+              let u = (MortonDecodeX(i) + 0.5) / diameter
+              let v = (MortonDecodeY(i) + 0.5) / diameter
+              pos[axis] = sign
+              pos[(axis + 1) % 3] = u * 2.0 - 1.0
+              pos[(axis + 2) % 3] = v * 2.0 - 1.0
+
+              let l = Math.sqrt(pos[0]*pos[0] + pos[1]*pos[1] + pos[2]*pos[2])
+              pos[0] /= l
+              pos[1] /= l
+              pos[2] /= l
+              Add(pos, level)
+            }
+          }
+        }
+
+        break;
+      }
+
       case 'lat-lon-subdivision': {
 
         if (true) {
