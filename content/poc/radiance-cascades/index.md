@@ -1047,21 +1047,21 @@ click/drag to move the light
         <output></output>
       </div>
       <div class="debugMaxProbeLevel-control control">
-        max probe level: <input type="range" min="0" max="6" step="1" value="5">
+        max probe level: <input type="range" min="0" max="6" step="1" value="0">
         <output></output>
       </div>
       <div class="debugRenderRawFluence-control control">
-        render raw fluence <input type="checkbox" value="1" />
+        render fluence <input type="checkbox" value="1" checked/>
       </div>
     </div>
     <h4>Radiance Cascade Parameters</h4>
     <div class="indent">
-      <div class="probeRayCount-control control">
+      <!-- <div class="probeRayCount-control control">
         2<sup>r</sup> raycount (level 0): <input type="range" min="3" max="5" value="3">
         <output></output>
-      </div>
+      </div> -->
       <div class="intervalRadius-control control">
-        interval radius (level 0): <input type="range" min="0" max="256" value="6">
+        interval radius (level 0): <input type="range" min="0" max="256" value="131">
         <output></output>
       </div>
     </div>
