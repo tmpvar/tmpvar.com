@@ -1046,8 +1046,8 @@ click/drag to move the light
         raymarch fixed size step multiplier: <input type="range" min="0.1" max="100.0" step="0.01" value="2.0">
         <output></output>
       </div>
-      <div class="debugProbeLevel-control control">
-        probe level: <input type="range" min="0" max="6" step="1" value="0">
+      <div class="debugMaxProbeLevel-control control">
+        max probe level: <input type="range" min="0" max="6" step="1" value="1">
         <output></output>
       </div>
       <div class="debugRenderRawFluence-control control">
