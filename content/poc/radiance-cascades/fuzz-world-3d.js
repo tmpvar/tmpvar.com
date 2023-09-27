@@ -1228,6 +1228,89 @@ async function FuzzWorld3dBegin() {
         @group(0) @binding(3) var volumeTexture: texture_3d<f32>;
         @group(0) @binding(4) var volumeSampler: sampler;
 
+        fn MarchCone(rayOrigin: vec3f, rayDirection: vec3f, boxRadius: vec3f) -> vec4f {
+          var acc = vec4f(0.0);
+          var t = 0.0;
+          var stepSize = 0.001;
+          let levelCount = f32(log2(boxRadius.x * 2.0));
+          var level = 0.0;
+          var steps = 512;
+          while(true) {
+            steps--;
+            if (steps < 0) {
+              acc = vec4(1.0, 0.0, 0.0, 1.0);
+              break;
+            }
+
+            t += max(1.0, t * stepSize);
+            let hitPos = rayOrigin + rayDirection * t;
+            let uvw = (hitPos / boxRadius) * 0.5 + 0.5;
+
+            if (
+              (uvw.x < 0.0 || uvw.x >= 1.0) ||
+              (uvw.y < 0.0 || uvw.y >= 1.0) ||
+              (uvw.z < 0.0 || uvw.z >= 1.0)
+            ) {
+              break;
+            }
+
+            let percent = 0.125 * t * tan(ubo.fov * 0.5) / f32(boxRadius.x);
+            level = percent * levelCount;
+
+            stepSize = 0.0125 * level;
+            if (ubo.debugRenderRawFluence == 1) {
+              let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
+              acc = Accumulate(acc, fluence);
+            } else {
+              var albedo = textureSampleLevel(albedoTexture, volumeSampler, uvw, level);
+              if (albedo.a > 0.0) {
+                let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
+                var c = vec4(
+                  albedo.rgb * fluence.rgb,
+                  albedo.a
+                );
+
+                acc = Accumulate(acc , c);
+              }
+            }
+          }
+          return acc;
+        }
+
+        fn MarchRay(rayOrigin: vec3f, rayDirection: vec3f, boxRadius: vec3f) -> vec4f {
+          var acc = vec4f(0.0);
+          var t = 0.0;
+          var stepSize = 2.0;
+          let levelCount = f32(log2(boxRadius.x * 2.0));
+          var steps = 350;
+          while(true) {
+            steps--;
+            if (steps < 0) {
+              acc = vec4(1.0, 0.0, 0.0, 1.0);
+              break;
+            }
+
+            t += stepSize;
+            let hitPos = rayOrigin + rayDirection * t;
+            let uvw = (hitPos / boxRadius) * 0.5 + 0.5;
+
+            if (
+              (uvw.x < 0.0 || uvw.x >= 1.0) ||
+              (uvw.y < 0.0 || uvw.y >= 1.0) ||
+              (uvw.z < 0.0 || uvw.z >= 1.0)
+            ) {
+              break;
+            }
+
+            let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0);
+            acc = Accumulate(acc, fluence);
+            if (fluence.a >= 1.0) {
+              break;
+            }
+          }
+          return acc;
+        }
+
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           let dims = vec3f(textureDimensions(volumeTexture));
@@ -1251,56 +1334,16 @@ async function FuzzWorld3dBegin() {
           }
 
           var acc = vec4f(0.0);
-          var energy = 1.0;
-          var steps = 512;
           if (aabbHitT >= 0.0) {
             let aabbHit = ubo.eye.xyz + rayDir * aabbHitT;
-            var t = 0.0;
-            var stepSize = 0.001;
-            let levelCount = f32(log2(dims.x));
-            var level = 0.0;
-            while(true) {
-              steps--;
-              if (steps < 0) {
-                acc = vec4(1.0, 0.0, 0.0, 1.0);
-                break;
-              }
-
-              t += max(1.0, t * stepSize);
-              let hitPos = aabbHit + rayDir * t;
-              let uvw = (hitPos / boxRadius) * 0.5 + 0.5;
-
-              if (
-                (uvw.x < 0.0 || uvw.x >= 1.0) ||
-                (uvw.y < 0.0 || uvw.y >= 1.0) ||
-                (uvw.z < 0.0 || uvw.z >= 1.0)
-              ) {
-                break;
-              }
-
-              let percent = 0.125 * t * tan(ubo.fov * 0.5) / f32(dims.x / 2);
-              level = percent * levelCount;
-
-              stepSize = 0.00125 * level;
-              if (ubo.debugRenderRawFluence == 1) {
-                let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
-                acc = Accumulate(acc, fluence);
-              } else {
-                var albedo = textureSampleLevel(albedoTexture, volumeSampler, uvw, level);
-                if (albedo.a > 0.0) {
-                  let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, level);
-                  var c = vec4(
-                    albedo.rgb * fluence.rgb,
-                    albedo.a
-                  );
-
-                  acc = Accumulate(acc , c);
-                }
-              }
+            if (ubo.debugRenderRawFluence == 1) {
+              acc = MarchRay(aabbHit, rayDir, boxRadius);
+            } else {
+              acc = MarchCone(aabbHit, rayDir, boxRadius);
             }
           }
 
-          let backgroundColor = vec4f(0.1, 0.1, 0.1, 1.0);
+          let backgroundColor = vec4f(0.0, 0.0, 0.0, 1.0);
           let color = Accumulate(acc, backgroundColor);
 
           textureStore(
