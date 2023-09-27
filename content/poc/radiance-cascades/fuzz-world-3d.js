@@ -439,6 +439,8 @@ async function FuzzWorld3dBegin() {
       const labelPrefix = gpu.labelPrefix + 'RaymarchProbeRays/'
       const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
 
+      const maxLevelCount = Math.log2(level0ProbeLatticeDiameter)
+
       const uboFields = [
         ['level', 'u32', 4],
         ['probeRadius', 'i32', 4],
@@ -453,8 +455,10 @@ async function FuzzWorld3dBegin() {
       let uboBufferSize = uboFields.reduce((p, c) => {
         return p + c[2]
       }, 0)
-      uboBufferSize = Math.floor(uboBufferSize / 16 + 1) * 16
-      const uboBuffer = new ArrayBuffer(uboBufferSize)
+
+      const alignedUBOIncrement = Math.max(16, gpu.adapter.limits.minUniformBufferOffsetAlignment)
+      uboBufferSize = Math.floor(uboBufferSize / alignedUBOIncrement + 1) * alignedUBOIncrement
+      const uboBuffer = new ArrayBuffer(uboBufferSize * maxLevelCount)
 
       const uboData = new DataView(uboBuffer)
       const ubo = gpu.device.createBuffer({
@@ -511,14 +515,14 @@ async function FuzzWorld3dBegin() {
           let UpperLevel = i32(ubo.level + 1);
 
           if (UpperLevel >= i32(ubo.levelCount)) {
-            return vec4f(0.0, 0.0, 0.0, 1.0);
+            return vec4f(0.0);
           }
 
           let UpperRaysPerProbe = ubo.probeRayCount << ubo.branchingFactor;
           let UpperLevelRayIndex = rayIndex << ubo.branchingFactor;
           let UpperLevelBufferOffset = level0RayCount * (UpperLevel % 2);
           let UpperProbeDiameter = 2 * (ubo.probeRadius << 1);
-          let UpperCascadeWidth = ${volumeTexture.width} / UpperProbeDiameter;
+          let UpperCascadeWidth = level0ProbeLatticeDiameter >> ubo.level;
 
           let uv = (lowerProbeCenter/f32(UpperProbeDiameter)) / f32(UpperCascadeWidth);
           let index = uv * f32(UpperCascadeWidth) - 0.5;
@@ -597,7 +601,12 @@ async function FuzzWorld3dBegin() {
           }
         }
 
-        fn RayMarchFixedSize(probeCenter: vec3f, rayOrigin: vec3f, rayDirection: vec3f, maxDistance: f32) -> vec4f {
+        fn RayMarchFixedSize(
+          probeCenter: vec3f,
+          rayOrigin: vec3f,
+          rayDirection: vec3f,
+          maxDistance: f32
+        ) -> vec4f {
           let levelDivisor = 1.0 / f32(1<<u32(ubo.level));
           let levelMip = f32(ubo.level);
           let levelRayOrigin = rayOrigin * levelDivisor;
@@ -633,14 +642,14 @@ async function FuzzWorld3dBegin() {
               levelMip
             );
 
-            if (sample.a > 0.0) {
-              occlusion += sample.a;
+            // if (sample.a > 0.0) {
+            //   occlusion += sample.a;
               acc = Accumulate(acc, sample);
-            }
+            // }
 
-            if (occlusion > 1.0) {
-              break;
-            }
+            // if (occlusion > 1.0) {
+            //   break;
+            // }
 
             t += stepSize;
           }
@@ -665,14 +674,7 @@ async function FuzzWorld3dBegin() {
 
           let ProbeRayIndex = RayIndex % ubo.probeRayCount;
           let ProbeIndex = RayIndex / ubo.probeRayCount;
-          // color based on ray index
-          // {
-          //   var col = i32(ProbeIndex/1000 + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
-          //   col = col % vec3<i32>(255, 253, 127);
-          //   probes[RayIndex] = vec4(vec3f(col), 1.00001);
-          //   // probes[RayIndex] = vec4(0.0, 1.0, 0.0, 0.01);
-          //   return;
-          // }
+          let LatticeDiameter = level0ProbeLatticeDiameter >> ubo.level;
 
           // TODO: use a more appropriate curve
           let GoldenRatio = (1.0 + sqrt(5.0)) * 0.5;
@@ -685,16 +687,16 @@ async function FuzzWorld3dBegin() {
           );
 
           var idx = ProbeIndex;
-          let z = idx / (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter);
-          idx -= z * (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter);
+          let z = idx / (LatticeDiameter * LatticeDiameter);
+          idx -= z * (LatticeDiameter * LatticeDiameter);
           let LatticePosition = vec3f(
-            f32(idx % level0ProbeLatticeDiameter),
-            f32(idx / level0ProbeLatticeDiameter),
+            f32(idx % LatticeDiameter),
+            f32(idx / LatticeDiameter),
             f32(z)
           );
 
-          let IntervalRadius = f32(ubo.intervalEndRadius);
           let LowerIntervalRadius = f32(ubo.intervalStartRadius);
+          let IntervalRadius = f32(ubo.intervalEndRadius);
 
           let ProbeRadius = f32(ubo.probeRadius);
           let ProbeDiameter = ProbeRadius * 2.0;
@@ -712,22 +714,16 @@ async function FuzzWorld3dBegin() {
             ProbeRayIndex
           );
 
-          let OutputIndex = (i32(ubo.level) % 2) * level0RayCount;
-
-          // probes[OutputIndex + RayIndex] = LowerResult;
-          // probes[OutputIndex + RayIndex] = vec4f(
-          //   LowerResult.rgb + LowerResult.a * UpperResult.rgb,
-          //   LowerResult.a * UpperResult.a
-          // );
-          probes[OutputIndex + RayIndex] = Accumulate(
-            LowerResult,
-            UpperResult
+          let OutputIndex = (i32(ubo.level) % 2) * level0RayCount + RayIndex;
+          probes[OutputIndex] = vec4f(
+            LowerResult.rgb + LowerResult.a * UpperResult.rgb,
+            LowerResult.a * UpperResult.a
           );
-
         }
       `
 
       const shaderModule = gpu.device.createShaderModule({
+        label: `${labelPrefix}ShaderModule`,
         code: source
       })
 
@@ -746,6 +742,7 @@ async function FuzzWorld3dBegin() {
             visibility: GPUShaderStage.COMPUTE,
             buffer: {
               type: 'uniform',
+              hasDynamicOffset: true,
             }
           },
           {
@@ -792,7 +789,8 @@ async function FuzzWorld3dBegin() {
           {
             binding: 1,
             resource: {
-              buffer: ubo
+              buffer: ubo,
+              size: uboBufferSize,
             }
           },
           {
@@ -814,17 +812,16 @@ async function FuzzWorld3dBegin() {
         commandEncoder,
         params
       ) {
-        const level = 0//params.debugProbeLevel
-        const probeRadius = 2 << level
-        const intervalStartRadius = level == 0 ? 0 : params.intervalRadius << (level - 1)
-        const intervalEndRadius = params.intervalRadius << level
-        const levelProbeRayCount = params.probeRayCount << (2 * level)
+        const levelCount = params.debugMaxProbeLevel + 1
+        const branchingFactor = 4
 
+        for (let level = 0; level < levelCount; level++) {
+          let probeRadius = 2 << level
+          let intervalStartRadius = level == 0 ? 0 : params.intervalRadius << (level - 1)
+          let intervalEndRadius = params.intervalRadius << level
+          let levelProbeRayCount = params.probeRayCount << (2 * level)
+          let byteOffset = uboBufferSize * level;
 
-        // update uniform buffer
-        {
-          let byteOffset = 0
-          // TODO: prepopulate a ubo section for each level
           // level
           uboData.setInt32(byteOffset, level, true)
           byteOffset += 4
@@ -844,39 +841,45 @@ async function FuzzWorld3dBegin() {
           uboData.setFloat32(byteOffset, params.debugRaymarchFixedSizeStepMultiplier, true)
           byteOffset += 4
 
-          const branchingFactor = 4
           uboData.setUint32(byteOffset, branchingFactor, true)
           byteOffset += 4
 
-          const levelCount = Math.log2(volumeTexture.width)
           uboData.setInt32(byteOffset, levelCount, true)
           byteOffset += 4
 
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
         }
 
-        const computePass = commandEncoder.beginComputePass()
-        computePass.setPipeline(pipeline)
-        computePass.setBindGroup(0, bindGroup)
+        for (let level = levelCount - 1; level >= 0 ; level--) {
+          let byteOffset = uboBufferSize * level;
 
-        const totalRays = Math.pow(level0ProbeLatticeDiameter, 3) * state.params.probeRayCount
-        const totalWorkGroups = totalRays / workgroupSize[0];
-        let x = totalWorkGroups
-        let y = 1
-        let z = 1
+          const computePass = commandEncoder.beginComputePass()
+          computePass.setPipeline(pipeline)
+          computePass.setBindGroup(0, bindGroup, [byteOffset])
 
-        if (x > maxWorkgroupsPerDimension) {
-          y = x / maxWorkgroupsPerDimension
-          x = maxWorkgroupsPerDimension
+          const totalRays = (
+            Math.pow(level0ProbeLatticeDiameter >> level, 3) *
+            (state.params.probeRayCount << (2 * level))
+          )
+
+          const totalWorkGroups = totalRays / workgroupSize[0];
+          let x = totalWorkGroups
+          let y = 1
+          let z = 1
+
+          if (x > maxWorkgroupsPerDimension) {
+            y = x / maxWorkgroupsPerDimension
+            x = maxWorkgroupsPerDimension
+          }
+
+          if (y > maxWorkgroupsPerDimension) {
+            z = y / maxWorkgroupsPerDimension
+            y = maxWorkgroupsPerDimension
+          }
+
+          computePass.dispatchWorkgroups(x, y, z)
+          computePass.end()
         }
-
-        if (y > maxWorkgroupsPerDimension) {
-          z = y / maxWorkgroupsPerDimension
-          y = maxWorkgroupsPerDimension
-        }
-
-        computePass.dispatchWorkgroups(x, y, z)
-        computePass.end()
       }
     },
 
