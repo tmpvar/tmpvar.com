@@ -35,12 +35,13 @@
 
 ## Pending
 - radiance-cascades: convert #flatland-2d-controls to `.controls`
-- radiance-cascades/3d: find a better ray distribution function
 - radiance-cascades/3d: ensure the branching factor is correct
 - radiance-cascades/3d: debug render probes
 - radiance-cascades/3d: rename volumeTexture to radianceTexture
 - radiance-cascades/3d: fix erroneous darkening for distant objects
 
+## 2023-09-27
+- radiance-cascades/3d: find a better ray distribution function
 ## 2023-09-26
 - radiance-cascades/3d: merge upper cascade
 - radiance-cascades/3d: trace cascade N probe rays, collecting into probe buffer
