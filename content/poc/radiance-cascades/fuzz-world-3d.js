@@ -1345,6 +1345,7 @@ async function FuzzWorld3dBegin() {
           var stepSize = 1.0;
           let levelCount = f32(log2(boxRadius.x * 2.0));
           var steps = 512;
+
           while(true) {
             steps--;
             if (steps < 0) {
@@ -1363,9 +1364,12 @@ async function FuzzWorld3dBegin() {
             ) {
               break;
             }
-
-            let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0);
+            let fluence = textureLoad(volumeTexture, vec3<i32>(uvw * boxRadius * 2.0), 0);
+            // let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0);
             acc = Accumulate(acc, fluence);
+            if (acc.a >= 0) {
+              break;
+            }
           }
           return acc;
         }
