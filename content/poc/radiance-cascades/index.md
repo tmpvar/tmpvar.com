@@ -1065,15 +1065,19 @@ click/drag to move the light
     <h4>Radiance Cascade Parameters</h4>
     <div class="indent">
       <div class="probeRayCount-control control">
-        4<sup>r</sup> raycount (level 0): <input type="range" min="0" max="1" value="0">
+        4<sup>r</sup> raycount (level 0): <input type="range" min="0" max="1" value="0" disabled>
         <output></output>
       </div>
       <div class="branchingFactor-control control">
-        branching factor: <input type="range" min="1" max="1" value="1">
+        branching factor: <input type="range" min="1" max="1" value="1" disabled>
         <output></output>
       </div>
       <div class="intervalRadius-control control">
         interval radius (level 0): <input type="range" min="0" max="256" value="70">
+        <output></output>
+      </div>
+      <div class="probeLatticeDiameter-control control">
+        probe lattice diameter (level 0): <input type="range" min="2" max="6" value="5">
         <output></output>
       </div>
     </div>
