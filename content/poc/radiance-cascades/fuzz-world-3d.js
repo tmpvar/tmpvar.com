@@ -192,9 +192,9 @@ async function FuzzWorld3dBegin() {
             let pos = vec3f(id.xyz);
 
             // a singular emissive sphere
-            let light = SDFSphere(pos, dims * 0.5, 16);
+            let light = SDFSphere(pos, dims * 0.5, 8);
             if (light < 0.0) {
-              textureStore(volumeTexture, id, vec4f(vec3f(10.0), 1.0));
+              textureStore(volumeTexture, id, vec4f(vec3f(100.0), 1.0));
               textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
             } else {
               textureStore(volumeTexture, id.xyz, vec4f(0.0, 0.0, 0.0, 0.0));
@@ -217,8 +217,8 @@ async function FuzzWorld3dBegin() {
             textureStore(albedoTexture, id.xyz, vec4f(0.0, 0.0, 0.0, 0.0));
 
             let floor = SDFBox(
-              pos - vec3f(dims.x * 0.5, 0.0, dims.z * 0.5),
-              vec3f(dims.x * 0.5, 15.0, dims.z * 0.5)
+              pos - vec3f(dims.x * 0.5, 96, dims.z * 0.5),
+              vec3f(dims.x, 15.0, dims.z)
             );
 
             if (floor <= 0.0) {
@@ -226,19 +226,33 @@ async function FuzzWorld3dBegin() {
               textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
             }
 
-            let box = SDFBox(
-              pos - vec3f(dims.x * 0.35, dims.y * 0.25, dims.z * 0.5),
-              vec3f(8.0, dims.y * 0.5, 32.0)
-            );
+            {
+              let box = SDFBox(
+                pos - vec3f(100, dims.y * 0.5, 128),
+                vec3f(8.0, dims.y * 0.5, 32.0)
+              );
 
-            if (box <= 0.0) {
-              textureStore(volumeTexture, id, vec4f(vec3f(0.0), 0.0));
-              textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
+              if (box <= 0.0) {
+                textureStore(volumeTexture, id, vec4f(vec3f(0.0), 0.0));
+                textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
+              }
             }
 
-            let light = SDFSphere(pos, vec3f(32, dims.y * 0.125 + 32, dims.z * 0.5  - 64), 16);
+            {
+              let box = SDFBox(
+                pos - vec3f(128, dims.y * 0.5, 100),
+                vec3f(32.0, dims.y * 0.5, 8.0)
+              );
+
+              if (box <= 0.0) {
+                textureStore(volumeTexture, id, vec4f(vec3f(0.0), 0.0));
+                textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
+              }
+            }
+
+            let light = SDFSphere(pos, vec3f(32, 160, dims.z * 0.5  - 64), 16);
             if (light < 0.0) {
-              textureStore(volumeTexture, id, vec4f(vec3f(10.0), 1.0));
+              textureStore(volumeTexture, id, vec4f(vec3f(100.0), 1.0));
               textureStore(albedoTexture, id, vec4f(1.0, 1.0, 1.0, 1.0));
             }
           }
@@ -555,7 +569,7 @@ async function FuzzWorld3dBegin() {
 
       const alignedUBOIncrement = Math.max(16, gpu.adapter.limits.minUniformBufferOffsetAlignment)
       uboBufferSize = Math.floor(uboBufferSize / alignedUBOIncrement + 1) * alignedUBOIncrement
-      const uboBuffer = new ArrayBuffer(uboBufferSize * maxLevelCount)
+      const uboBuffer = new ArrayBuffer(uboBufferSize * (maxLevelCount + 1))
 
       const uboData = new DataView(uboBuffer)
       const ubo = gpu.device.createBuffer({
@@ -752,7 +766,9 @@ async function FuzzWorld3dBegin() {
             );
 
             acc = Accumulate(acc, sample);
-
+            if (acc.a > 1.0) {
+              break;
+            }
             // occlusion += sample.a;
             // if (occlusion > 0.001) {
             //   break;
@@ -847,9 +863,8 @@ async function FuzzWorld3dBegin() {
           );
 
           let UpperResult = SampleUpperProbes(ProbeCenterUVW, ProbeRayIndex);
-
           let OutputIndex = (i32(ubo.level) % 2) * pingPongBufferRayCount + RayIndex;
-          probes[OutputIndex] = Accumulate(UpperResult, LowerResult);
+          probes[OutputIndex] = Accumulate(LowerResult, UpperResult);
         }
       `
 
@@ -1367,9 +1382,9 @@ async function FuzzWorld3dBegin() {
             let fluence = textureLoad(volumeTexture, vec3<i32>(uvw * boxRadius * 2.0), 0);
             // let fluence = textureSampleLevel(volumeTexture, volumeSampler, uvw, 0);
             acc = Accumulate(acc, fluence);
-            if (acc.a >= 0) {
-              break;
-            }
+            // if (acc.a >= 0) {
+            //   break;
+            // }
           }
           return acc;
         }
