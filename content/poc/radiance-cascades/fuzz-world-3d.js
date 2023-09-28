@@ -947,13 +947,12 @@ async function FuzzWorld3dBegin() {
         params
       ) {
         const levelCount = params.debugMaxProbeLevel + 1
-        const branchingFactor = 4
 
         for (let level = levelCount - 1; level >= 0; level--) {
           let probeRadius = 2 << level
           let intervalStartRadius = level == 0 ? 0 : params.intervalRadius << (level - 1)
           let intervalEndRadius = params.intervalRadius << level
-          let levelProbeRayCount = params.probeRayCount << (2 * level)
+          let levelProbeRayCount = params.probeRayCount * Math.pow(params.branchingFactor, level)
           let byteOffset = uboBufferSize * level;
 
           // level
@@ -975,7 +974,7 @@ async function FuzzWorld3dBegin() {
           uboData.setFloat32(byteOffset, params.debugRaymarchFixedSizeStepMultiplier, true)
           byteOffset += 4
 
-          uboData.setUint32(byteOffset, branchingFactor, true)
+          uboData.setUint32(byteOffset, params.branchingFactor, true)
           byteOffset += 4
 
           uboData.setInt32(byteOffset, levelCount, true)
@@ -989,12 +988,11 @@ async function FuzzWorld3dBegin() {
           const computePass = commandEncoder.beginComputePass()
           computePass.setPipeline(pipeline)
           computePass.setBindGroup(0, bindGroup, [byteOffset])
-          const branchingFactor = 4
           const totalRays = (
             Math.pow(level0ProbeLatticeDiameter >> level, 3) *
-            // (state.params.probeRayCount << (2 * level))
-            state.params.probeRayCount * Math.pow(branchingFactor, level)
+            params.probeRayCount * Math.pow(params.branchingFactor, level)
           )
+
           const totalWorkGroups = totalRays / workgroupSize[0];
           let x = totalWorkGroups
           let y = 1
