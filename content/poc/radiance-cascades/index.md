@@ -1042,6 +1042,14 @@ click/drag to move the light
   <section class="controls">
     <h4>Debug/Development</h4>
     <div class="indent">
+      <div class="scene-control control">
+        scene:
+        <select>
+          <option value="single-centered-sphere" selected>Single Sphere</option>
+          <option value="occluder">Occluder</option>
+          <option value="fractal-with-sphere">Fractal</option>
+        </select>
+      </div>
       <div class="debugRaymarchFixedSizeStepMultiplier-control control">
         raymarch fixed size step multiplier: <input type="range" min="0.1" max="100.0" step="0.01" value="2.0">
         <output></output>
@@ -1060,6 +1068,10 @@ click/drag to move the light
         2<sup>r</sup> raycount (level 0): <input type="range" min="3" max="5" value="3">
         <output></output>
       </div> -->
+      <div class="branchingFactor-control control">
+        branching factor: <input type="range" min="2" max="4" value="2">
+        <output></output>
+      </div>
       <div class="intervalRadius-control control">
         interval radius (level 0): <input type="range" min="0" max="256" value="70">
         <output></output>
