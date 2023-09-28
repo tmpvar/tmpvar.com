@@ -1064,12 +1064,12 @@ click/drag to move the light
     </div>
     <h4>Radiance Cascade Parameters</h4>
     <div class="indent">
-      <!-- <div class="probeRayCount-control control">
-        2<sup>r</sup> raycount (level 0): <input type="range" min="3" max="5" value="3">
+      <div class="probeRayCount-control control">
+        4<sup>r</sup> raycount (level 0): <input type="range" min="0" max="1" value="0">
         <output></output>
-      </div> -->
+      </div>
       <div class="branchingFactor-control control">
-        branching factor: <input type="range" min="2" max="4" value="2">
+        branching factor: <input type="range" min="1" max="1" value="1">
         <output></output>
       </div>
       <div class="intervalRadius-control control">
