@@ -530,10 +530,10 @@ async function FuzzWorld3dBegin() {
           let pos = clamp(rawPos, vec3<i32>(0), vec3<i32>(cascadeWidth - 1));
 
           let index = (
-            pos.x * raysPerProbe +
-            pos.y * cascadeWidth * raysPerProbe +
-            pos.z * cascadeWidth * cascadeWidth * raysPerProbe
-          );
+            pos.x +
+            pos.y * cascadeWidth +
+            pos.z * cascadeWidth * cascadeWidth
+          ) * raysPerProbe;
           let rayCount = i32(ubo.branchingFactor);
           var accColor = vec4(0.0);
           var accRadiance = 0.0;
@@ -544,7 +544,7 @@ async function FuzzWorld3dBegin() {
         }
 
         // given: world space sample pos, angle
-        // - sample each probe in the neighborhood (4)
+        // - sample each probe in the neighborhood (8)
         // - interpolate
         fn SampleUpperProbes(lowerProbeCenter: vec3f, rayIndex: i32) -> vec4f {
           let UpperLevel = i32(ubo.level + 1);
@@ -556,13 +556,12 @@ async function FuzzWorld3dBegin() {
           let UpperRaysPerProbe = ubo.probeRayCount * i32(ubo.branchingFactor);
           let UpperLevelRayIndex = rayIndex * i32(ubo.branchingFactor);
           let UpperLevelBufferOffset = level0RayCount * (UpperLevel % 2);
-          let UpperProbeDiameter = 2 * (ubo.probeRadius << 1);
+          let UpperProbeDiameter = (ubo.probeRadius * 2);
           let UpperCascadeWidth = level0ProbeLatticeDiameter >> u32(UpperLevel);
 
           let uvw = (lowerProbeCenter/f32(UpperProbeDiameter)) / f32(UpperCascadeWidth);
-          let index = uvw * f32(UpperCascadeWidth) - 0.5;
-
-          var basePos = vec3<i32>(floor(index));
+          let index = uvw * f32(UpperCascadeWidth);
+          var basePos = vec3<i32>(floor(index)) / 2;
 
           let bufferStartIndex = UpperLevelBufferOffset + UpperLevelRayIndex;
           let samples = array(
@@ -784,6 +783,11 @@ async function FuzzWorld3dBegin() {
           );
 
           let OutputIndex = (i32(ubo.level) % 2) * level0RayCount + RayIndex;
+          if (ubo.level == 0) {
+            probes[OutputIndex] = UpperResult;
+          } else {
+            probes[OutputIndex] = LowerResult;//Accumulate(UpperResult, LowerResult);
+          }
           probes[OutputIndex] = Accumulate(UpperResult, LowerResult);
         }
       `
