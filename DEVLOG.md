@@ -40,6 +40,7 @@
 - radiance-cascades/3d: debug render probes
 - radiance-cascades/3d: rename volumeTexture to radianceTexture
 - radiance-cascades/3d: fix erroneous darkening for distant objects
+- radiance-cascades/3d: stop primary ray when acc.a >= 1.0
 
 
 ## 2023-09-28
