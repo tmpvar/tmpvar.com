@@ -1004,7 +1004,7 @@ click/drag to move the light
 <section id="probe-ray-distribution-3d-content" class="has-webgpu">
   <section class="controls">
     <div class="rayPackingApproach-control control">
-      ray packing:
+      approach:
       <select>
         <option value="cube-face-subdivision" selected>Cube Face Subdivision</option>
         <option value="lat-lon-subdivision">Lat/Lon Subdivision</option>
