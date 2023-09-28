@@ -51,16 +51,27 @@ async function FuzzWorld3dBegin() {
 
 
   const level0ProbeLatticeDiameter = 64
-  const maxRaysPerLevel0Probe = 6
-  // const maxRaysPerLevel0Probe = Math.pow(
-  //   2,
-  //   parseFloat(document.querySelector('#fuzz-world-3d-content .controls .probeRayCount-control input').max)
-  // )
+  // TODO: consider making this a tunable param
+  const maxRaysPerLevel0Probe = 6 * Math.pow(
+    4,
+    parseFloat(controlEl.querySelector('.probeRayCount-control input').max)
+  )
+
+  const maxBranchingFactor = Math.pow(
+    4,
+    parseFloat(controlEl.querySelector('.branchingFactor-control input').max)
+  )
 
   const level0BytesPerProbeRay = 16
   const level0ProbeCount = Math.pow(level0ProbeLatticeDiameter, 3)
-  const level0RayCount = maxRaysPerLevel0Probe * level0ProbeCount
-  const probeBufferByteSize = level0RayCount * level0BytesPerProbeRay * 2
+  const maxLevel = Math.log2(level0ProbeLatticeDiameter)
+
+  const pingPongBufferRayCount = Math.max(
+    maxRaysPerLevel0Probe * level0ProbeCount,
+    maxRaysPerLevel0Probe * Math.pow(maxBranchingFactor, maxLevel)
+  )
+  const probeBufferByteSize = pingPongBufferRayCount * level0BytesPerProbeRay * 2
+  console.log('pingPongBufferRayCount', pingPongBufferRayCount, 'size', probeBufferByteSize)
 
   try {
     state.gpu = await InitGPU(ctx, probeBufferByteSize);
@@ -519,7 +530,7 @@ async function FuzzWorld3dBegin() {
       probeBuffer,
       workgroupSize,
       level0ProbeLatticeDiameter,
-      level0RayCount
+      pingPongBufferRayCount
     ) {
       const labelPrefix = gpu.labelPrefix + 'RaymarchProbeRays/'
       const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
@@ -565,7 +576,7 @@ async function FuzzWorld3dBegin() {
         const PI: f32 = ${Math.PI};
         const TAU: f32 = ${Math.PI * 2.0};
         const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
-        const level0RayCount: i32 = ${level0RayCount};
+        const pingPongBufferRayCount: i32 = ${pingPongBufferRayCount};
 
         struct UBOParams {
           ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
@@ -609,7 +620,7 @@ async function FuzzWorld3dBegin() {
 
           let UpperRaysPerProbe = ubo.probeRayCount * i32(ubo.branchingFactor);
           let UpperLevelRayIndex = rayIndex * i32(ubo.branchingFactor);
-          let UpperLevelBufferOffset = level0RayCount * (UpperLevel % 2);
+          let UpperLevelBufferOffset = pingPongBufferRayCount * (UpperLevel % 2);
           let UpperProbeDiameter = (ubo.probeRadius * 2);
           let UpperCascadeWidth = level0ProbeLatticeDiameter >> u32(UpperLevel);
 
@@ -835,7 +846,7 @@ async function FuzzWorld3dBegin() {
             ProbeRayIndex
           );
 
-          let OutputIndex = (i32(ubo.level) % 2) * level0RayCount + RayIndex;
+          let OutputIndex = (i32(ubo.level) % 2) * pingPongBufferRayCount + RayIndex;
           if (ubo.level == 0) {
             probes[OutputIndex] = UpperResult;
           } else {
@@ -1778,7 +1789,7 @@ async function FuzzWorld3dBegin() {
       state.gpu.buffers.probes,
       [256, 1, 1],
       level0ProbeLatticeDiameter,
-      level0RayCount
+      pingPongBufferRayCount
     ),
     raymarchPrimaryRays: shaders.RaymarchPrimaryRays(
       state.gpu,
@@ -1890,17 +1901,16 @@ async function FuzzWorld3dBegin() {
 
     Param('branchingFactor', 'i32', (parentEl, value) => {
       let probeRayCount = state.params.probeRayCount;
-      let displayValue = Math.pow(2, value)
+      let displayValue = Math.pow(4, value)
       let examples = ([0, 1, 2, 3]).map(level => {
-        let shifted = state.params.probeRayCount << (value * level)
-        let powed = probeRayCount * Math.pow(2, value * level)
+        let powed = probeRayCount * Math.pow(4, value * level)
         return powed
       })
 
       parentEl.querySelector('output').innerHTML = `
-          2<sup class="highlight-blue">${value}</sup> = ${displayValue} (<span class="highlight-orange">${probeRayCount}</span> * 2<sup>(<span  class="highlight-blue">${value}</span> * level)</sup> = ${examples.join(', ')}, ...)
+          4<sup class="highlight-blue">${value}</sup> = ${displayValue} (<span class="highlight-orange">${probeRayCount}</span> * 2<sup>(<span  class="highlight-blue">${value}</span> * level)</sup> = ${examples.join(', ')}, ...)
         `
-      return value
+      return displayValue
     })
 
 
@@ -1909,14 +1919,11 @@ async function FuzzWorld3dBegin() {
       return value;
     })
 
-    // Param('probeRayCount', 'i32', (parentEl, value) => {
-    //   let newValue = Math.pow(2, value)
-    //   parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = <span class="highlight-orange">${newValue}</span>`
-    //   return newValue
-    // })
-
-    state.params.probeRayCount = 6;
-
+    Param('probeRayCount', 'i32', (parentEl, value) => {
+      let newValue = 6 * Math.pow(4, value)
+      parentEl.querySelector('output').innerHTML = `6 * 4<sup>${value}</sup> = <span class="highlight-orange">${newValue}</span>`
+      return newValue
+    })
 
   }
 
