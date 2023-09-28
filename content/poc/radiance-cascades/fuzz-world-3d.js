@@ -49,9 +49,11 @@ async function FuzzWorld3dBegin() {
   state.camera.state.targetDistance = 200
   state.camera.state.scrollSensitivity = 0.1;
 
+  const maxLevel0ProbeLatticeDiameter = Math.pow(
+    2,
+    parseFloat(controlEl.querySelector('.probeLatticeDiameter-control input').max)
+  )
 
-  const level0ProbeLatticeDiameter = 64
-  // TODO: consider making this a tunable param
   const maxRaysPerLevel0Probe = 6 * Math.pow(
     4,
     parseFloat(controlEl.querySelector('.probeRayCount-control input').max)
@@ -63,12 +65,12 @@ async function FuzzWorld3dBegin() {
   )
 
   const level0BytesPerProbeRay = 16
-  const level0ProbeCount = Math.pow(level0ProbeLatticeDiameter, 3)
-  const maxLevel = Math.log2(level0ProbeLatticeDiameter)
+  const maxLevel0ProbeCount = Math.pow(maxLevel0ProbeLatticeDiameter, 3)
+  const maxLevelCount = Math.log2(maxLevel0ProbeLatticeDiameter)
 
   const pingPongBufferRayCount = Math.max(
-    maxRaysPerLevel0Probe * level0ProbeCount,
-    maxRaysPerLevel0Probe * Math.pow(maxBranchingFactor, maxLevel)
+    maxRaysPerLevel0Probe * maxLevel0ProbeCount,
+    maxRaysPerLevel0Probe * Math.pow(maxBranchingFactor, maxLevelCount)
   )
   const probeBufferByteSize = pingPongBufferRayCount * level0BytesPerProbeRay * 2
   console.log('pingPongBufferRayCount', pingPongBufferRayCount, 'size', probeBufferByteSize)
@@ -529,13 +531,11 @@ async function FuzzWorld3dBegin() {
       volumeTexture,
       probeBuffer,
       workgroupSize,
-      level0ProbeLatticeDiameter,
+      maxLevelCount,
       pingPongBufferRayCount
     ) {
       const labelPrefix = gpu.labelPrefix + 'RaymarchProbeRays/'
       const maxWorkgroupsPerDimension = gpu.adapter.limits.maxComputeWorkgroupsPerDimension
-
-      const maxLevelCount = Math.log2(level0ProbeLatticeDiameter) + 1
 
       const uboFields = [
         ['level', 'u32', 4],
@@ -546,6 +546,7 @@ async function FuzzWorld3dBegin() {
         ['debugRaymarchFixedSizeStepMultiplier', 'f32', 4],
         ['branchingFactor', 'u32', 4],
         ['levelCount', 'u32', 4],
+        ['probeLatticeDiameter', 'i32', 4],
       ]
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -575,7 +576,6 @@ async function FuzzWorld3dBegin() {
       const source =  /* wgsl */`
         const PI: f32 = ${Math.PI};
         const TAU: f32 = ${Math.PI * 2.0};
-        const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
         const pingPongBufferRayCount: i32 = ${pingPongBufferRayCount};
 
         struct UBOParams {
@@ -621,12 +621,12 @@ async function FuzzWorld3dBegin() {
           let UpperRaysPerProbe = ubo.probeRayCount * i32(ubo.branchingFactor);
           let UpperLevelRayIndex = rayIndex * i32(ubo.branchingFactor);
           let UpperLevelBufferOffset = pingPongBufferRayCount * (UpperLevel % 2);
-          let UpperProbeDiameter = (ubo.probeRadius * 2);
-          let UpperCascadeWidth = level0ProbeLatticeDiameter >> u32(UpperLevel);
+          let UpperProbeDiameter = (ubo.probeRadius * 2) * 2;
+          let UpperCascadeWidth = ubo.probeLatticeDiameter >> u32(UpperLevel);
 
           let uvw = (lowerProbeCenter/f32(UpperProbeDiameter)) / f32(UpperCascadeWidth);
           let index = uvw * f32(UpperCascadeWidth);
-          var basePos = vec3<i32>(floor(index)) / 2;
+          var basePos = vec3<i32>(floor(index));
 
           let bufferStartIndex = UpperLevelBufferOffset + UpperLevelRayIndex;
           let samples = array(
@@ -792,7 +792,7 @@ async function FuzzWorld3dBegin() {
 
           let ProbeRayIndex = RayIndex % ubo.probeRayCount;
           let ProbeIndex = RayIndex / ubo.probeRayCount;
-          let LatticeDiameter = level0ProbeLatticeDiameter >> ubo.level;
+          let LatticeDiameter = ubo.probeLatticeDiameter >> ubo.level;
 
           var rayDirection: vec3f;
           // Cube Face Subdivision
@@ -979,6 +979,9 @@ async function FuzzWorld3dBegin() {
 
           uboData.setInt32(byteOffset, levelCount, true)
           byteOffset += 4
+
+          uboData.setInt32(byteOffset, params.probeLatticeDiameter, true)
+          byteOffset += 4
         }
         gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
 
@@ -989,10 +992,9 @@ async function FuzzWorld3dBegin() {
           computePass.setPipeline(pipeline)
           computePass.setBindGroup(0, bindGroup, [byteOffset])
           const totalRays = (
-            Math.pow(level0ProbeLatticeDiameter >> level, 3) *
+            Math.pow(params.probeLatticeDiameter >> level, 3) *
             params.probeRayCount * Math.pow(params.branchingFactor, level)
           )
-
           const totalWorkGroups = totalRays / workgroupSize[0];
           let x = totalWorkGroups
           let y = 1
@@ -1020,12 +1022,12 @@ async function FuzzWorld3dBegin() {
       fluenceTexture,
       probeBuffer,
       workgroupSize,
-      level0ProbeLatticeDiameter,
     ) {
       const labelPrefix = gpu.labelPrefix + 'ComputeFluence/'
 
       const uboFields = [
         ['probeRayCount', 'i32', 4],
+        ['probeLatticeDiameter', 'i32', 4]
       ];
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -1046,8 +1048,6 @@ async function FuzzWorld3dBegin() {
           ${uboFields.map(i => `${i[0]}: ${i[1]},\n `).join('    ')}
         };
 
-        const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
-
         @group(0) @binding(0) var<storage, read_write> probes: array<vec4f>;
         @group(0) @binding(1) var fluenceTexture: texture_storage_3d<rgba16float, write>;
         @group(0) @binding(2) var<uniform> ubo: UBOParams;
@@ -1057,12 +1057,12 @@ async function FuzzWorld3dBegin() {
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           let dims = vec3f(textureDimensions(fluenceTexture));
           let uvw = vec3f(id) / dims;
-          let Index = vec3<i32>(uvw * f32(level0ProbeLatticeDiameter));
+          let Index = vec3<i32>(uvw * f32(ubo.probeLatticeDiameter));
 
           let StartIndex = (
             Index.x +
-            Index.y * level0ProbeLatticeDiameter +
-            Index.z * (level0ProbeLatticeDiameter * level0ProbeLatticeDiameter)
+            Index.y * ubo.probeLatticeDiameter +
+            Index.z * (ubo.probeLatticeDiameter * ubo.probeLatticeDiameter)
           ) * ubo.probeRayCount;
 
           var acc = vec4f(0.0);
@@ -1176,6 +1176,10 @@ async function FuzzWorld3dBegin() {
           uboData.setInt32(byteOffset, params.probeRayCount, true)
           byteOffset += 4;
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
+
+          uboData.setInt32(byteOffset, params.probeLatticeDiameter, true)
+          byteOffset += 4;
+          gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
         }
 
         const computePass = commandEncoder.beginComputePass()
@@ -1196,10 +1200,8 @@ async function FuzzWorld3dBegin() {
       volumeTexture,
       outputTexture,
       workgroupSize,
-      level0ProbeLatticeDiameter
     ) {
       const labelPrefix = gpu.labelPrefix + 'RaymarchPrimaryRays/'
-
 
       const uboFields = [
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
@@ -1209,6 +1211,7 @@ async function FuzzWorld3dBegin() {
         ['height', 'i32', 4],
         ['fov', 'f32', 4],
         ['debugRenderRawFluence', 'i32', 4],
+        ['probeLatticeDiameter', 'i32', 4],
       ]
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -1234,7 +1237,6 @@ async function FuzzWorld3dBegin() {
       })
 
       const source =  /* wgsl */`
-        const level0ProbeLatticeDiameter: i32 = ${level0ProbeLatticeDiameter};
 
         fn MinComponent(a: vec3f) -> f32 {
           return min(a.x, min(a.y, a.z));
@@ -1559,6 +1561,9 @@ async function FuzzWorld3dBegin() {
           uboData.setInt32(byteOffset, params.debugRenderRawFluence ? 1 : 0, true)
           byteOffset += 4;
 
+          uboData.setInt32(byteOffset, params.probeLatticeDiameter, true)
+          byteOffset += 4;
+
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
         }
 
@@ -1777,16 +1782,14 @@ async function FuzzWorld3dBegin() {
       state.gpu.textures.volume,
       state.gpu.textures.fluence,
       state.gpu.buffers.probes,
-      [16, 4, 4],
-      level0ProbeLatticeDiameter,
-      state.params.probeRayCount
+      [16, 4, 4]
     ),
     raymarchProbeRays: shaders.RaymarchProbeRays(
       state.gpu,
       state.gpu.textures.volume,
       state.gpu.buffers.probes,
       [256, 1, 1],
-      level0ProbeLatticeDiameter,
+      maxLevelCount,
       pingPongBufferRayCount
     ),
     raymarchPrimaryRays: shaders.RaymarchPrimaryRays(
@@ -1795,7 +1798,6 @@ async function FuzzWorld3dBegin() {
       state.gpu.textures.fluence,
       state.gpu.textures.output,
       [16, 16, 1],
-      level0ProbeLatticeDiameter
     ),
     blit: shaders.Blit(
       state.gpu,
@@ -1920,6 +1922,12 @@ async function FuzzWorld3dBegin() {
     Param('probeRayCount', 'i32', (parentEl, value) => {
       let newValue = 6 * Math.pow(4, value)
       parentEl.querySelector('output').innerHTML = `6 * 4<sup>${value}</sup> = <span class="highlight-orange">${newValue}</span>`
+      return newValue
+    })
+
+    Param('probeLatticeDiameter', 'i32', (parentEl, value) => {
+      let newValue = Math.pow(2, value)
+      parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = ${newValue}`
       return newValue
     })
 

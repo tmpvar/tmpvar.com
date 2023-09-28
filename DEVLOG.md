@@ -34,15 +34,19 @@
 - radiance-cascades/3d: mipmap only changed regions
 
 ## Pending
+- radiance-cascades/3d: add slider for probe lattice diameter (level 0)
+
 - radiance-cascades: convert #flatland-2d-controls to `.controls`
-- radiance-cascades/3d: ensure the branching factor is correct
 - radiance-cascades/3d: debug render probes
 - radiance-cascades/3d: rename volumeTexture to radianceTexture
 - radiance-cascades/3d: fix erroneous darkening for distant objects
+
+
+## 2023-09-28
 - radiance-cascades/3d: re-enable level 0 ray count, but based on 6 instead of 8
-
-
+                        __this causes the gpu to crash when set to anything other than 6__
 ## 2023-09-27
+- radiance-cascades/3d: ensure the branching factor is correct
 - radiance-cascades/3d: find a better ray distribution function
 ## 2023-09-26
 - radiance-cascades/3d: merge upper cascade
