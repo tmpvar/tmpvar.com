@@ -583,7 +583,13 @@ async function FuzzWorld3dBegin() {
         };
 
 
-        fn SampleUpperProbe(rawPos: vec3<i32>, raysPerProbe: i32, bufferStartIndex: i32, cascadeWidth: i32) -> vec4f {
+        fn SampleUpperProbe(
+          rawPos: vec3<i32>,
+          raysPerProbe: i32,
+          PingPongBufferOffset: i32,
+          ProbeRayIndex: i32,
+          cascadeWidth: i32
+        ) -> vec4f {
           // TODO: rawPos can be out of the scene bounds, intentionally.
           //       this is a bit of a hack, that reuses an in-bounds probe multiple times
           //       instead of going out of bounds to a probe that doesn't exist or simply
@@ -594,16 +600,19 @@ async function FuzzWorld3dBegin() {
 
           let pos = clamp(rawPos, vec3<i32>(0), vec3<i32>(cascadeWidth - 1));
 
-          let index = (
+          let ProbeIndex = (
             pos.x +
             pos.y * cascadeWidth +
             pos.z * cascadeWidth * cascadeWidth
-          ) * raysPerProbe;
+          );
+
+          let ProbeRayOffset = ProbeIndex * raysPerProbe + ProbeRayIndex;
+
           let rayCount = i32(ubo.branchingFactor);
           var accColor = vec4(0.0);
           var accRadiance = 0.0;
-          for (var offset=0; offset<rayCount; offset++) {
-            accColor += probes[bufferStartIndex + index + offset];
+          for (var rayIndex=0; rayIndex<rayCount; rayIndex++) {
+            accColor += probes[PingPongBufferOffset + ProbeRayOffset + rayIndex];
           }
           return accColor / f32(rayCount);
         }
@@ -611,75 +620,77 @@ async function FuzzWorld3dBegin() {
         // given: world space sample pos, angle
         // - sample each probe in the neighborhood (8)
         // - interpolate
-        fn SampleUpperProbes(lowerProbeCenter: vec3f, rayIndex: i32) -> vec4f {
+        fn SampleUpperProbes(lowerProbeCenterUVW: vec3f, LowerProbeRayIndex: i32) -> vec4f {
           let UpperLevel = i32(ubo.level + 1);
-
           if (UpperLevel >= i32(ubo.levelCount)) {
             return vec4f(0.0);
           }
-
+          let UpperLatticeDiameter = ubo.probeLatticeDiameter >> u32(UpperLevel);
+          let UpperProbeRayIndex = LowerProbeRayIndex * i32(ubo.branchingFactor);
           let UpperRaysPerProbe = ubo.probeRayCount * i32(ubo.branchingFactor);
-          let UpperLevelRayIndex = rayIndex * i32(ubo.branchingFactor);
-          let UpperLevelBufferOffset = pingPongBufferRayCount * (UpperLevel % 2);
-          let UpperProbeDiameter = (ubo.probeRadius * 2) * 2;
-          let UpperCascadeWidth = ubo.probeLatticeDiameter >> u32(UpperLevel);
+          let BasePos = vec3<i32>(floor(lowerProbeCenterUVW * f32(UpperLatticeDiameter) - 0.5));
 
-          let uvw = (lowerProbeCenter/f32(UpperProbeDiameter)) / f32(UpperCascadeWidth);
-          let index = uvw * f32(UpperCascadeWidth);
-          var basePos = vec3<i32>(floor(index));
-
-          let bufferStartIndex = UpperLevelBufferOffset + UpperLevelRayIndex;
+          let BufferStartIndex = (pingPongBufferRayCount * (UpperLevel % 2));
           let samples = array(
             SampleUpperProbe(
-              basePos + vec3<i32>(0, 0, 0),
+              BasePos + vec3<i32>(0, 0, 0),
               UpperRaysPerProbe,
-              bufferStartIndex,
-              UpperCascadeWidth
+              BufferStartIndex,
+              UpperProbeRayIndex,
+              UpperLatticeDiameter
             ),
             SampleUpperProbe(
-              basePos + vec3<i32>(1, 0, 0),
+              BasePos + vec3<i32>(1, 0, 0),
               UpperRaysPerProbe,
-              bufferStartIndex,
-              UpperCascadeWidth
+              BufferStartIndex,
+              UpperProbeRayIndex,
+              UpperLatticeDiameter
             ),
             SampleUpperProbe(
-              basePos + vec3<i32>(0, 1, 0),
+              BasePos + vec3<i32>(0, 1, 0),
               UpperRaysPerProbe,
-              bufferStartIndex,
-              UpperCascadeWidth
+              BufferStartIndex,
+              UpperProbeRayIndex,
+              UpperLatticeDiameter
             ),
             SampleUpperProbe(
-              basePos + vec3<i32>(1, 1, 0),
+              BasePos + vec3<i32>(1, 1, 0),
               UpperRaysPerProbe,
-              bufferStartIndex,
-              UpperCascadeWidth
+              BufferStartIndex,
+              UpperProbeRayIndex,
+              UpperLatticeDiameter
             ),
             SampleUpperProbe(
-              basePos + vec3<i32>(0, 0, 1),
+              BasePos + vec3<i32>(0, 0, 1),
               UpperRaysPerProbe,
-              bufferStartIndex,
-              UpperCascadeWidth
+              BufferStartIndex,
+              UpperProbeRayIndex,
+              UpperLatticeDiameter
             ),
             SampleUpperProbe(
-              basePos + vec3<i32>(1, 0, 1),
+              BasePos + vec3<i32>(1, 0, 1),
               UpperRaysPerProbe,
-              bufferStartIndex,
-              UpperCascadeWidth
+              BufferStartIndex,
+              UpperProbeRayIndex,
+              UpperLatticeDiameter
             ),
             SampleUpperProbe(
-              basePos + vec3<i32>(0, 1, 1),
+              BasePos + vec3<i32>(0, 1, 1),
               UpperRaysPerProbe,
-              bufferStartIndex,
-              UpperCascadeWidth
+              BufferStartIndex,
+              UpperProbeRayIndex,
+              UpperLatticeDiameter
             ),
             SampleUpperProbe(
-              basePos + vec3<i32>(1, 1, 1),
+              BasePos + vec3<i32>(1, 1, 1),
               UpperRaysPerProbe,
-              bufferStartIndex,
-              UpperCascadeWidth
+              BufferStartIndex,
+              UpperProbeRayIndex,
+              UpperLatticeDiameter
             ),
           );
 
+          let index = lowerProbeCenterUVW * f32(UpperLatticeDiameter);
           let factor = fract(index);
           let invFactor = 1.0 - factor;
 
@@ -709,11 +720,7 @@ async function FuzzWorld3dBegin() {
           rayDirection: vec3f,
           maxDistance: f32
         ) -> vec4f {
-          let levelDivisor = 1.0 / f32(1<<u32(ubo.level));
           let levelMip = f32(ubo.level);
-          let levelRayOrigin = rayOrigin * levelDivisor;
-          let levelProbeCenter = probeCenter * levelDivisor;
-          let levelMaxDistance = maxDistance * levelDivisor;
           var acc = vec4f(0.0, 0.0, 0.0, 0.0);
           let dims = vec3f(textureDimensions(volumeTexture));
 
@@ -783,7 +790,6 @@ async function FuzzWorld3dBegin() {
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           let dims = vec3f(textureDimensions(volumeTexture));
-
           let RayIndex: i32 = i32(
             id.x +
             id.y * ${workgroupSize[0]} +
@@ -793,14 +799,14 @@ async function FuzzWorld3dBegin() {
           let ProbeRayIndex = RayIndex % ubo.probeRayCount;
           let ProbeIndex = RayIndex / ubo.probeRayCount;
           let LatticeDiameter = ubo.probeLatticeDiameter >> ubo.level;
-
+          const CubeFaceCount = 6;
           var rayDirection: vec3f;
           // Cube Face Subdivision
           {
             let level = ubo.level;
             // pow(branchingFactor, level)
             let raysPerFace = 1 << ((ubo.branchingFactor/2) * level);
-            let totalRayCount = raysPerFace * 6;
+            let totalRayCount = raysPerFace * CubeFaceCount;
             let diameter = sqrt(f32(raysPerFace));
 
             let face = ProbeRayIndex / raysPerFace;
@@ -830,9 +836,8 @@ async function FuzzWorld3dBegin() {
           let LowerIntervalRadius = f32(ubo.intervalStartRadius);
           let IntervalRadius = f32(ubo.intervalEndRadius);
 
-          let ProbeRadius = f32(ubo.probeRadius);
-          let ProbeDiameter = ProbeRadius * 2.0;
-          let ProbeCenter = LatticePosition * ProbeDiameter + ProbeRadius;
+          let ProbeCenterUVW = (LatticePosition + 0.5) / f32(LatticeDiameter);
+          let ProbeCenter = ProbeCenterUVW * dims;
 
           let LowerResult = RayMarchFixedSize(
             ProbeCenter,
@@ -841,17 +846,9 @@ async function FuzzWorld3dBegin() {
             IntervalRadius
           );
 
-          let UpperResult = SampleUpperProbes(
-            ProbeCenter,
-            ProbeRayIndex
-          );
+          let UpperResult = SampleUpperProbes(ProbeCenterUVW, ProbeRayIndex);
 
           let OutputIndex = (i32(ubo.level) % 2) * pingPongBufferRayCount + RayIndex;
-          if (ubo.level == 0) {
-            probes[OutputIndex] = UpperResult;
-          } else {
-            probes[OutputIndex] = LowerResult;//Accumulate(UpperResult, LowerResult);
-          }
           probes[OutputIndex] = Accumulate(UpperResult, LowerResult);
         }
       `
