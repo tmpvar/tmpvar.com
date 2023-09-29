@@ -1036,6 +1036,12 @@ click/drag to move the light
   </section>
 </section>
 
+<!-- ### World Space Storage Requirements (3D)
+<section id="world-space-storage-requirements-3d-content">
+
+</section> -->
+
+<!--
 ### Fuzz World (3D)
 <span class="highlight-blue">(Work in progress)</span>
 <section id="fuzz-world-3d-content" class="has-webgpu">
@@ -1096,5 +1102,4 @@ click/drag to move the light
     <p>
   </section>
 </section>
-
-
+-->
