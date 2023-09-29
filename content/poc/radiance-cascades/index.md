@@ -1036,10 +1036,54 @@ click/drag to move the light
   </section>
 </section>
 
-<!-- ### World Space Storage Requirements (3D)
+### World Space Storage Requirements (3D)
 <section id="world-space-storage-requirements-3d-content">
+  <p>
+    Compute a storage cost table for world space probes, using a ping-pong buffer, at various
+    spatial resolutions.
+  </p>
+  <code><pre>
+rayCount = 6
+bytesPerRay = 16
+diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
+  <table>
+    <thead>
+      <tr>
+        <td>diameter</td>
+        <td>megabytes</td>
+      </tr>
+    </thead>
+    <tbody>
+    </tbody>
+  </table>
 
-</section> -->
+  <script type="module">
+    const root = document.querySelector('#world-space-storage-requirements-3d-content')
+
+    const tbody = root.querySelector('tbody')
+    const rayCount = 6
+    const bytesPerRay = 16
+    const MB = Math.pow(1024, 2)
+    for (let d = 4; d<11; d++) {
+      let diameter = Math.pow(2, d)
+      let volume = Math.pow(diameter, 3)
+
+      const row = document.createElement('tr')
+      const cellDiameter = document.createElement('td')
+      cellDiameter.innerText = diameter
+      row.appendChild(cellDiameter)
+
+      const cellMemory = document.createElement('td')
+      cellMemory.innerText = (volume * rayCount * bytesPerRay)/MB * 2
+      row.appendChild(cellMemory)
+
+      tbody.appendChild(row)
+    }
+
+  </script>
+</section>
+
+
 
 <!--
 ### Fuzz World (3D)
