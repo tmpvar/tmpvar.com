@@ -6,13 +6,58 @@ async function IsosurfaceExtraction2DBegin() {
   const ctx = canvas.getContext('2d')
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
 
+  function SDFSphere(px, py, cx, cy, r) {
+    let dx = px - cx
+    let dy = py - cy
+    return Math.sqrt(dx * dx + dy * dy) - r
+  }
+
   function SampleSDF(x, y) {
-    let circleCenter = [canvas.width / 2, canvas.height / 2]
-    let circleRadius = 256
-    let dx = circleCenter[0] - x
-    let dy = circleCenter[1] - y
-    let l = Math.sqrt(dx * dx + dy * dy)
-    return l - circleRadius
+    let d = 1000.0;
+
+    // spheres
+    {
+      d = SDFSphere(
+        x,
+        y,
+        canvas.width / 2 + 16.123,
+        canvas.height / 2,
+        256
+      )
+
+      d = Math.min(d, SDFSphere(
+        x,
+        y,
+        256,
+        256,
+        128
+      ))
+
+      d = Math.min(d, SDFSphere(
+        x,
+        y,
+        256,
+        768,
+        64
+      ))
+      d = Math.min(d, SDFSphere(
+        x,
+        y,
+        840,
+        768,
+        32
+      ))
+
+      d = Math.max(d, -SDFSphere(
+        x,
+        y,
+        768,
+        512,
+        64
+      ))
+    }
+
+    return d
   }
 
   function Sign(d) {
@@ -20,14 +65,17 @@ async function IsosurfaceExtraction2DBegin() {
   }
 
   async function RenderFrame() {
+    const cellDiameter = 128
+    const cellRadius = cellDiameter / 2
+
     ctx.reset()
     ctx.scale(1, -1)
     ctx.translate(0, -canvas.height)
-    console.log(imageData)
+
     // fill the canvas with sdf coloring
     {
       for (let y = 0; y < canvas.height; y++) {
-        let yoff = (canvas.height - y) * canvas.width * 4;
+        let yoff = y * canvas.width * 4;
         for (let x = 0; x < canvas.width; x++) {
           let offset = yoff + x * 4
           let d = SampleSDF(x, y)
@@ -54,7 +102,6 @@ async function IsosurfaceExtraction2DBegin() {
     let grid = null
     {
       const TAU = Math.PI * 2.0
-      let cellDiameter = 32
       let latticeDiameter = canvas.width / cellDiameter + 1
       const cellCount = latticeDiameter * latticeDiameter
       grid = new Float32Array(cellCount)
@@ -91,10 +138,11 @@ async function IsosurfaceExtraction2DBegin() {
       }
     }
 
-    // draw edges that have crossings
+    // collect edges that have crossings
+    const borderCells = []
+    const crossingEdges = []
     {
       const TAU = Math.PI * 2.0
-      let cellDiameter = 32
       let latticeDiameter = canvas.width / cellDiameter + 1
       const cellCount = latticeDiameter * latticeDiameter
 
@@ -110,6 +158,18 @@ async function IsosurfaceExtraction2DBegin() {
           let a = Sign(grid[yoff + x])
           let b = Sign(grid[yoff + x + 1])
           let c = Sign(grid[yoff + latticeDiameter + x])
+          let d = Sign(grid[yoff + latticeDiameter + x + 1])
+
+          let code = (
+            ((a < 0.0 ? 1 : 0) << 0) |
+            ((b < 0.0 ? 1 : 0) << 1) |
+            ((c < 0.0 ? 1 : 0) << 2) |
+            ((d < 0.0 ? 1 : 0) << 3)
+          )
+
+          if (code == 0 || code == 0b1111) {
+            continue;
+          }
 
           if (a!=b) {
             ctx.beginPath()
