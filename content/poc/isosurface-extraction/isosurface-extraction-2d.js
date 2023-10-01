@@ -172,10 +172,12 @@ async function IsosurfaceExtraction2DBegin() {
     // collect edges that have crossings
     let latticeDiameter = canvas.width / cellDiameter + 1
     const cellCount = latticeDiameter * latticeDiameter
-    const borderCrossings = []
-    const gridToCrossingMap = new Int32Array(cellCount)
+
     const borderCrossingCells = []
     const cellCodes = new Uint8Array(cellCount)
+
+    const cellPrimalVertIndices = new Int32Array(cellCount * 4)
+    const primalVertices = []
     {
       let padding = 10
       let halfPadding = padding / 2
@@ -253,9 +255,11 @@ async function IsosurfaceExtraction2DBegin() {
               TAU
             )
             ctx.fill();
-            edgeIntersections[0] = lineIntersection.slice()
+
+            cellPrimalVertIndices[(yoff + x) * 4 + 0] = primalVertices.length
+            primalVertices.push(lineIntersection.slice())
           } else {
-            edgeIntersections[0] = false
+            cellPrimalVertIndices[(yoff + x) * 4 + 0] = -1
           }
 
           // (0, 0) -> (0, 1)
@@ -291,39 +295,41 @@ async function IsosurfaceExtraction2DBegin() {
               TAU
             )
             ctx.fill();
-            edgeIntersections[1] = lineIntersection.slice()
+
+            cellPrimalVertIndices[(yoff + x) * 4 + 3] = primalVertices.length
+            primalVertices.push(lineIntersection.slice())
           } else {
-            edgeIntersections[1] = false
+            cellPrimalVertIndices[(yoff + x) * 4 + 3] = -1
           }
 
-          gridToCrossingMap[yoff + x] = borderCrossings.length
-          borderCrossings.push(edgeIntersections.slice())
           borderCrossingCells.push(yoff + x)
 
-          ctx.save()
-          ctx.scale(1, -1)
-          ctx.translate(0, -canvas.height)
-          ctx.fillStyle = '#ffd1d5'
-          ctx.font = "12px Hack, monospace"
-          ctx.fillText(
-            `${yoff + x}`,
-            x * cellDiameter + 10,
-            canvas.height - (y + 1) * cellDiameter + 14
-          )
-          ctx.fillText(
-            `${gridToCrossingMap[yoff + x]}`,
-            x * cellDiameter + 10,
-            canvas.height - (y + 1) * cellDiameter + 28
-          )
-          ctx.fillText(
-            `${cellCodes[yoff + x]}`,
-            x * cellDiameter + 10,
-            canvas.height - (y + 1) * cellDiameter + 42
-          )
-          ctx.restore()
+          // ctx.save()
+          // ctx.scale(1, -1)
+          // ctx.translate(0, -canvas.height)
+          // ctx.fillStyle = '#ffd1d5'
+          // ctx.font = "10px Hack, monospace"
+          // ctx.fillText(
+          //   `${yoff + x} ${cellCodes[yoff + x].toString(2)}b`,
+          //   x * cellDiameter + 10,
+          //   canvas.height - (y + 1) * cellDiameter + 14
+          // )
+          // ctx.restore()
         }
       }
 
+      // Convienience: each cell stores all primal vertex indices
+      {
+        borderCrossingCells.forEach(cellIndex => {
+          cellPrimalVertIndices[cellIndex * 4 + 1] = cellPrimalVertIndices[cellIndex * 4 + 4 + 3]
+          cellPrimalVertIndices[cellIndex * 4 + 2] = cellPrimalVertIndices[cellIndex * 4 + latticeDiameter * 4]
+        })
+      }
+
+      let primalSegments = []
+      // array of loops
+      let primalGraph = []
+      let cellVisited = new Uint8Array(cellCount)
       {
         /*
          Vert ordering
@@ -357,67 +363,33 @@ async function IsosurfaceExtraction2DBegin() {
           14: [[0, 3]],
         }
 
-        function GetEdge(out, cellIndex, edgeIndex) {
-          let crossing = [0, 0]
-          switch (edgeIndex) {
-            case 0: {
-              let crossingIndex = gridToCrossingMap[cellIndex]
-              crossing = borderCrossings[crossingIndex][0]
-              break;
-            }
 
-            case 1: {
-              let crossingIndex = gridToCrossingMap[cellIndex + 1]
-              crossing = borderCrossings[crossingIndex][1]
-              break;
-            }
-
-            case 2: {
-              let crossingIndex = gridToCrossingMap[cellIndex + latticeDiameter]
-              crossing = borderCrossings[crossingIndex][0]
-              break;
-            }
-
-            case 3: {
-              let crossingIndex = gridToCrossingMap[cellIndex]
-              crossing = borderCrossings[crossingIndex][1]
-              break;
-            }
-          }
-
-          out[0] = crossing[0]
-          out[1] = crossing[1]
-
-          // let crossingIndex = gridToCrossingMap[offsetCellIndex]
-          // borderCrossings[crossingIndex]
-        }
-
-        let posa = [0, 0]
-        let posb = [0, 0]
-        ctx.save()
-        ctx.strokeStyle = '#f0f'
-        ctx.lineWidth = 3;
         borderCrossingCells.forEach(cellIndex => {
           let code = cellCodes[cellIndex]
           let entry = lookup[code]
-          console.log(cellIndex, JSON.stringify(entry), code, '0b' + code.toString(2))
           entry.forEach(pair => {
-
-            GetEdge(posa, cellIndex, pair[0])
-            GetEdge(posb, cellIndex, pair[1])
-
-            ctx.beginPath()
-            ctx.moveTo(posa[0], posa[1])
-            ctx.lineTo(posb[0], posb[1])
-            ctx.stroke()
+            let primalIndexA = cellPrimalVertIndices[cellIndex * 4 + pair[0]]
+            let primalIndexB = cellPrimalVertIndices[cellIndex * 4 + pair[1]]
+            primalSegments.push([primalIndexA, primalIndexB])
           })
         })
+
+        ctx.save()
+        ctx.strokeStyle = '#fa6e79'
+        ctx.lineWidth = 2;
+        ctx.beginPath()
+        primalSegments.forEach(segment => {
+          let primalVertA = primalVertices[segment[0]]
+          let primalVertB = primalVertices[segment[1]]
+          ctx.moveTo(primalVertA[0], primalVertA[1])
+          ctx.lineTo(primalVertB[0], primalVertB[1])
+          ctx.stroke()
+        })
+
         ctx.restore();
       }
       ctx.restore()
     }
-
-
   }
 
   RenderFrame()
