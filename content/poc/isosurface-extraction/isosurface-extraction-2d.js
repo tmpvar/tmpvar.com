@@ -96,7 +96,7 @@ async function IsosurfaceExtraction2DBegin() {
   }
 
   async function RenderFrame() {
-    const cellDiameter = 64
+    const cellDiameter = 128
     const cellRadius = cellDiameter / 2
 
     ctx.reset()
@@ -381,8 +381,17 @@ async function IsosurfaceExtraction2DBegin() {
         primalSegments.forEach(segment => {
           let primalVertA = primalVertices[segment[0]]
           let primalVertB = primalVertices[segment[1]]
-          ctx.moveTo(primalVertA[0], primalVertA[1])
-          ctx.lineTo(primalVertB[0], primalVertB[1])
+
+          let dx = primalVertB[0] - primalVertA[0]
+          let dy = primalVertB[1] - primalVertA[1]
+
+          let l = Math.sqrt(dx * dx + dy * dy)
+          dx /= l
+          dy /= l
+          let padding = 0.125
+
+          ctx.moveTo(primalVertA[0] + dx * l * padding, primalVertA[1] + dy * l * padding)
+          ctx.lineTo(primalVertB[0] - dx * l * padding, primalVertB[1] - dy * l * padding)
           ctx.stroke()
         })
 
