@@ -1,11 +1,30 @@
+import CreateParamReader from './params.js'
+
 async function IsosurfaceExtraction2DBegin() {
   const TAU = Math.PI * 2.0
 
   const rootEl = document.getElementById('isosurface-extraction-2d-content')
   const controlEl = rootEl.querySelector('.controls')
+
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('2d')
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+
+  const state = {
+    params: {},
+    dirty: true
+  }
+
+  const Param = CreateParamReader(state, controlEl)
+  function ReadParams() {
+    Param('cellDiameter', 'i32', (parentEl, value, oldValue) => {
+      let newValue = Math.pow(2, value)
+      parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = ${newValue}`
+      return newValue
+    })
+
+
+  }
 
   function SDFSphere(px, py, cx, cy, r) {
     let dx = px - cx
@@ -96,7 +115,17 @@ async function IsosurfaceExtraction2DBegin() {
   }
 
   async function RenderFrame() {
-    const cellDiameter = 64
+    window.requestAnimationFrame(RenderFrame)
+
+    ReadParams()
+
+    if (!state.dirty) {
+      return
+    }
+    state.dirty = false
+
+
+    const cellDiameter = state.params.cellDiameter
     const cellRadius = cellDiameter / 2
 
     ctx.reset()
