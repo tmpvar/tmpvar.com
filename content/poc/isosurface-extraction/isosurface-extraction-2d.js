@@ -96,13 +96,16 @@ async function IsosurfaceExtraction2DBegin() {
   }
 
   async function RenderFrame() {
-    const cellDiameter = 128
+    const cellDiameter = 32
     const cellRadius = cellDiameter / 2
 
     ctx.reset()
     ctx.scale(1, -1)
     ctx.translate(0, -canvas.height)
-
+    ctx.translate(-400, -300)
+    ctx.scale(4, 4)
+    ctx.translate(-200, -30)
+    ctx.lineWidth = 0.1
     // fill the canvas with sdf coloring
     {
       for (let y = 0; y < canvas.height; y++) {
@@ -175,6 +178,7 @@ async function IsosurfaceExtraction2DBegin() {
 
     const borderCrossingCells = []
     const cellCodes = new Uint8Array(cellCount)
+    const cellEdgeCodes = new Uint8Array(cellCount * 4)
 
     const cellPrimalVertIndices = new Int32Array(cellCount * 4)
     const primalVertices = []
@@ -208,10 +212,10 @@ async function IsosurfaceExtraction2DBegin() {
           */
 
           let code = (
-            ((bl < 0.0 ? 1 : 0) << 0) |
-            ((br < 0.0 ? 1 : 0) << 1) |
-            ((ur < 0.0 ? 1 : 0) << 2) |
-            ((ul < 0.0 ? 1 : 0) << 3)
+            ((ul < 0.0 ? 1 : 0) << 0) |
+            ((ur < 0.0 ? 1 : 0) << 1) |
+            ((br < 0.0 ? 1 : 0) << 2) |
+            ((bl < 0.0 ? 1 : 0) << 3)
           )
 
           cellCodes[yoff + x] = code
@@ -256,10 +260,10 @@ async function IsosurfaceExtraction2DBegin() {
             )
             ctx.fill();
 
-            cellPrimalVertIndices[(yoff + x) * 4 + 0] = primalVertices.length
+            cellPrimalVertIndices[(yoff + x) * 4 + 2] = primalVertices.length
             primalVertices.push(lineIntersection.slice())
           } else {
-            cellPrimalVertIndices[(yoff + x) * 4 + 0] = -1
+            cellPrimalVertIndices[(yoff + x) * 4 + 2] = -1
           }
 
           // (0, 0) -> (0, 1)
@@ -304,79 +308,99 @@ async function IsosurfaceExtraction2DBegin() {
 
           borderCrossingCells.push(yoff + x)
 
-          // ctx.save()
-          // ctx.scale(1, -1)
-          // ctx.translate(0, -canvas.height)
-          // ctx.fillStyle = '#ffd1d5'
-          // ctx.font = "10px Hack, monospace"
-          // ctx.fillText(
-          //   `${yoff + x} ${cellCodes[yoff + x].toString(2)}b`,
-          //   x * cellDiameter + 10,
-          //   canvas.height - (y + 1) * cellDiameter + 14
-          // )
-          // ctx.restore()
+          ctx.save()
+          ctx.scale(1, -1)
+          ctx.translate(0, -canvas.height)
+          ctx.fillStyle = '#ffd1d5'
+          ctx.font = "3px Hack, monospace"
+          ctx.fillText(
+            `${yoff + x} ${cellCodes[yoff + x].toString(2).padStart(4, '0')}b ${cellCodes[yoff + x]}`,
+            x * cellDiameter + 10,
+            canvas.height - (y + 1) * cellDiameter + 14
+          )
+          ctx.restore()
         }
       }
 
       // Convienience: each cell stores all primal vertex indices
       {
+        const stride = 4
+        const latticeStride = latticeDiameter * stride
         borderCrossingCells.forEach(cellIndex => {
-          cellPrimalVertIndices[cellIndex * 4 + 1] = cellPrimalVertIndices[cellIndex * 4 + 4 + 3]
-          cellPrimalVertIndices[cellIndex * 4 + 2] = cellPrimalVertIndices[cellIndex * 4 + latticeDiameter * 4]
+          let offset = cellIndex * stride
+          cellPrimalVertIndices[offset + 0] = cellPrimalVertIndices[offset + latticeStride + 2]
+          cellPrimalVertIndices[offset + 1] = cellPrimalVertIndices[offset + stride + 3]
         })
       }
 
-      let primalSegments = []
-      // array of loops
-      let primalGraph = []
-      let cellVisited = new Uint8Array(cellCount)
+      /*
+
+      Vert ordering
+      0      1
+        +--+
+        |  |
+        +--+
+      3      2
+
+      Edge Ordering
+         0
+        +--+
+      3 |  | 1
+        +--+
+         2
+      */
+      const CodeToEdges = {
+        1: [[0, 3]],
+        2: [[1, 0]],
+        3: [[1, 3]],
+        4: [[2, 1]],
+        5: [[0, 3], [2, 1]],
+        6: [[2, 0]],
+        7: [[2, 3]],
+        8: [[3, 2]],
+        9: [[0, 2]],
+        10: [[1, 0], [3, 2]],
+        11: [[1, 2]],
+        12: [[3, 1]],
+        13: [[0, 1]],
+        14: [[3, 0]],
+      }
+
+      // const edgeCodeLookup = {
+      //   1: 0b1000,
+      //   2: 0b0001,
+      //   3: 0b0001,
+
+      // }
+
+      let CellEdgeTransition = [
+        latticeDiameter,
+        1,
+        -latticeDiameter,
+        -1
+      ]
+
+      let EdgePairings = [2, 3, 0, 1]
+
       {
-        /*
-         Vert ordering
-         3    2
-          +--+
-          |  |
-          +--+
-         0    1
-
-         Edge Ordering
-            2
-           +--+
-         3 |  | 1
-           +--+
-            0
-        */
-        const lookup = {
-          1: [[0, 3]],
-          2: [[0, 1]],
-          3: [[1, 3]],
-          4: [[1, 2]],
-          5: [[0, 3], [1, 2]],
-          6: [[0, 2]],
-          7: [[2, 3]],
-          8: [[2, 3]],
-          9: [[0, 2]],
-          10: [[0, 1], [2, 3]],
-          11: [[1, 2]],
-          12: [[1, 3]],
-          13: [[0, 1]],
-          14: [[0, 3]],
-        }
-
-
+        let primalSegments = []
         borderCrossingCells.forEach(cellIndex => {
           let code = cellCodes[cellIndex]
-          let entry = lookup[code]
+          let entry = CodeToEdges[code]
+          let indicesOffset = cellIndex * 4
           entry.forEach(pair => {
-            let primalIndexA = cellPrimalVertIndices[cellIndex * 4 + pair[0]]
-            let primalIndexB = cellPrimalVertIndices[cellIndex * 4 + pair[1]]
+            let primalIndexA = cellPrimalVertIndices[indicesOffset + pair[0]]
+            let primalIndexB = cellPrimalVertIndices[indicesOffset + pair[1]]
             primalSegments.push([primalIndexA, primalIndexB])
           })
         })
 
+        console.log(primalSegments)
+        console.log(primalVertices)
+
         ctx.save()
         ctx.strokeStyle = '#fa6e79'
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.beginPath()
         primalSegments.forEach(segment => {
           let primalVertA = primalVertices[segment[0]]
@@ -392,11 +416,151 @@ async function IsosurfaceExtraction2DBegin() {
 
           ctx.moveTo(primalVertA[0] + dx * l * padding, primalVertA[1] + dy * l * padding)
           ctx.lineTo(primalVertB[0] - dx * l * padding, primalVertB[1] - dy * l * padding)
+
           ctx.stroke()
         })
 
         ctx.restore();
       }
+
+      // Walk the edges collecting loops
+      {
+
+        let primalGraph = []
+        let cellVisited = new Uint8Array(cellCount)
+
+        let loops = []
+        let loop = []
+        let steps = 4000
+        // TODO: process all crossing cells
+
+        let queue = []
+        let nextQueue = []
+
+        // Populate the queue with a single item
+        {
+          borderCrossingCells.forEach(cellIndex => {
+            let code = cellCodes[cellIndex]
+            let edges = CodeToEdges[code]
+            queue.push({
+              cellIndex,
+              edgeIndex: edges[0][0]
+            })
+          })
+        }
+
+        while (queue.length && steps--) {
+          let job = queue.pop()
+          let cellIndex = job.cellIndex
+
+          let code = cellCodes[cellIndex]
+          let visited = cellVisited[cellIndex]
+
+          let edges = CodeToEdges[code]
+
+          const queueLength = queue.length
+          for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex++) {
+
+            let edgePair = edges[edgeIndex]
+
+            console.log(cellIndex, 'start', edgeIndex, edgePair)
+            let startEdge = edgePair[0]
+            let endEdge = edgePair[1]
+
+            let startMask = 1 << startEdge
+            let endMask = 1 << endEdge
+
+            if ((visited & startMask) != 0) {
+              continue
+            }
+            // Skip edges that do not continue the current contour
+            if (startEdge != job.edgeIndex) {
+              queue.push({
+                cellIndex: cellIndex,
+                edgeIndex: startEdge
+              })
+              console.log(cellIndex, 'miss', startEdge, job.edgeIndex,)
+              continue
+            }
+            console.log(cellIndex, 'hit', startEdge, job.edgeIndex)
+
+            cellVisited[cellIndex] |= (startMask | endMask)
+
+            let startVertIndex = cellPrimalVertIndices[cellIndex * 4 + startEdge]
+            let endVertIndex = cellPrimalVertIndices[cellIndex * 4 + endEdge]
+            if (startVertIndex < 0 || endVertIndex < 0) {
+              continue;
+            }
+            let startVert = primalVertices[startVertIndex]
+            let endVert = primalVertices[endVertIndex]
+
+            if (loop.length == 0) {
+              loop.push(startVertIndex)
+            }
+
+            loop.push(endVertIndex)
+
+            ctx.fillStyle = "#ff0"
+            ctx.beginPath()
+            ctx.arc(
+              startVert[0],
+              startVert[1],
+              6,
+              0,
+              TAU
+            )
+            ctx.fill();
+
+            ctx.strokeStyle = "#0ff"
+            ctx.beginPath()
+            ctx.arc(
+              endVert[0],
+              endVert[1],
+              10,
+              0,
+              TAU
+            )
+            ctx.stroke();
+
+            let transition = CellEdgeTransition[endEdge]
+            console.log('process edge', job.edgeIndex, 'cell', cellIndex, 'nextCell', cellIndex + transition, 'endEdge', endEdge, edges[edgeIndex])
+            let nextCellIndex = cellIndex + transition
+            queue.push({
+              cellIndex: nextCellIndex,
+              edgeIndex: EdgePairings[endEdge]
+            })
+          }
+
+          // finalize the current loop
+          if (queueLength == queue.length) {
+            console.log('finish loop', loop)
+            loops.push(loop)
+            loop = []
+          }
+
+
+          loops.forEach((vertIndices, loopIndex) => {
+            let r = ((loopIndex + 1) * 158) % 255
+            let g = ((loopIndex + 1) * 2 * 156) % 255
+            let b = ((loopIndex + 1) * 3 * 159) % 127
+            ctx.save()
+            ctx.strokeStyle = `rgb(${r},${g},${b})`
+            ctx.beginPath()
+            ctx.lineWidth = 0.1;
+            vertIndices.forEach((vertIndex, i) => {
+              let vert = primalVertices[vertIndex]
+              if (i == 0) {
+                ctx.moveTo(vert[0], vert[1])
+              } else {
+                ctx.lineTo(vert[0], vert[1])
+              }
+            })
+            ctx.stroke()
+            ctx.restore()
+          })
+        }
+      }
+
       ctx.restore()
     }
   }
