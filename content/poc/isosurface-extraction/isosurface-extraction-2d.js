@@ -96,16 +96,16 @@ async function IsosurfaceExtraction2DBegin() {
   }
 
   async function RenderFrame() {
-    const cellDiameter = 32
+    const cellDiameter = 64
     const cellRadius = cellDiameter / 2
 
     ctx.reset()
     ctx.scale(1, -1)
     ctx.translate(0, -canvas.height)
-    ctx.translate(-400, -300)
-    ctx.scale(4, 4)
-    ctx.translate(-200, -30)
-    ctx.lineWidth = 0.1
+    // ctx.translate(-400, -300)
+    // ctx.scale(4, 4)
+    // ctx.translate(-200, -30)
+    // ctx.lineWidth = 0.1
     // fill the canvas with sdf coloring
     {
       for (let y = 0; y < canvas.height; y++) {
@@ -308,17 +308,17 @@ async function IsosurfaceExtraction2DBegin() {
 
           borderCrossingCells.push(yoff + x)
 
-          ctx.save()
-          ctx.scale(1, -1)
-          ctx.translate(0, -canvas.height)
-          ctx.fillStyle = '#ffd1d5'
-          ctx.font = "3px Hack, monospace"
-          ctx.fillText(
-            `${yoff + x} ${cellCodes[yoff + x].toString(2).padStart(4, '0')}b ${cellCodes[yoff + x]}`,
-            x * cellDiameter + 10,
-            canvas.height - (y + 1) * cellDiameter + 14
-          )
-          ctx.restore()
+          // ctx.save()
+          // ctx.scale(1, -1)
+          // ctx.translate(0, -canvas.height)
+          // ctx.fillStyle = '#ffd1d5'
+          // ctx.font = "3px Hack, monospace"
+          // ctx.fillText(
+          //   `${yoff + x} ${cellCodes[yoff + x].toString(2).padStart(4, '0')}b ${cellCodes[yoff + x]}`,
+          //   x * cellDiameter + 10,
+          //   canvas.height - (y + 1) * cellDiameter + 14
+          // )
+          // ctx.restore()
         }
       }
 
@@ -395,9 +395,6 @@ async function IsosurfaceExtraction2DBegin() {
           })
         })
 
-        console.log(primalSegments)
-        console.log(primalVertices)
-
         ctx.save()
         ctx.strokeStyle = '#fa6e79'
         ctx.lineWidth = 1;
@@ -439,7 +436,7 @@ async function IsosurfaceExtraction2DBegin() {
 
         // Populate the queue with a single item
         {
-          borderCrossingCells.forEach(cellIndex => {
+          borderCrossingCells.reverse().forEach(cellIndex => {
             let code = cellCodes[cellIndex]
             let edges = CodeToEdges[code]
             queue.push({
@@ -454,7 +451,9 @@ async function IsosurfaceExtraction2DBegin() {
           let cellIndex = job.cellIndex
 
           let code = cellCodes[cellIndex]
-          let visited = cellVisited[cellIndex]
+          if (cellVisited[cellIndex] == code) {
+            continue;
+          }
 
           let edges = CodeToEdges[code]
 
@@ -463,26 +462,29 @@ async function IsosurfaceExtraction2DBegin() {
 
             let edgePair = edges[edgeIndex]
 
-            console.log(cellIndex, 'start', edgeIndex, edgePair)
             let startEdge = edgePair[0]
             let endEdge = edgePair[1]
 
             let startMask = 1 << startEdge
             let endMask = 1 << endEdge
-
+            let visited = cellVisited[cellIndex]
             if ((visited & startMask) != 0) {
               continue
             }
+            if ((cellVisited[cellIndex] & endMask) != 0) {
+              continue
+            }
+
             // Skip edges that do not continue the current contour
             if (startEdge != job.edgeIndex) {
-              queue.push({
+              // Note: put this at the front of the queue so that we don't end up processing it first
+              //       the priority is to continue the contour that got us to this cell
+              queue.unshift({
                 cellIndex: cellIndex,
                 edgeIndex: startEdge
               })
-              console.log(cellIndex, 'miss', startEdge, job.edgeIndex,)
               continue
             }
-            console.log(cellIndex, 'hit', startEdge, job.edgeIndex)
 
             cellVisited[cellIndex] |= (startMask | endMask)
 
@@ -500,30 +502,7 @@ async function IsosurfaceExtraction2DBegin() {
 
             loop.push(endVertIndex)
 
-            ctx.fillStyle = "#ff0"
-            ctx.beginPath()
-            ctx.arc(
-              startVert[0],
-              startVert[1],
-              6,
-              0,
-              TAU
-            )
-            ctx.fill();
-
-            ctx.strokeStyle = "#0ff"
-            ctx.beginPath()
-            ctx.arc(
-              endVert[0],
-              endVert[1],
-              10,
-              0,
-              TAU
-            )
-            ctx.stroke();
-
             let transition = CellEdgeTransition[endEdge]
-            console.log('process edge', job.edgeIndex, 'cell', cellIndex, 'nextCell', cellIndex + transition, 'endEdge', endEdge, edges[edgeIndex])
             let nextCellIndex = cellIndex + transition
             queue.push({
               cellIndex: nextCellIndex,
@@ -533,20 +512,19 @@ async function IsosurfaceExtraction2DBegin() {
 
           // finalize the current loop
           if (queueLength == queue.length) {
-            console.log('finish loop', loop)
             loops.push(loop)
             loop = []
           }
 
 
+          ctx.save()
           loops.forEach((vertIndices, loopIndex) => {
             let r = ((loopIndex + 1) * 158) % 255
             let g = ((loopIndex + 1) * 2 * 156) % 255
             let b = ((loopIndex + 1) * 3 * 159) % 127
-            ctx.save()
             ctx.strokeStyle = `rgb(${r},${g},${b})`
             ctx.beginPath()
-            ctx.lineWidth = 0.1;
+            ctx.lineWidth = 3
             vertIndices.forEach((vertIndex, i) => {
               let vert = primalVertices[vertIndex]
               if (i == 0) {
@@ -556,8 +534,8 @@ async function IsosurfaceExtraction2DBegin() {
               }
             })
             ctx.stroke()
-            ctx.restore()
           })
+          ctx.restore()
         }
       }
 
