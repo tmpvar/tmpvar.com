@@ -87,7 +87,7 @@ export default function CreateCamera(ctx) {
   canvas.addEventListener('mousedown', handleMouseDown)
   canvas.addEventListener('mouseup', handleMouseUp)
   canvas.addEventListener('mousemove', handleMouseMove)
-  canvas.addEventListener('mousewheel', handleMouseWheel, { passive: false })
+  canvas.addEventListener('wheel', handleMouseWheel, { passive: false })
   canvas.addEventListener('resize', handleResize)
 
   function handleMouseDown(e) {
