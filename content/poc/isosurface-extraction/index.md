@@ -17,7 +17,7 @@ description = "Playground for various isosurface extraction techniques"
       subdivide while collecting loops<input type="checkbox" value="1" checked />
     </div>
     <div class="subdivideWhileCollectingLoopsMaxSubdivisions-control control">
-      max subdivisions: <input type="range" min="0" max="50" value="10">
+      max subdivisions: <input type="range" min="0" max="100" value="10">
       <output></output>
     </div>
   </section>
