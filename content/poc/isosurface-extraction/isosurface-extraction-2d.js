@@ -92,6 +92,23 @@ async function IsosurfaceExtraction2DBegin() {
     return d
   }
 
+  function SDFNormal(out, x, y) // for function f(p)
+  {
+    let h = 0.0001; // replace by an appropriate value
+
+    let s0 = SampleSDF(x - h, y - h)
+    let s1 = SampleSDF(x + h, y - h)
+    let s2 = SampleSDF(x - h, y + h)
+    let s3 = SampleSDF(x + h, y + h)
+
+    let nx = -s0 + s1 - s2 + s3
+    let ny = -s0 - s1 + s2 + s3
+
+    let l = Math.sqrt(nx * nx + ny * ny)
+    out[0] = nx / l
+    out[1] = ny / l
+  }
+
   function Sign(d) {
     return d <= 0 ? -1 : 1
   }
@@ -130,8 +147,6 @@ async function IsosurfaceExtraction2DBegin() {
     }
   }
 
-
-
   function SubdivideSegment(startx, starty, endx, endy, loop, remainingSteps) {
     if (remainingSteps <= 0) {
       return
@@ -139,8 +154,20 @@ async function IsosurfaceExtraction2DBegin() {
 
     let mx = (endx + startx) * 0.5
     let my = (endy + starty) * 0.5
-
+    let normal = [0, 0]
+    SDFNormal(normal, mx, my)
     let d = SampleSDF(mx, my)
+
+    // negate normal so we point towards the surface
+    let ex = mx + -normal[0] * d
+    let ey = my + -normal[1] * d
+
+    ctx.beginPath()
+    ctx.strokeStyle = "#f0f"
+    ctx.lineWidth = 1;
+    ctx.moveTo(mx, my)
+    ctx.lineTo(ex, ey)
+    ctx.stroke()
 
     let epsilon = 1.0
     if (Math.abs(d) < epsilon) {
@@ -157,17 +184,19 @@ async function IsosurfaceExtraction2DBegin() {
 
     // nx *= -Sign(d)
 
-    let ex = mx + ny * state.params.cellDiameter * 0.5 * Sign(d)
-    let ey = my - nx * state.params.cellDiameter * 0.5 * Sign(d)
+    // let ex = mx + ny * state.params.cellDiameter * 0.5 * Sign(d)
+    // let ey = my - nx * state.params.cellDiameter * 0.5 * Sign(d)
+
     let foundPos = [0, 0]
     let found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), 0.1, 100)
 
-    ctx.beginPath()
-    ctx.strokeStyle = found ? "green" : 'red'
-    ctx.lineWidth = 1;
-    ctx.moveTo(mx, my)
-    ctx.lineTo(ex, ey)
-    ctx.stroke()
+
+    // ctx.beginPath()
+    // ctx.strokeStyle = found ? "green" : 'red'
+    // ctx.lineWidth = 1;
+    // ctx.moveTo(mx, my)
+    // ctx.lineTo(ex, ey)
+    // ctx.stroke()
 
     if (found) {
 
