@@ -10,7 +10,7 @@ description = "Playground for various isosurface extraction techniques"
 <section id="isosurface-extraction-2d-content">
   <section class="controls">
     <div class="cellDiameter-control control">
-      cell diameter: <input type="range" min="4" max="9" value="5">
+      cell diameter: <input type="range" min="2" max="9" value="5">
       <output></output>
     </div>
   </section>
