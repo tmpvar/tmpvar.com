@@ -26,7 +26,12 @@ async function IsosurfaceExtraction2DBegin() {
       return newValue
     })
 
+    Param('subdivideWhileCollectingLoopsMaxSubdivisions', 'i32', (parentEl, value, oldValue) => {
+      parentEl.querySelector('output').innerHTML = `${value}`
+      return value
+    })
 
+    Param('subdivideWhileCollectingLoops', 'bool')
   }
 
   function SDFSphere(px, py, cx, cy, r) {
@@ -87,17 +92,17 @@ async function IsosurfaceExtraction2DBegin() {
     return d <= 0 ? -1 : 1
   }
 
-  function LineSearch(out, sx, sy, sd, ex, ey, ed, epsilon) {
+  function LineSearch(out, sx, sy, sd, ex, ey, ed, epsilon, remainingSteps) {
     if (Math.abs(sd) <= epsilon) {
       out[0] = sx
       out[1] = sy
-      return
+      return true
     }
 
     if (Math.abs(ed) <= epsilon) {
       out[0] = ex
       out[1] = ey
-      return
+      return true
     }
 
     let mx = (sx + ex) * 0.5
@@ -107,13 +112,73 @@ async function IsosurfaceExtraction2DBegin() {
     if (Math.abs(md) <= epsilon) {
       out[0] = mx
       out[1] = my
-      return
+      return true
+    }
+
+    if (remainingSteps < 0) {
+      return false
     }
 
     if ((sd < 0.0 && md >= 0) || (sd >= 0.0 && md < 0.0)) {
-      LineSearch(out, mx, my, md, sx, sy, md, epsilon)
+      return LineSearch(out, mx, my, md, sx, sy, md, epsilon, remainingSteps - 1)
     } else {
-      LineSearch(out, mx, my, md, ex, ey, ed, epsilon)
+      return LineSearch(out, mx, my, md, ex, ey, ed, epsilon, remainingSteps - 1)
+    }
+  }
+
+
+
+  function SubdivideSegment(startx, starty, endx, endy, loop, remainingSteps) {
+    if (remainingSteps <= 0) {
+      return
+    }
+
+    let mx = (endx + startx) * 0.5
+    let my = (endy + starty) * 0.5
+
+    let d = SampleSDF(mx, my)
+
+    let epsilon = 1.0
+    if (Math.abs(d) < epsilon) {
+      return
+    }
+
+
+    let nx = endx - startx
+    let ny = endy - starty
+
+    let l = Math.sqrt(nx * nx + ny * ny)
+    nx /= l
+    ny /= l
+
+    // nx *= -Sign(d)
+
+    let ex = mx + ny * state.params.cellDiameter * 0.5 * Sign(d)
+    let ey = my - nx * state.params.cellDiameter * 0.5 * Sign(d)
+    let foundPos = [0, 0]
+    let found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), 0.1, 100)
+
+    ctx.beginPath()
+    ctx.strokeStyle = found ? "green" : 'red'
+    ctx.lineWidth = 1;
+    ctx.moveTo(mx, my)
+    ctx.lineTo(ex, ey)
+    ctx.stroke()
+
+    if (found) {
+
+      ctx.fillStyle = "#0FF"
+      ctx.moveTo(foundPos[0], foundPos[1])
+      ctx.arc(foundPos[0], foundPos[1], 4.0, 0, TAU)
+      ctx.fill()
+
+      SubdivideSegment(startx, starty, foundPos[0], foundPos[1], loop, remainingSteps - 1)
+
+      loop.push(state.primalVertices.length)
+      state.primalVertices.push(foundPos)
+
+      SubdivideSegment(foundPos[0], foundPos[1], endx, endy, loop, remainingSteps - 1)
+
     }
   }
 
@@ -121,7 +186,7 @@ async function IsosurfaceExtraction2DBegin() {
     window.requestAnimationFrame(RenderFrame)
 
     ReadParams()
-    const needRebuild = state.dirty
+    const needRebuild = state.dirty || state.camera.dirty
     if (!needRebuild && !state.camera.dirty) {
       return
     }
@@ -440,7 +505,6 @@ async function IsosurfaceExtraction2DBegin() {
       state.loops = []
       let loop = []
       let queue = []
-
       // Populate the queue with a single item
       {
         state.borderCrossingCells.reverse().forEach(cellIndex => {
@@ -505,6 +569,12 @@ async function IsosurfaceExtraction2DBegin() {
             loop.push(startVertIndex)
           }
 
+          if (state.params.subdivideWhileCollectingLoops) {
+            let start = state.primalVertices[startVertIndex]
+            let end = state.primalVertices[endVertIndex]
+            SubdivideSegment(start[0], start[1], end[0], end[1], loop, state.params.subdivideWhileCollectingLoopsMaxSubdivisions)
+          }
+
           loop.push(endVertIndex)
 
           let transition = CellEdgeTransition[endEdge]
@@ -532,7 +602,7 @@ async function IsosurfaceExtraction2DBegin() {
         let b = ((loopIndex + 1) * 3 * 159) % 127
         ctx.strokeStyle = `rgb(${r},${g},${b})`
         ctx.beginPath()
-        ctx.lineWidth = 3
+        ctx.lineWidth = 1
         vertIndices.forEach((vertIndex, i) => {
           let vert = state.primalVertices[vertIndex]
           if (i == 0) {
