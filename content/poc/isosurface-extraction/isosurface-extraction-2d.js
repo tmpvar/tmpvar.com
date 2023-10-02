@@ -202,7 +202,7 @@ async function IsosurfaceExtraction2DBegin() {
 
       ctx.fillStyle = "#0FF"
       ctx.moveTo(foundPos[0], foundPos[1])
-      ctx.arc(foundPos[0], foundPos[1], 4.0, 0, TAU)
+      ctx.arc(foundPos[0], foundPos[1], 4.0 / (state.camera.state.zoom * 0.5), 0, TAU)
       ctx.fill()
 
       SubdivideSegment(startx, starty, foundPos[0], foundPos[1], loop, remainingSteps - 1)
