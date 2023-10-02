@@ -40,10 +40,11 @@ async function IsosurfaceExtraction2DBegin() {
     })
 
     Param('subdivideWhileCollectingLoops', 'bool', (parentEl, value, oldValue) => {
-      let input = controlEl.querySelector('.subdivideWhileCollectingLoopsMaxSubdivisions-control input')
-      input.disabled = !value
+      controlEl.querySelector('.subdivideWhileCollectingLoopsMaxSubdivisions-control input').disabled = !value
+      controlEl.querySelector('.subdivideWhileCollectingLoopsUseSegmentBisector-control input').disabled = !value
       return value
     })
+    Param('subdivideWhileCollectingLoopsUseSegmentBisector', 'bool')
   }
 
   function SDFSphere(px, py, cx, cy, r) {
@@ -166,16 +167,6 @@ async function IsosurfaceExtraction2DBegin() {
     SDFNormal(normal, mx, my)
     let d = SampleSDF(mx, my)
 
-    // negate normal so we point towards the surface
-    let ex = mx + -normal[0] * d
-    let ey = my + -normal[1] * d
-
-    ctx.beginPath()
-    ctx.strokeStyle = "#f0f"
-    ctx.moveTo(mx, my)
-    ctx.lineTo(ex, ey)
-    ctx.stroke()
-
     let epsilon = 1.0
     if (Math.abs(d) < epsilon) {
       return
@@ -190,12 +181,34 @@ async function IsosurfaceExtraction2DBegin() {
     ny /= l
 
     // nx *= -Sign(d)
-
-    // let ex = mx + ny * state.params.cellDiameter * 0.5 * Sign(d)
-    // let ey = my - nx * state.params.cellDiameter * 0.5 * Sign(d)
-
+    let found = false
     let foundPos = [0, 0]
-    let found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), 0.1, 100)
+    if (state.params.subdivideWhileCollectingLoopsUseSegmentBisector) {
+      let ex = mx + ny * d * 2.0
+      let ey = my - nx * d * 2.0
+      found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), 0.1, 100)
+      if (found) {
+        ctx.beginPath()
+        ctx.strokeStyle = "#fff"
+        ctx.moveTo(mx, my)
+        ctx.lineTo(ex, ey)
+        ctx.stroke()
+      }
+    }
+
+    if (!found) {
+      // negate normal so we point towards the surface
+      let ex = mx + -normal[0] * d
+      let ey = my + -normal[1] * d
+      found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), 0.1, 100)
+      if (found) {
+        ctx.beginPath()
+        ctx.strokeStyle = "#f0f"
+        ctx.moveTo(mx, my)
+        ctx.lineTo(ex, ey)
+        ctx.stroke()
+      }
+    }
 
 
     // ctx.beginPath()
@@ -223,13 +236,13 @@ async function IsosurfaceExtraction2DBegin() {
   }
 
   async function RenderFrame() {
-    window.requestAnimationFrame(RenderFrame)
-
     ReadParams()
     const needRebuild = state.dirty || state.camera.dirty
     if (!needRebuild && !state.camera.dirty) {
+      window.requestAnimationFrame(RenderFrame)
       return
     }
+
     state.dirty = false
 
     const cellDiameter = state.params.cellDiameter
@@ -691,7 +704,7 @@ async function IsosurfaceExtraction2DBegin() {
 
     state.camera.end()
     ctx.restore()
-
+    window.requestAnimationFrame(RenderFrame)
   }
 
   RenderFrame()

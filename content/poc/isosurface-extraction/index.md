@@ -20,6 +20,9 @@ description = "Playground for various isosurface extraction techniques"
       max subdivisions: <input type="range" min="0" max="100" value="10">
       <output></output>
     </div>
+    <div class="subdivideWhileCollectingLoopsUseSegmentBisector-control control">
+      while subdividing, try to use the segment normal<input type="checkbox" value="1" checked />
+    </div>
   </section>
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
