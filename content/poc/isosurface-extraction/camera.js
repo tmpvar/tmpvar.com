@@ -34,6 +34,7 @@ export default function CreateCamera(ctx) {
   }
 
   function begin() {
+    state.dirty = false
     ctx.save()
     ctx.scale(state.zoom, state.zoom)
     ctx.translate(state.translation[0], state.translation[1])
@@ -41,7 +42,6 @@ export default function CreateCamera(ctx) {
 
   function end() {
     ctx.restore()
-    state.dirty = false
     return state
   }
 
