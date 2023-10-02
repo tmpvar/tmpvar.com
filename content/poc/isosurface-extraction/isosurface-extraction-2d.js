@@ -9,11 +9,19 @@ async function IsosurfaceExtraction2DBegin() {
 
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('2d')
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const imageData = new ImageData(canvas.width, canvas.height)
 
   const state = {
     params: {},
     dirty: true,
+  }
+
+  // create a temporary canvas
+  {
+    let tmp = document.createElement('canvas')
+    tmp.width = canvas.width;
+    tmp.height = canvas.height
+    state.bitmap = tmp.getContext('2d')
   }
 
   state.camera = CreateCamera(ctx, canvas)
@@ -254,11 +262,11 @@ async function IsosurfaceExtraction2DBegin() {
           }
         }
       }
-      state.bitmap = await createImageBitmap(imageData)
+      state.bitmap.putImageData(imageData, 0, 0)
     }
 
     ctx.imageSmoothingEnabled = false
-    ctx.drawImage(state.bitmap, 0, 0, canvas.width, canvas.height)
+    ctx.drawImage(state.bitmap.canvas, 0, 0, canvas.width, canvas.height)
     ctx.imageSmoothingEnabled = true
 
     // compute a grid of corner oriented values
