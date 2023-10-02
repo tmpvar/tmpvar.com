@@ -31,7 +31,11 @@ async function IsosurfaceExtraction2DBegin() {
       return value
     })
 
-    Param('subdivideWhileCollectingLoops', 'bool')
+    Param('subdivideWhileCollectingLoops', 'bool', (parentEl, value, oldValue) => {
+      let input = controlEl.querySelector('.subdivideWhileCollectingLoopsMaxSubdivisions-control input')
+      input.disabled = !value
+      return value
+    })
   }
 
   function SDFSphere(px, py, cx, cy, r) {
