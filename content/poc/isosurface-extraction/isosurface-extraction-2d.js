@@ -208,11 +208,11 @@ async function IsosurfaceExtraction2DBegin() {
     let normal = [0, 0]
     SDFNormal(normal, mx, my)
 
-    ctx.beginPath()
-    ctx.strokeStyle = "#f50"
-    ctx.moveTo(mx, my)
-    ctx.lineTo(mx + normal[0] * 50.0, my + normal[1] * 50.0)
-    ctx.stroke()
+    // ctx.beginPath()
+    // ctx.strokeStyle = "#f50"
+    // ctx.moveTo(mx, my)
+    // ctx.lineTo(mx + normal[0] * 50.0, my + normal[1] * 50.0)
+    // ctx.stroke()
 
     let d = SampleSDF(mx, my)
 
@@ -277,11 +277,11 @@ async function IsosurfaceExtraction2DBegin() {
 
       found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), state.params.epsilon, 20)
       if (found) {
-        ctx.beginPath()
-        ctx.strokeStyle = "#fff"
-        ctx.moveTo(mx, my)
-        ctx.lineTo(ex, ey)
-        ctx.stroke()
+        // ctx.beginPath()
+        // ctx.strokeStyle = "#fff"
+        // ctx.moveTo(mx, my)
+        // ctx.lineTo(ex, ey)
+        // ctx.stroke()
       }
     }
 
@@ -291,11 +291,11 @@ async function IsosurfaceExtraction2DBegin() {
       let ey = my + -normal[1] * d
       found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), state.params.epsilon, 20)
       if (found) {
-        ctx.beginPath()
-        ctx.strokeStyle = "#f0f"
-        ctx.moveTo(mx, my)
-        ctx.lineTo(ex, ey)
-        ctx.stroke()
+        // ctx.beginPath()
+        // ctx.strokeStyle = "#f0f"
+        // ctx.moveTo(mx, my)
+        // ctx.lineTo(ex, ey)
+        // ctx.stroke()
       }
     }
 
@@ -728,7 +728,7 @@ async function IsosurfaceExtraction2DBegin() {
         }
 
         // finalize the current loop
-        if (queueLength == queue.length) {
+        if (queueLength == queue.length && loop.length) {
           state.loops.push(loop)
           loop = []
         }
@@ -744,7 +744,7 @@ async function IsosurfaceExtraction2DBegin() {
         let b = ((loopIndex + 1) * 3 * 159) % 127
         ctx.strokeStyle = `rgb(${r},${g},${b})`
         ctx.beginPath()
-        ctx.lineWidth = 1
+        ctx.lineWidth = 4.0
         vertIndices.forEach((vertIndex, i) => {
           let vert = state.primalVertices[vertIndex]
           if (i == 0) {
@@ -790,9 +790,29 @@ async function IsosurfaceExtraction2DBegin() {
         }
       }
     }
-
     state.camera.end()
     ctx.restore()
+
+    // draw stats
+    {
+      ctx.translate(10, 30)
+      ctx.fillStyle = '#fff'
+      ctx.font = `20px Hack, monospace`
+      ctx.fillText(
+        `loops: ${state.loops.length}`,
+        0, 0
+      )
+
+      ctx.translate(0, 25)
+      ctx.fillStyle = '#fff'
+      ctx.font = `20px Hack, monospace`
+      ctx.fillText(
+        `verts: ${state.loops.reduce((p, a) => p + a.length, 0)}`,
+        0, 0
+      )
+    }
+
+
     window.requestAnimationFrame(RenderFrame)
   }
 
