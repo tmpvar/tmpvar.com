@@ -2,6 +2,7 @@ import CreateParamReader from "./params.js"
 import CreateCamera from "./camera.js"
 
 function SubdividewDual2DBegin(rootEl) {
+  let controlEl = rootEl.querySelector('.controls')
   let canvas = rootEl.querySelector('canvas')
   let ctx = canvas.getContext('2d')
   const state = {
@@ -115,13 +116,50 @@ function SubdividewDual2DBegin(rootEl) {
 
 
 
-  const Param = CreateParamReader
+  const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
+    Param('maxDepth', 'f32', (parentEl, value, oldValue) => {
+      parentEl.querySelector('output').innerHTML = `${value}`
+      return value
+    })
 
+    Param('isolevel', 'f32', (parentEl, value, oldValue) => {
+      parentEl.querySelector('output').innerHTML = `${value}`
+      return value
+    })
   }
 
-  function SubdivideSquare(lx, ly, radius) {
+  function SubdivideSquare(cx, cy, radius, remainingSteps) {
+    if (remainingSteps == 0) {
+      return
+    }
+    ctx.strokeStyle = "#444"
+    let padding = radius / remainingSteps
+    let diameter = radius * 2.0
+    ctx.strokeRect(
+      (cx - radius),
+      (cy - radius),
+      diameter,
+      diameter)
 
+    let d = SampleSDF(cx, cy)
+
+    if (Math.abs(d) <= radius * 1.5) {
+      if (remainingSteps == 1) {
+        ctx.fillStyle = "#9de64e"
+        ctx.fillRect(
+          (cx - radius),
+          (cy - radius),
+          diameter,
+          diameter
+        )
+      }
+      let nextRadius = radius * 0.5
+      SubdivideSquare(cx - nextRadius, cy - nextRadius, nextRadius, remainingSteps - 1)
+      SubdivideSquare(cx + nextRadius, cy - nextRadius, nextRadius, remainingSteps - 1)
+      SubdivideSquare(cx - nextRadius, cy + nextRadius, nextRadius, remainingSteps - 1)
+      SubdivideSquare(cx + nextRadius, cy + nextRadius, nextRadius, remainingSteps - 1)
+    }
   }
 
   function RenderFrame() {
@@ -134,7 +172,13 @@ function SubdividewDual2DBegin(rootEl) {
 
     ctx.reset()
     state.camera.begin()
-    ctx.fillRect(0, 0, 10, 100)
+    ctx.scale(1, -1)
+    ctx.translate(0, -canvas.height)
+
+    let radius = canvas.width / 2
+    SubdivideSquare(radius, radius, radius, state.params.maxDepth)
+
+
     state.camera.end()
     requestAnimationFrame(RenderFrame)
   }
