@@ -45,6 +45,7 @@ async function IsosurfaceExtraction2DBegin() {
       return value
     })
     Param('subdivideWhileCollectingLoopsUseSegmentBisector', 'bool')
+    Param('subdivideWhileCollectingLoopsUseBestCagePoint', 'bool')
   }
 
   function SDFSphere(px, py, cx, cy, r) {
@@ -89,12 +90,20 @@ async function IsosurfaceExtraction2DBegin() {
         32
       ))
 
+      d = Math.min(d, SDFSphere(
+        x,
+        y,
+        700,
+        708,
+        32
+      ))
+
       d = Math.max(d, -SDFSphere(
         x,
         y,
-        768,
+        720,
         512,
-        64
+        70
       ))
     }
 
@@ -156,6 +165,10 @@ async function IsosurfaceExtraction2DBegin() {
     }
   }
 
+  function Dot(ax, ay, bx, by) {
+    return ax * bx + ay * by
+  }
+
   function SubdivideSegment(startx, starty, endx, endy, loop, remainingSteps) {
     if (remainingSteps <= 0) {
       return
@@ -184,8 +197,49 @@ async function IsosurfaceExtraction2DBegin() {
     let found = false
     let foundPos = [0, 0]
     if (state.params.subdivideWhileCollectingLoopsUseSegmentBisector) {
+
       let ex = mx + ny * d * 2.0
       let ey = my - nx * d * 2.0
+
+      if (state.params.subdivideWhileCollectingLoopsUseBestCagePoint) {
+        let bestIndex = -1
+        let bestDot = -1
+        let bestDistance = -1.0
+        let gridx = Math.floor(mx / state.params.cellDiameter) * state.params.cellDiameter
+        let gridy = Math.floor(my / state.params.cellDiameter) * state.params.cellDiameter
+
+        // TODO: generate less garbage
+        let coords = [
+          [gridx, gridy + state.params.cellDiameter],
+          [gridx + state.params.cellDiameter, gridy + state.params.cellDiameter],
+          [gridx + state.params.cellDiameter, gridy],
+          [gridx, gridy],
+        ]
+
+        coords.forEach((coord, coordIndex) => {
+          let x = -(coord[0] - mx)
+          let y = -(coord[1] - my)
+
+          let result = Dot(x, y, ny, -nx)
+          if (result > bestDot) {
+            bestDot = result
+            bestIndex = coordIndex
+            bestDistance = Math.sqrt(x*x + y*y) * Sign(d)
+          }
+        })
+
+        if (bestDot <= 0) {
+          console.log(bestDot, bestIndex)
+        }
+
+        // Reduce the max distance by half in an attempt to avoid collecting features from other
+        // parts of the isosurface.
+        bestDistance *= 0.5
+
+        ex = mx + ny * bestDistance
+        ey = my - nx * bestDistance
+      }
+
       found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), 0.1, 100)
       if (found) {
         ctx.beginPath()

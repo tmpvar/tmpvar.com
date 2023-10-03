@@ -2,6 +2,11 @@ export default function CreateParamReader(state, controlEl) {
   return function Param(paramName, paramType, cb) {
     let selector = `.${paramName}-control`
     let parentEl = controlEl.querySelector(selector)
+    if (!parentEl) {
+      console.warn("could not locate '%s'", selector)
+      return false
+    }
+
     let el = parentEl.querySelector(['input', 'select'])
     if (!el) {
       console.warn("could not locate '%s input'", selector)
