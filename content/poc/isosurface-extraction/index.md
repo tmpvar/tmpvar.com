@@ -33,7 +33,7 @@ description = "Playground for various isosurface extraction techniques"
         while subdividing, try to use the segment normal<input type="checkbox" value="1" checked />
       </div>
       <div class="subdivideWhileCollectingLoopsUseBestCagePoint-control control">
-        control the length of the segment bisector by the nearest cage point<input type="checkbox" value="1" checked />
+        control the length of the segment bisector by the nearest cage point<input type="checkbox" value="1" />
       </div>
     </section>
   </section>
