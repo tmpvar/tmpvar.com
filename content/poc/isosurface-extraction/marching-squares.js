@@ -1,10 +1,10 @@
 import CreateParamReader from './params.js'
 import CreateCamera from './camera.js'
 
-async function IsosurfaceExtraction2DBegin() {
+async function MarchingSquaresBegin() {
   const TAU = Math.PI * 2.0
 
-  const rootEl = document.getElementById('isosurface-extraction-2d-content')
+  const rootEl = document.getElementById('marching-squares-content')
   const controlEl = rootEl.querySelector('.controls')
 
   const canvas = rootEl.querySelector('canvas')
@@ -819,4 +819,4 @@ async function IsosurfaceExtraction2DBegin() {
   RenderFrame()
 }
 
-IsosurfaceExtraction2DBegin()
+MarchingSquaresBegin()

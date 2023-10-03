@@ -7,7 +7,7 @@ description = "Playground for various isosurface extraction techniques"
 ## 2D
 
 ### Marching Squares
-<section id="isosurface-extraction-2d-content">
+<section id="marching-squares-content">
   <section class="controls">
     <div class="cellDiameter-control control">
       cell diameter: <input type="range" min="2" max="9" value="7">
@@ -40,5 +40,15 @@ description = "Playground for various isosurface extraction techniques"
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
-  <script type="module" src="isosurface-extraction-2d.js"></script>
+  <script type="module" src="marching-squares.js"></script>
+</section>
+
+### Subdivide Dual 2D
+<section id="subdivide-dual-2d-content">
+  <section class="controls">
+  </section>
+  <section class="center-align">
+    <canvas width="1024" height="1024"></canvas>
+  </section>
+  <script type="module" src="subdivide-dual-2d.js"></script>
 </section>
