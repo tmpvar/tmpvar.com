@@ -16,13 +16,18 @@ description = "Playground for various isosurface extraction techniques"
     <div class="subdivideWhileCollectingLoops-control control">
       subdivide while collecting loops<input type="checkbox" value="1" checked />
     </div>
-    <div class="subdivideWhileCollectingLoopsMaxSubdivisions-control control">
-      max subdivisions: <input type="range" min="0" max="100" value="10">
-      <output></output>
-    </div>
-    <div class="subdivideWhileCollectingLoopsUseSegmentBisector-control control">
-      while subdividing, try to use the segment normal<input type="checkbox" value="1" checked />
-    </div>
+    <section class="indent">
+      <div class="subdivideWhileCollectingLoopsMaxSubdivisions-control control">
+        max subdivisions: <input type="range" min="0" max="100" value="10">
+        <output></output>
+      </div>
+      <div class="subdivideWhileCollectingLoopsUseSegmentBisector-control control">
+        while subdividing, try to use the segment normal<input type="checkbox" value="1" checked />
+      </div>
+      <div class="subdivideWhileCollectingLoopsUseBestCagePoint-control control">
+        control the length of the segment bisector by the nearest cage point<input type="checkbox" value="1" checked />
+      </div>
+    </section>
   </section>
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
