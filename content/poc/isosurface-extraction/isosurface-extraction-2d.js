@@ -34,6 +34,16 @@ async function IsosurfaceExtraction2DBegin() {
       return newValue
     })
 
+    Param('epsilon', 'f32', (parentEl, value, oldValue) => {
+      parentEl.querySelector('output').innerHTML = `${value}`
+      return value
+    })
+
+    Param('isolevel', 'f32', (parentEl, value, oldValue) => {
+      parentEl.querySelector('output').innerHTML = `${value}`
+      return value
+    })
+
     Param('subdivideWhileCollectingLoopsMaxSubdivisions', 'i32', (parentEl, value, oldValue) => {
       parentEl.querySelector('output').innerHTML = `${value}`
       return value
@@ -53,6 +63,18 @@ async function IsosurfaceExtraction2DBegin() {
     let dy = py - cy
     return Math.sqrt(dx * dx + dy * dy) - r
   }
+
+  function SDFBox(px, py, bx, by) {
+    let dx = Math.abs(px) - bx;
+    let dy = Math.abs(py) - by;
+
+    let l = Math.sqrt(
+      Math.pow(Math.max(dx, 0.0), 2) +
+      Math.pow(Math.max(dy, 0.0), 2)
+    )
+    return l + Math.min(Math.max(dx, dy), 0.0);
+  }
+
 
   function SampleSDF(x, y) {
     let d = 1000.0;
@@ -107,12 +129,19 @@ async function IsosurfaceExtraction2DBegin() {
       ))
     }
 
+    let rx = canvas.width / 2
+    let ry = canvas.height / 2
+
+    d -= state.params.isolevel
+    // clamp the sdf into the box
+    d = Math.max(d, SDFBox(rx - x, ry - y, rx - 10, ry - 10))
+    // d = Math.min(d, SDFBox(rx - x, ry - y, rx, ry))
+
     return d
   }
 
-  function SDFNormal(out, x, y) // for function f(p)
-  {
-    let h = 0.0001; // replace by an appropriate value
+  function SDFNormal(out, x, y) {
+    let h = 0.0001;
 
     let s0 = SampleSDF(x - h, y - h)
     let s1 = SampleSDF(x + h, y - h)
@@ -178,10 +207,16 @@ async function IsosurfaceExtraction2DBegin() {
     let my = (endy + starty) * 0.5
     let normal = [0, 0]
     SDFNormal(normal, mx, my)
+
+    ctx.beginPath()
+    ctx.strokeStyle = "#f50"
+    ctx.moveTo(mx, my)
+    ctx.lineTo(mx + normal[0] * 50.0, my + normal[1] * 50.0)
+    ctx.stroke()
+
     let d = SampleSDF(mx, my)
 
-    let epsilon = 1.0
-    if (Math.abs(d) < epsilon) {
+    if (Math.abs(d) < state.params.epsilon) {
       return
     }
 
@@ -240,7 +275,7 @@ async function IsosurfaceExtraction2DBegin() {
         ey = my - nx * bestDistance
       }
 
-      found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), 0.1, 100)
+      found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), state.params.epsilon, 20)
       if (found) {
         ctx.beginPath()
         ctx.strokeStyle = "#fff"
@@ -254,7 +289,7 @@ async function IsosurfaceExtraction2DBegin() {
       // negate normal so we point towards the surface
       let ex = mx + -normal[0] * d
       let ey = my + -normal[1] * d
-      found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), 0.1, 100)
+      found = LineSearch(foundPos, mx, my, d, ex, ey, SampleSDF(ex, ey), state.params.epsilon, 20)
       if (found) {
         ctx.beginPath()
         ctx.strokeStyle = "#f0f"

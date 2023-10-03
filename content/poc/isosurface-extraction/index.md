@@ -13,6 +13,14 @@ description = "Playground for various isosurface extraction techniques"
       cell diameter: <input type="range" min="2" max="9" value="7">
       <output></output>
     </div>
+    <div class="epsilon-control control">
+      epsilon: <input type="range" min="0.1" max="10" value="0.5" step="0.1">
+      <output></output>
+    </div>
+    <div class="isolevel-control control">
+      isolevel: <input type="range" min="-500" max="500" value="0.0" step="0.1">
+      <output></output>
+    </div>
     <div class="subdivideWhileCollectingLoops-control control">
       subdivide while collecting loops<input type="checkbox" value="1" checked />
     </div>
