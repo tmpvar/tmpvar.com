@@ -148,23 +148,31 @@ function SubdividewDual2DBegin(rootEl) {
       if (remainingSteps == 1) {
         ctx.fillStyle = "#9de64e"
         ctx.fillRect(
-          (cx - radius),
-          (cy - radius),
-          diameter,
-          diameter
+          (cx - radius) + 1.0 / state.camera.state.zoom,
+          (cy - radius) + 1.0 / state.camera.state.zoom,
+          diameter - 2.0 / state.camera.state.zoom,
+          diameter - 2.0 / state.camera.state.zoom
         )
       }
       let nextRadius = radius * 0.5
-      SubdivideSquare(cx - nextRadius, cy - nextRadius, nextRadius, remainingSteps - 1)
-      SubdivideSquare(cx + nextRadius, cy - nextRadius, nextRadius, remainingSteps - 1)
-      SubdivideSquare(cx - nextRadius, cy + nextRadius, nextRadius, remainingSteps - 1)
-      SubdivideSquare(cx + nextRadius, cy + nextRadius, nextRadius, remainingSteps - 1)
+      let results = ([
+        SubdivideSquare(cx - nextRadius, cy + nextRadius, nextRadius, remainingSteps - 1),
+        SubdivideSquare(cx + nextRadius, cy + nextRadius, nextRadius, remainingSteps - 1),
+        SubdivideSquare(cx + nextRadius, cy - nextRadius, nextRadius, remainingSteps - 1),
+        SubdivideSquare(cx - nextRadius, cy - nextRadius, nextRadius, remainingSteps - 1),
+      ]).filter(Boolean)
+
+      if (results.length > 0) {
+        console.log(results)
+        return true
+      }
     }
+    return false
   }
 
   function RenderFrame() {
     ReadParams()
-    if (!state.dirty && !state.camera.state.dirty) {
+    if (!state.dirty && !state.camera.dirty) {
       requestAnimationFrame(RenderFrame)
       return
     }
@@ -172,9 +180,12 @@ function SubdividewDual2DBegin(rootEl) {
 
     ctx.reset()
     state.camera.begin()
+    ctx.fillStyle = "rgb(11, 11, 11)"
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
     ctx.scale(1, -1)
     ctx.translate(0, -canvas.height)
 
+    ctx.lineWidth = 1.0 / state.camera.state.zoom
     let radius = canvas.width / 2
     SubdivideSquare(radius, radius, radius, state.params.maxDepth)
 
