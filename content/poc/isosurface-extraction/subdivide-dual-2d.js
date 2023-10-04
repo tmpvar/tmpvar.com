@@ -119,16 +119,22 @@ function SubdividewDual2DBegin(rootEl) {
   function ReadParams() {
     Param('debugDrawNodeIndex', 'bool')
     Param('debugDrawNodeCornerState', 'bool')
+    Param('debugDrawDualGraph', 'bool')
 
     Param('maxDepth', 'f32', (parentEl, value, oldValue) => {
       parentEl.querySelector('output').innerHTML = `${value}`
       return value
     })
-
     Param('isolevel', 'f32', (parentEl, value, oldValue) => {
       parentEl.querySelector('output').innerHTML = `${value}`
       return value
     })
+
+    Param('maxExtractionSteps', 'i32', (parentEl, value, oldValue) => {
+      parentEl.querySelector('output').innerHTML = `${value}`
+      return value
+    })
+
   }
 
   function SubdivideSquare(nodes, cx, cy, radius, remainingSteps) {
@@ -368,11 +374,11 @@ function SubdividewDual2DBegin(rootEl) {
           AddNodeToNodeMapping(edge[0], edge[1], dx, dy)
         }
 
-        // {
-        //   let dx = nodeB.center[0] - nodeA.center[0]
-        //   let dy = nodeB.center[1] - nodeA.center[1]
-        //   AddNodeToNodeMapping(edge[1], edge[0], dx, dy)
-        // }
+        {
+          let dx = nodeB.center[0] - nodeA.center[0]
+          let dy = nodeB.center[1] - nodeA.center[1]
+          AddNodeToNodeMapping(edge[1], edge[0], dx, dy)
+        }
       }
     })
 
@@ -382,7 +388,7 @@ function SubdividewDual2DBegin(rootEl) {
         return
       }
 
-      ctx.fillStyle = '#5ab552'
+      ctx.fillStyle = '#006554'
       ctx.fillRect(
         node.center[0] - node.radius * 0.95,
         node.center[1] - node.radius * 0.95,
@@ -419,7 +425,13 @@ function SubdividewDual2DBegin(rootEl) {
       }
     })
 
+    let step = 0
     nodes.forEach(node => {
+      console.log(step, state.params.maxExtractionSteps)
+      if (step > state.params.maxExtractionSteps) {
+        return
+      }
+
       if (visitedNodes[node.index]) {
         return
       }
@@ -434,36 +446,27 @@ function SubdividewDual2DBegin(rootEl) {
 
         let nextNode = node
         let dirIndex = 0
-        let step = 0
+
         console.group('walk edge')
-        while (nextNode) {
-          ctx.strokeStyle = "red"
+        while (nextNode && step < state.params.maxExtractionSteps) {
+          console.log(step, state.params.maxExtractionSteps)
+          ctx.strokeStyle = "#9de64e"
           ctx.lineWidth = 5.0 / state.camera.state.zoom
 
           let nextNodeIndex = nextNode.index
           node = nextNode
           nextNode = null
 
-          if (nextNodeIndex == 256) {
-            console.log('currentDir', indexName[dirIndex], 'mapping:', nodeToNodeMapping[nextNodeIndex])
-          }
-
           for (let i = 3; i >= 0; i--) {
             let index = Math.abs((i + dirIndex) % 4)
             let otherNodeIndex = nodeToNodeMapping[nextNodeIndex][index]
 
-            // if (step == 26) {
-            //   console.log(i, otherNodeIndex)
-            // }
             if (otherNodeIndex == -1) {
               continue
             }
 
             let otherNode = nodes[otherNodeIndex]
 
-            if (nextNodeIndex == 256) {
-              console.log(index, indexName[index], otherNodeIndex, otherNode)
-            }
             if (otherNode.containsContour && !visitedNodes[otherNodeIndex]) {
               visitedNodes[otherNodeIndex] = true
               ctx.beginPath()
@@ -482,6 +485,7 @@ function SubdividewDual2DBegin(rootEl) {
               break
             }
           }
+          step++;
         }
         console.groupEnd('walk edge')
       }
@@ -489,18 +493,18 @@ function SubdividewDual2DBegin(rootEl) {
     })
     ctx.restore()
 
-    ctx.strokeStyle = "#3388de"
+    if (state.params.debugDrawDualGraph) {
+      ctx.strokeStyle = "#3388de"
+      ctx.beginPath()
+      edges.forEach(edge => {
+        let a = nodes[edge[0]]
+        let b = nodes[edge[1]]
 
-
-    ctx.beginPath()
-    edges.forEach(edge => {
-      let a = nodes[edge[0]]
-      let b = nodes[edge[1]]
-
-      ctx.moveTo(a.center[0], a.center[1])
-      ctx.lineTo(b.center[0], b.center[1])
-    })
-    ctx.stroke()
+        ctx.moveTo(a.center[0], a.center[1])
+        ctx.lineTo(b.center[0], b.center[1])
+      })
+      ctx.stroke()
+    }
 
     state.camera.end()
     requestAnimationFrame(RenderFrame)
