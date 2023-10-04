@@ -49,13 +49,14 @@ description = "Playground for various isosurface extraction techniques"
     <h4>Debug</h4>
     <div class="indent">
       <div class="debugDrawNodeIndex-control control">
-        draw node index<input type="checkbox" value="1" />
+        <input type="checkbox" value="1" checked />
+        <label>draw node index</label>
       </div>
       <div class="debugDrawNodeCornerState-control control">
-        draw node corner state<input type="checkbox" value="1" />
+        <input type="checkbox" value="1" /> draw node corner state
       </div>
       <div class="debugDrawDualGraph-control control">
-        draw dual graph<input type="checkbox" value="1" />
+        <input type="checkbox" value="1" /> draw dual graph
       </div>
       <div class="maxExtractionSteps-control control">
         <input type="range" min="0" max="5000" value="1"> max contour extraction steps =
