@@ -129,10 +129,7 @@ function SubdividewDual2DBegin(rootEl) {
     })
   }
 
-  function SubdivideSquare(cx, cy, radius, remainingSteps) {
-    if (remainingSteps == 0) {
-      return
-    }
+  function SubdivideSquare(nodes, cx, cy, radius, remainingSteps) {
     ctx.strokeStyle = "#444"
     let padding = radius / remainingSteps
     let diameter = radius * 2.0
@@ -144,30 +141,132 @@ function SubdividewDual2DBegin(rootEl) {
 
     let d = SampleSDF(cx, cy)
 
-    if (Math.abs(d) <= radius * 1.5) {
-      if (remainingSteps == 1) {
-        ctx.fillStyle = "#9de64e"
-        ctx.fillRect(
-          (cx - radius) + 1.0 / state.camera.state.zoom,
-          (cy - radius) + 1.0 / state.camera.state.zoom,
-          diameter - 2.0 / state.camera.state.zoom,
-          diameter - 2.0 / state.camera.state.zoom
-        )
-      }
-      let nextRadius = radius * 0.5
-      let results = ([
-        SubdivideSquare(cx - nextRadius, cy + nextRadius, nextRadius, remainingSteps - 1),
-        SubdivideSquare(cx + nextRadius, cy + nextRadius, nextRadius, remainingSteps - 1),
-        SubdivideSquare(cx + nextRadius, cy - nextRadius, nextRadius, remainingSteps - 1),
-        SubdivideSquare(cx - nextRadius, cy - nextRadius, nextRadius, remainingSteps - 1),
-      ]).filter(Boolean)
-
-      if (results.length > 0) {
-        console.log(results)
-        return true
-      }
+    let nodeIndex = nodes.length
+    let node = {
+      index: nodeIndex,
+      center: [cx, cy],
+      radius: radius,
+      distance: d,
+      children: [-1, -1, -1, -1],
+      mask: 0,
     }
-    return false
+    nodes.push(node)
+
+    if (remainingSteps == 0) {
+      return nodeIndex
+    }
+
+    if (Math.abs(d) <= radius * 1.4142135623730951) {
+      let nextRadius = radius * 0.5
+      let coords = [
+        [cx - nextRadius, cy - nextRadius],
+        [cx + nextRadius, cy - nextRadius],
+        [cx - nextRadius, cy + nextRadius],
+        [cx + nextRadius, cy + nextRadius],
+      ]
+
+      coords.forEach((coord, i) => {
+        let childNodeIndex = SubdivideSquare(
+          nodes,
+          coord[0],
+          coord[1],
+          nextRadius,
+          remainingSteps - 1
+        )
+        if (childNodeIndex > -1) {
+          node.mask |= 1<<i
+        }
+        node.children[i] = childNodeIndex
+      })
+      return nodeIndex
+    }
+
+    return nodeIndex
+  }
+
+  function HorizontalProc(nodes, edges, leftNodeIndex, rightNodeIndex) {
+    if (leftNodeIndex == -1 || rightNodeIndex == -1) {
+      return
+    }
+
+    let leftNode = nodes[leftNodeIndex]
+    let rightNode = nodes[rightNodeIndex]
+
+    if (rightNode.mask === 0 && leftNode.mask === 0) {
+      edges.push([leftNodeIndex, rightNodeIndex])
+      edges.push([rightNodeIndex, leftNodeIndex])
+      return
+    }
+
+    // left is a leaf
+    if (leftNode.mask === 0) {
+      HorizontalProc(nodes, edges, leftNodeIndex, rightNode.children[0]);
+      HorizontalProc(nodes, edges, leftNodeIndex, rightNode.children[2]);
+      return;
+    }
+
+    // right is a leaf
+    if (rightNode.mask === 0) {
+      HorizontalProc(nodes, edges, leftNode.children[1], rightNodeIndex);
+      HorizontalProc(nodes, edges, leftNode.children[3], rightNodeIndex);
+      return;
+    }
+
+    HorizontalProc(nodes, edges, leftNode.children[1], rightNode.children[0]);
+    HorizontalProc(nodes, edges, leftNode.children[3], rightNode.children[2]);
+  }
+
+  function VerticalProc(nodes, edges, upperNodeIndex, lowerNodeIndex) {
+    if (upperNodeIndex == -1 || lowerNodeIndex == -1) {
+      return
+    }
+
+    let upperNode = nodes[upperNodeIndex]
+    let lowerNode = nodes[lowerNodeIndex]
+
+    if (upperNode.mask === 0 && lowerNode.mask === 0) {
+      edges.push([upperNodeIndex, lowerNodeIndex])
+      edges.push([lowerNodeIndex, upperNodeIndex])
+      return
+    }
+
+    // upper is a leaf
+    if (upperNode.mask === 0) {
+      VerticalProc(nodes, edges, upperNodeIndex, lowerNode.children[2]);
+      VerticalProc(nodes, edges, upperNodeIndex, lowerNode.children[3]);
+      return
+    }
+
+    // lower is a leaf
+    if (lowerNode.mask == 0) {
+      VerticalProc(nodes, edges, upperNode.children[0], lowerNodeIndex);
+      VerticalProc(nodes, edges, upperNode.children[1], lowerNodeIndex);
+      return;
+    }
+
+    VerticalProc(nodes, edges, upperNode.children[0], lowerNode.children[2]);
+    VerticalProc(nodes, edges, upperNode.children[1], lowerNode.children[3]);
+  }
+
+  function FaceProc(nodes, edges, nodeIndex) {
+    let node = nodes[nodeIndex]
+    if (!nodes[nodeIndex].mask) {
+      return
+    }
+
+    for (let childIndex = 0; childIndex < 4; childIndex++) {
+      let childNodeIndex = node.children[childIndex]
+      if (childNodeIndex == -1) {
+        continue
+      }
+      FaceProc(nodes, edges, childNodeIndex)
+    }
+
+    VerticalProc(nodes, edges, node.children[2], node.children[0])
+    VerticalProc(nodes, edges, node.children[3], node.children[1])
+    HorizontalProc(nodes, edges, node.children[0], node.children[1])
+    HorizontalProc(nodes, edges, node.children[2], node.children[3])
+
   }
 
   function RenderFrame() {
@@ -187,8 +286,37 @@ function SubdividewDual2DBegin(rootEl) {
 
     ctx.lineWidth = 1.0 / state.camera.state.zoom
     let radius = canvas.width / 2
-    SubdivideSquare(radius, radius, radius, state.params.maxDepth)
+    let nodes = []
+    SubdivideSquare(nodes, radius, radius, radius, state.params.maxDepth)
 
+    let edges = []
+    FaceProc(nodes, edges, 0)
+    ctx.strokeStyle = "#3388de"
+
+    ctx.beginPath()
+    // console.log(nodes)
+    edges.forEach(edge => {
+      let a = nodes[edge[0]]
+      let b = nodes[edge[1]]
+
+      ctx.moveTo(a.center[0], a.center[1])
+      ctx.lineTo(b.center[0], b.center[1])
+    })
+    ctx.stroke()
+
+    // if (result) {
+    //   ctx.lineWidth = 2.0 / state.camera.state.zoom
+    //   ctx.strokeStyle = '#36c5f4'
+    //   ctx.beginPath()
+    //   result.forEach((v, i) => {
+    //     if (i == 0) {
+    //       ctx.moveTo(v[0], v[1])
+    //     } else {
+    //       ctx.lineTo(v[0], v[1])
+    //     }
+    //   })
+    //   ctx.stroke()
+    // }
 
     state.camera.end()
     requestAnimationFrame(RenderFrame)
