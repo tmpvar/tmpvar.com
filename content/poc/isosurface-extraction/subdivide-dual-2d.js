@@ -292,7 +292,7 @@ function SubdividewDual2DBegin(rootEl) {
     let edges = []
     FaceProc(nodes, edges, 0)
     ctx.strokeStyle = "#3388de"
-
+console.log(state.camera.state.zoom)
     ctx.beginPath()
     // console.log(nodes)
     edges.forEach(edge => {

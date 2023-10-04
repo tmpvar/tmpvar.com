@@ -60,7 +60,7 @@ export default function CreateCamera(ctx) {
     var ox = x / state.zoom
     var oy = y / state.zoom
 
-    zoomCamera(amount)
+    zoomCamera(amount * state.zoom)
 
     var nx = x / state.zoom
     var ny = y / state.zoom
