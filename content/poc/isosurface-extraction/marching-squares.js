@@ -327,7 +327,7 @@ async function MarchingSquaresBegin() {
   async function RenderFrame() {
     ReadParams()
     const needRebuild = state.dirty || state.camera.dirty
-    if (!needRebuild && !state.camera.dirty) {
+    if (!needRebuild) {
       window.requestAnimationFrame(RenderFrame)
       return
     }
