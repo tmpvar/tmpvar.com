@@ -137,9 +137,31 @@ function SubdividewDual2DBegin(rootEl) {
       (cx - radius),
       (cy - radius),
       diameter,
-      diameter)
+      diameter
+    )
 
     let d = SampleSDF(cx, cy)
+
+    let crossing = Math.abs(d) <= radius * 1.4142135623730951
+
+    if (remainingSteps === 0) {
+      let mask = 0
+      let corners = [
+        [cx - radius, cy - radius],
+        [cx + radius, cy - radius],
+        [cx - radius, cy + radius],
+        [cx + radius, cy + radius],
+      ]
+
+      corners.forEach((corner, i) => {
+        let d = SampleSDF(corner[0], corner[1])
+        if (d < 0) {
+          mask |= 1<<i
+        }
+      })
+
+      crossing = mask !== 0 && mask != 0b1111
+    }
 
     let nodeIndex = nodes.length
     let node = {
@@ -149,6 +171,8 @@ function SubdividewDual2DBegin(rootEl) {
       distance: d,
       children: [-1, -1, -1, -1],
       mask: 0,
+      remainingSteps: remainingSteps,
+      crossing: crossing
     }
     nodes.push(node)
 
@@ -156,7 +180,7 @@ function SubdividewDual2DBegin(rootEl) {
       return nodeIndex
     }
 
-    if (Math.abs(d) <= radius * 1.4142135623730951) {
+    if (crossing) {
       let nextRadius = radius * 0.5
       let coords = [
         [cx - nextRadius, cy - nextRadius],
@@ -291,10 +315,21 @@ function SubdividewDual2DBegin(rootEl) {
 
     let edges = []
     FaceProc(nodes, edges, 0)
+
+    nodes.forEach(node => {
+      if (node.remainingSteps === 0 && node.crossing) {
+        ctx.fillStyle = '#9de64e'
+        ctx.fillRect(
+          node.center[0] - node.radius * 0.95,
+          node.center[1] - node.radius * 0.95,
+          node.radius * 2.0 * 0.9,
+          node.radius * 2.0 * 0.9)
+      }
+    })
     ctx.strokeStyle = "#3388de"
-console.log(state.camera.state.zoom)
+
+
     ctx.beginPath()
-    // console.log(nodes)
     edges.forEach(edge => {
       let a = nodes[edge[0]]
       let b = nodes[edge[1]]
@@ -303,20 +338,6 @@ console.log(state.camera.state.zoom)
       ctx.lineTo(b.center[0], b.center[1])
     })
     ctx.stroke()
-
-    // if (result) {
-    //   ctx.lineWidth = 2.0 / state.camera.state.zoom
-    //   ctx.strokeStyle = '#36c5f4'
-    //   ctx.beginPath()
-    //   result.forEach((v, i) => {
-    //     if (i == 0) {
-    //       ctx.moveTo(v[0], v[1])
-    //     } else {
-    //       ctx.lineTo(v[0], v[1])
-    //     }
-    //   })
-    //   ctx.stroke()
-    // }
 
     state.camera.end()
     requestAnimationFrame(RenderFrame)
