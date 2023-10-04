@@ -2,6 +2,7 @@ import CreateParamReader from "./params.js"
 import CreateCamera from "./camera.js"
 
 function SubdividewDual2DBegin(rootEl) {
+  const TAU = Math.PI * 2
   let controlEl = rootEl.querySelector('.controls')
   let canvas = rootEl.querySelector('canvas')
   let ctx = canvas.getContext('2d')
@@ -114,10 +115,11 @@ function SubdividewDual2DBegin(rootEl) {
     return d <= 0 ? -1 : 1
   }
 
-
-
   const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
+    Param('debugDrawNodeIndex', 'bool')
+    Param('debugDrawNodeCornerState', 'bool')
+
     Param('maxDepth', 'f32', (parentEl, value, oldValue) => {
       parentEl.querySelector('output').innerHTML = `${value}`
       return value
@@ -388,14 +390,33 @@ function SubdividewDual2DBegin(rootEl) {
         node.radius * 2.0 * 0.9
       )
 
+      let samplePoints = [
+        [node.center[0] - node.radius, node.center[1] - node.radius],
+        [node.center[0] + node.radius, node.center[1] - node.radius],
+        [node.center[0] - node.radius, node.center[1] + node.radius],
+        [node.center[0] + node.radius, node.center[1] + node.radius],
+      ]
 
-      ctx.save()
-      ctx.scale(1, -1)
-      ctx.translate(0, -canvas.height)
-      ctx.font = "3px Hack, monospace"
-      ctx.fillStyle = 'white'
-      ctx.fillText(`${node.index}`, node.center[0] - node.radius, canvas.height - node.center[1])
-      ctx.restore()
+
+      if (state.params.debugDrawNodeCornerState) {
+        samplePoints.forEach(point => {
+          let d = SampleSDF(point[0], point[1])
+          ctx.fillStyle = (d <= 0) ? '#0f0' : '#f00'
+          ctx.beginPath()
+          ctx.arc(point[0], point[1], Math.min(2.0, 4.0 / state.camera.state.zoom), 0, TAU)
+          ctx.fill()
+        })
+      }
+
+      if (state.params.debugDrawNodeIndex && state.camera.state.zoom > 4.0) {
+        ctx.save()
+        ctx.scale(1, -1)
+        ctx.translate(0, -canvas.height)
+        ctx.font = `${12 / Math.max(1.0, state.camera.state.zoom)}px Hack, monospace`
+        ctx.fillStyle = 'white'
+        ctx.fillText(`idx:${node.index}`, node.center[0] - node.radius * .95, canvas.height - (node.center[1] + node.radius * 0.5))
+        ctx.restore()
+      }
     })
 
     nodes.forEach(node => {
