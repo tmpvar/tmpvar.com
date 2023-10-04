@@ -43,8 +43,8 @@ description = "Playground for various isosurface extraction techniques"
   <script type="module" src="marching-squares.js"></script>
 </section>
 
-### Subdivide Dual 2D
-<section id="subdivide-dual-2d-content">
+### Subdivide 2D
+<section id="subdivide-2d-content">
   <section class="controls">
     <h4>Debug</h4>
     <div class="indent">
@@ -59,18 +59,26 @@ description = "Playground for various isosurface extraction techniques"
         <input type="checkbox" value="1" /> draw dual graph
       </div>
       <div class="maxExtractionSteps-control control">
-        <input type="range" min="0" max="5000" value="1"> max contour extraction steps =
+        <input type="range" min="-1" max="5000" value="-1"> max contour extraction steps =
         <output></output>
       </div>
     </div>
     <h4>Params</h4>
     <div class="indent">
       <div class="maxDepth-control control">
-        <input type="range" min="0" max="15" value="6"> max subdivision depth =
+        <input type="range" min="0" max="15" value="5"> max subdivision depth =
         <output></output>
       </div>
       <div class="isolevel-control control">
         <input type="range" min="-500" max="500" value="0.0" step="0.1"> isolevel =
+        <output></output>
+      </div>
+      <div class="contourExtractionApproach-control control">
+        <select>
+            <option value="marching-squares">Marching Squares</option>
+            <option value="dual-contouring">Dual Contouring</option>
+        </select>
+        contour extraction approach
         <output></output>
       </div>
     </div>
@@ -78,5 +86,5 @@ description = "Playground for various isosurface extraction techniques"
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
-  <script type="module" src="subdivide-dual-2d.js"></script>
+  <script type="module" src="subdivide-2d.js"></script>
 </section>

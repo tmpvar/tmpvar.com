@@ -1,7 +1,7 @@
 import CreateParamReader from "./params.js"
 import CreateCamera from "./camera.js"
 
-function SubdividewDual2DBegin(rootEl) {
+function Subdivide2DBegin(rootEl) {
   const TAU = Math.PI * 2
   let controlEl = rootEl.querySelector('.controls')
   let canvas = rootEl.querySelector('canvas')
@@ -131,9 +131,14 @@ function SubdividewDual2DBegin(rootEl) {
     })
 
     Param('maxExtractionSteps', 'i32', (parentEl, value, oldValue) => {
+      if (value == -1) {
+        value = Infinity
+      }
       parentEl.querySelector('output').innerHTML = `${value}`
       return value
     })
+
+    Param('contourExtractionApproach', 'string')
 
   }
 
@@ -303,6 +308,158 @@ function SubdividewDual2DBegin(rootEl) {
 
   }
 
+  const ContourExtractionApproaches = {
+    'marching-squares': function MarchingSquares(nodes) {
+      console.log('marching squares')
+    },
+    'dual-contouring': function DualContouring(nodes) {
+      let edges = []
+      FaceProc(nodes, edges, 0)
+
+      if (state.params.debugDrawDualGraph) {
+        ctx.strokeStyle = "#3388de"
+        ctx.beginPath()
+        edges.forEach(edge => {
+          let a = nodes[edge[0]]
+          let b = nodes[edge[1]]
+
+          ctx.moveTo(a.center[0], a.center[1])
+          ctx.lineTo(b.center[0], b.center[1])
+        })
+        ctx.stroke()
+      }
+
+      let nodeToNodeMapping = {}
+      let visitedNodes = {}
+
+      function DirToIndex(dx, dy) {
+        // what index does dx/dy map to?
+        //     2
+        //    +-+
+        //  3 | | 1
+        //    +-+
+        //     0
+        if (dx != 0 && dy != 0) {
+          throw new Error('self reference')
+        }
+
+        if (dy < 0) {
+          return 0
+        }
+        if (dy > 0) {
+          return 1
+        }
+        if (dx > 0) {
+          return 2
+        }
+        if (dx < 0) {
+          return 3
+        }
+      }
+
+      function AddNodeToNodeMapping(fromIndex, toIndex, dx, dy) {
+        let outputIndex = DirToIndex(dx, dy)
+        if (!nodeToNodeMapping[fromIndex]) {
+          nodeToNodeMapping[fromIndex] = [-1, -1, -1, -1]
+        }
+
+        nodeToNodeMapping[fromIndex][outputIndex] = toIndex
+      }
+
+      edges.forEach(edge => {
+        let nodeA = nodes[edge[0]]
+        let nodeB = nodes[edge[1]]
+
+        if (nodeA.containsContour && nodeB.containsContour) {
+          {
+            let dx = Math.sign(nodeA.center[0] - nodeB.center[0])
+            let dy = Math.sign(nodeA.center[1] - nodeB.center[1])
+            AddNodeToNodeMapping(edge[0], edge[1], dx, dy)
+          }
+
+          {
+            let dx = nodeB.center[0] - nodeA.center[0]
+            let dy = nodeB.center[1] - nodeA.center[1]
+            AddNodeToNodeMapping(edge[1], edge[0], dx, dy)
+          }
+        }
+      })
+
+      let step = 0
+      nodes.forEach(node => {
+        if (step > state.params.maxExtractionSteps) {
+          return
+        }
+
+        if (visitedNodes[node.index]) {
+          return
+        }
+        visitedNodes[node.index] = true
+        if (!node.containsContour) {
+          return
+        }
+
+        // walk the edge
+        {
+          let indexName = ['down', 'right', 'up', 'left']
+
+          let nextNode = node
+          let dirIndex = 0
+
+
+          while (nextNode && step <= state.params.maxExtractionSteps) {
+            ctx.strokeStyle = "#9de64e"
+            ctx.lineWidth = 5.0 / state.camera.state.zoom
+
+            let nextNodeIndex = nextNode.index
+            node = nextNode
+            nextNode = null
+
+            for (let i = 3; i >= 0; i--) {
+              let index = Math.abs((i + dirIndex) % 4)
+              let otherNodeIndex = nodeToNodeMapping[nextNodeIndex][index]
+
+              if (step === state.params.maxExtractionSteps) {
+                console.log({ i, dirIndex, index, step, otherNodeIndex })
+              }
+
+              if (otherNodeIndex == -1) {
+                continue
+              }
+
+              let otherNode = nodes[otherNodeIndex]
+
+              if (otherNode.containsContour && !visitedNodes[otherNodeIndex]) {
+                visitedNodes[otherNodeIndex] = true
+                ctx.beginPath()
+                ctx.moveTo(node.center[0], node.center[1])
+                ctx.lineTo(otherNode.center[0], otherNode.center[1])
+                ctx.stroke()
+
+                nextNode = otherNode
+                // switch (index) {
+                //   case 0: dirIndex = 1; break;
+                //   case 1: dirIndex = 2; break;
+                //   case 2: dirIndex = 3; break;
+                //   case 3: dirIndex = 0; break;
+                // }
+                if (step === state.params.maxExtractionSteps) {
+                  console.log('break going', indexName[dirIndex], 'from', indexName[index])
+                }
+                dirIndex = index
+
+                break
+              }
+            }
+            step++;
+          }
+        }
+
+      })
+    }
+
+  }
+
   function RenderFrame() {
     ReadParams()
     if (!state.dirty && !state.camera.dirty) {
@@ -323,189 +480,54 @@ function SubdividewDual2DBegin(rootEl) {
     let nodes = []
     SubdivideSquare(nodes, radius, radius, radius, state.params.maxDepth)
 
-    let edges = []
-    FaceProc(nodes, edges, 0)
+    // Draw nodes
+    {
+      ctx.save()
+      nodes.forEach(node => {
+        if (!node.containsContour) {
+          return
+        }
 
-    let nodeToNodeMapping = {}
-    let visitedNodes = {}
+        ctx.fillStyle = '#006554'
+        ctx.fillRect(
+          node.center[0] - node.radius * 0.95,
+          node.center[1] - node.radius * 0.95,
+          node.radius * 2.0 * 0.9,
+          node.radius * 2.0 * 0.9
+        )
 
-    function DirToIndex(dx, dy) {
-      // what index does dx/dy map to?
-      //     2
-      //    +-+
-      //  3 | | 1
-      //    +-+
-      //     0
-      if (dx != 0 && dy != 0) {
-        throw new Error('self reference')
-      }
+        let samplePoints = [
+          [node.center[0] - node.radius, node.center[1] - node.radius],
+          [node.center[0] + node.radius, node.center[1] - node.radius],
+          [node.center[0] - node.radius, node.center[1] + node.radius],
+          [node.center[0] + node.radius, node.center[1] + node.radius],
+        ]
 
-      if (dy < 0) {
-        return 0
-      }
-      if (dy > 0) {
-        return 1
-      }
-      if (dx > 0) {
-        return 2
-      }
-      if (dx < 0) {
-        return 3
-      }
+
+        if (state.params.debugDrawNodeCornerState) {
+          samplePoints.forEach(point => {
+            let d = SampleSDF(point[0], point[1])
+            ctx.fillStyle = (d <= 0) ? '#0f0' : '#f00'
+            ctx.beginPath()
+            ctx.arc(point[0], point[1], Math.min(2.0, 4.0 / state.camera.state.zoom), 0, TAU)
+            ctx.fill()
+          })
+        }
+
+        if (state.params.debugDrawNodeIndex && state.camera.state.zoom > 4.0) {
+          ctx.save()
+          ctx.scale(1, -1)
+          ctx.translate(0, -canvas.height)
+          ctx.font = `${12 / Math.max(1.0, state.camera.state.zoom)}px Hack, monospace`
+          ctx.fillStyle = 'white'
+          ctx.fillText(`idx:${node.index}`, node.center[0] - node.radius * .95, canvas.height - (node.center[1] + node.radius * 0.5))
+          ctx.restore()
+        }
+      })
     }
-
-    function AddNodeToNodeMapping(fromIndex, toIndex, dx, dy) {
-      let outputIndex = DirToIndex(dx, dy)
-      if (!nodeToNodeMapping[fromIndex]) {
-        nodeToNodeMapping[fromIndex] = [-1, -1, -1, -1]
-      }
-
-      nodeToNodeMapping[fromIndex][outputIndex] = toIndex
-    }
-
-    edges.forEach(edge => {
-      let nodeA = nodes[edge[0]]
-      let nodeB = nodes[edge[1]]
-
-      if (nodeA.containsContour && nodeB.containsContour) {
-        {
-          let dx = Math.sign(nodeA.center[0] - nodeB.center[0])
-          let dy = Math.sign(nodeA.center[1] - nodeB.center[1])
-          AddNodeToNodeMapping(edge[0], edge[1], dx, dy)
-        }
-
-        {
-          let dx = nodeB.center[0] - nodeA.center[0]
-          let dy = nodeB.center[1] - nodeA.center[1]
-          AddNodeToNodeMapping(edge[1], edge[0], dx, dy)
-        }
-      }
-    })
-
-    ctx.save()
-    nodes.forEach(node => {
-      if (!node.containsContour) {
-        return
-      }
-
-      ctx.fillStyle = '#006554'
-      ctx.fillRect(
-        node.center[0] - node.radius * 0.95,
-        node.center[1] - node.radius * 0.95,
-        node.radius * 2.0 * 0.9,
-        node.radius * 2.0 * 0.9
-      )
-
-      let samplePoints = [
-        [node.center[0] - node.radius, node.center[1] - node.radius],
-        [node.center[0] + node.radius, node.center[1] - node.radius],
-        [node.center[0] - node.radius, node.center[1] + node.radius],
-        [node.center[0] + node.radius, node.center[1] + node.radius],
-      ]
-
-
-      if (state.params.debugDrawNodeCornerState) {
-        samplePoints.forEach(point => {
-          let d = SampleSDF(point[0], point[1])
-          ctx.fillStyle = (d <= 0) ? '#0f0' : '#f00'
-          ctx.beginPath()
-          ctx.arc(point[0], point[1], Math.min(2.0, 4.0 / state.camera.state.zoom), 0, TAU)
-          ctx.fill()
-        })
-      }
-
-      if (state.params.debugDrawNodeIndex && state.camera.state.zoom > 4.0) {
-        ctx.save()
-        ctx.scale(1, -1)
-        ctx.translate(0, -canvas.height)
-        ctx.font = `${12 / Math.max(1.0, state.camera.state.zoom)}px Hack, monospace`
-        ctx.fillStyle = 'white'
-        ctx.fillText(`idx:${node.index}`, node.center[0] - node.radius * .95, canvas.height - (node.center[1] + node.radius * 0.5))
-        ctx.restore()
-      }
-    })
-
-    let step = 0
-    nodes.forEach(node => {
-      console.log(step, state.params.maxExtractionSteps)
-      if (step > state.params.maxExtractionSteps) {
-        return
-      }
-
-      if (visitedNodes[node.index]) {
-        return
-      }
-      visitedNodes[node.index] = true
-      if (!node.containsContour) {
-        return
-      }
-
-      // walk the edge
-      {
-        let indexName = ['down', 'right', 'up', 'left']
-
-        let nextNode = node
-        let dirIndex = 0
-
-        console.group('walk edge')
-        while (nextNode && step < state.params.maxExtractionSteps) {
-          console.log(step, state.params.maxExtractionSteps)
-          ctx.strokeStyle = "#9de64e"
-          ctx.lineWidth = 5.0 / state.camera.state.zoom
-
-          let nextNodeIndex = nextNode.index
-          node = nextNode
-          nextNode = null
-
-          for (let i = 3; i >= 0; i--) {
-            let index = Math.abs((i + dirIndex) % 4)
-            let otherNodeIndex = nodeToNodeMapping[nextNodeIndex][index]
-
-            if (otherNodeIndex == -1) {
-              continue
-            }
-
-            let otherNode = nodes[otherNodeIndex]
-
-            if (otherNode.containsContour && !visitedNodes[otherNodeIndex]) {
-              visitedNodes[otherNodeIndex] = true
-              ctx.beginPath()
-              ctx.moveTo(node.center[0], node.center[1])
-              ctx.lineTo(otherNode.center[0], otherNode.center[1])
-              ctx.stroke()
-
-              nextNode = otherNode
-              switch (i) {
-                case 0: dirIndex = 1; break;
-                case 1: dirIndex = 2; break;
-                case 2: dirIndex = 3; break;
-                case 3: dirIndex = 0; break;
-              }
-
-              break
-            }
-          }
-          step++;
-        }
-        console.groupEnd('walk edge')
-      }
-
-    })
     ctx.restore()
 
-    if (state.params.debugDrawDualGraph) {
-      ctx.strokeStyle = "#3388de"
-      ctx.beginPath()
-      edges.forEach(edge => {
-        let a = nodes[edge[0]]
-        let b = nodes[edge[1]]
-
-        ctx.moveTo(a.center[0], a.center[1])
-        ctx.lineTo(b.center[0], b.center[1])
-      })
-      ctx.stroke()
-    }
-
+    ContourExtractionApproaches[state.params.contourExtractionApproach](nodes)
     state.camera.end()
     requestAnimationFrame(RenderFrame)
   }
@@ -513,6 +535,6 @@ function SubdividewDual2DBegin(rootEl) {
 }
 
 
-SubdividewDual2DBegin(
-  document.querySelector('#subdivide-dual-2d-content')
+Subdivide2DBegin(
+  document.querySelector('#subdivide-2d-content')
 )
