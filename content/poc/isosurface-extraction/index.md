@@ -54,15 +54,22 @@ description = "Playground for various isosurface extraction techniques"
       <div class="debugDrawNodeCornerState-control control">
         draw node corner state<input type="checkbox" value="1" />
       </div>
+      <div class="debugDrawDualGraph-control control">
+        draw dual graph<input type="checkbox" value="1" />
+      </div>
+      <div class="maxExtractionSteps-control control">
+        <input type="range" min="0" max="5000" value="1"> max contour extraction steps =
+        <output></output>
+      </div>
     </div>
     <h4>Params</h4>
     <div class="indent">
       <div class="maxDepth-control control">
-        max subdivision depth: <input type="range" min="0" max="15" value="6">
+        <input type="range" min="0" max="15" value="6"> max subdivision depth =
         <output></output>
       </div>
       <div class="isolevel-control control">
-        isolevel: <input type="range" min="-500" max="500" value="0.0" step="0.1">
+        <input type="range" min="-500" max="500" value="0.0" step="0.1"> isolevel =
         <output></output>
       </div>
     </div>
