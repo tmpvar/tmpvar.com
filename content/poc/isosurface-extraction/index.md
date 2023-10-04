@@ -47,7 +47,7 @@ description = "Playground for various isosurface extraction techniques"
 <section id="subdivide-dual-2d-content">
   <section class="controls">
     <div class="maxDepth-control control">
-      max subdivision depth: <input type="range" min="0" max="15" value="9">
+      max subdivision depth: <input type="range" min="0" max="15" value="6">
       <output></output>
     </div>
     <div class="isolevel-control control">
