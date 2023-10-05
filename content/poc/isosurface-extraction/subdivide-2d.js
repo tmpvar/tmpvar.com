@@ -111,10 +111,6 @@ function Subdivide2DBegin(rootEl) {
     out[1] = ny / l
   }
 
-  function Sign(d) {
-    return d <= 0 ? -1 : 1
-  }
-
   const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
     Param('debugDrawNodeIndex', 'bool')
@@ -184,6 +180,8 @@ function Subdivide2DBegin(rootEl) {
       radius: radius,
       distance: d,
       children: [-1, -1, -1, -1],
+      parent: -1,
+      parentQuadrant: 0,
       mask: 0,
       remainingSteps: remainingSteps,
       crossing: crossing,
@@ -214,8 +212,11 @@ function Subdivide2DBegin(rootEl) {
         )
         if (childNodeIndex > -1) {
           node.mask |= 1 << i
+          nodes[childNodeIndex].parent = nodeIndex
+          nodes[childNodeIndex].parentQuadrant = i
         }
         node.children[i] = childNodeIndex
+
       })
       return nodeIndex
     }
@@ -479,7 +480,7 @@ function Subdivide2DBegin(rootEl) {
     let radius = canvas.width / 2
     let nodes = []
     SubdivideSquare(nodes, radius, radius, radius, state.params.maxDepth)
-
+console.log('node count', nodes.length)
     // Draw nodes
     {
       ctx.save()
