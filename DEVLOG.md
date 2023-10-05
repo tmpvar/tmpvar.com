@@ -34,7 +34,17 @@
 - radiance-cascades/3d: mipmap only changed regions
 
 ## Pending
-
+- isosurface-extraction/2d: merge marching squares and subdivision
+                            process:
+                            1. collect boundary cells
+                            2. build traversal map (e.g., node->node mapping for 4 edges)
+                            3. traverse the boundary cells collecting a contour using the
+                               user selected approach
+- isosurface-extraction/2d: tuck controls for each approach under their own section and show/hide
+                            based on selection
+- marching-squares: instead of line searching to the nearest cage point
+                    maybe raymarching would be a better way to avoid crossing
+                    multiple iso lines
 
 ## 2023-10-05
 - radiance-cascades: convert #flatland-2d-controls to `.controls`

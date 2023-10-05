@@ -744,7 +744,7 @@ async function MarchingSquaresBegin() {
         let b = ((loopIndex + 1) * 3 * 159) % 127
         ctx.strokeStyle = `rgb(${r},${g},${b})`
         ctx.beginPath()
-        ctx.lineWidth = 4.0
+        ctx.lineWidth = Math.min(4.0, 8.0 / state.camera.state.zoom)
         vertIndices.forEach((vertIndex, i) => {
           let vert = state.primalVertices[vertIndex]
           if (i == 0) {
