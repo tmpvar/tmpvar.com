@@ -6,6 +6,16 @@ description = "Playground for various isosurface extraction techniques"
 
 ## 2D
 
+<section id="isosurface-extraction-2d-content">
+  <section class="controls">
+  </section>
+  <section class="center-align">
+    <canvas width="1024" height="1024"></canvas>
+  </section>
+  <script type="module" src="2d/isosurface-extraction-2d.js"></script>
+
+</section>
+
 ### Marching Squares
 <section id="marching-squares-content">
   <section class="controls">
@@ -40,7 +50,7 @@ description = "Playground for various isosurface extraction techniques"
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
-  <script type="module" src="marching-squares.js"></script>
+  <script type="module" src="old-marching-squares.js"></script>
 </section>
 
 ### Subdivide 2D
@@ -86,5 +96,5 @@ description = "Playground for various isosurface extraction techniques"
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
-  <script type="module" src="subdivide-2d.js"></script>
+  <script type="module" src="old-subdivide.js"></script>
 </section>
