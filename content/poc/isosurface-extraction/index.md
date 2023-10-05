@@ -32,15 +32,15 @@ description = "Playground for various isosurface extraction techniques"
       contour extraction approach
     </div>
     <div class="performSubdivision-control control">
-      <input type="checkbox" value="1" checked>
+      <input type="checkbox" value="1" >
       subdivide
     </div>
     <div class="cellDiameter-control control hiddenBy-performSubdivision">
-      <input type="range" min="2" max="9" value="7"> cell diameter
+      <input type="range" min="2" max="9" value="3"> cell diameter
       <output></output>
     </div>
     <div class="maxSubdivisionDepth-control control shownBy-performSubdivision">
-      <input type="range" min="2" max="9" value="7"> max subdivision depth
+      <input type="range" min="2" max="12" value="7"> max subdivision depth
       <output></output>
     </div>
   </section>

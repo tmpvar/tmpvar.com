@@ -10,6 +10,7 @@ function Now() {
 }
 
 function IsosurfaceExtractionBegin(rootEl) {
+  const TAU = Math.PI * 2.0
   const controlEl = rootEl.querySelector('.controls')
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('2d')
@@ -148,6 +149,24 @@ function IsosurfaceExtractionBegin(rootEl) {
     out[1] = ny / l
   }
 
+  function Sign(d) {
+    return d <= 0 ? -1 : 1
+  }
+
+  function SDFGetMortonCornerCode(cx, cy, radius) {
+    let bl = SampleSDF(cx - radius, cy - radius)
+    let br = SampleSDF(cx + radius, cy - radius)
+    let ul = SampleSDF(cx - radius, cy + radius)
+    let ur = SampleSDF(cx + radius, cy + radius)
+
+    return (
+      ((bl < 0.0 ? 1 : 0) << 0) |
+      ((br < 0.0 ? 1 : 0) << 1) |
+      ((ul < 0.0 ? 1 : 0) << 2) |
+      ((ur < 0.0 ? 1 : 0) << 3)
+    )
+  }
+
   function SubdivideSquare(nodes, cx, cy, radius, remainingSteps) {
     ctx.strokeStyle = "#444"
     let padding = radius / remainingSteps
@@ -163,23 +182,10 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     let crossing = Math.abs(d) <= radius * 1.4142135623730951
     let containsContour = false
+    let mortonCornerCode = 0
     if (remainingSteps === 0) {
-      let mask = 0
-      let corners = [
-        [cx - radius, cy - radius],
-        [cx + radius, cy - radius],
-        [cx - radius, cy + radius],
-        [cx + radius, cy + radius],
-      ]
-
-      corners.forEach((corner, i) => {
-        let d = SampleSDF(corner[0], corner[1])
-        if (d < 0) {
-          mask |= 1 << i
-        }
-      })
-
-      crossing = mask !== 0 && mask != 0b1111
+      mortonCornerCode = SDFGetMortonCornerCode(cx, cy, radius)
+      crossing = mortonCornerCode !== 0 && mortonCornerCode != 0b1111
       containsContour = crossing
     }
 
@@ -192,7 +198,7 @@ function IsosurfaceExtractionBegin(rootEl) {
       children: [-1, -1, -1, -1],
       parent: -1,
       parentQuadrant: 0,
-      mask: 0,
+      mortonCornerCode: mortonCornerCode,
       remainingSteps: remainingSteps,
       crossing: crossing,
       containsContour: containsContour
@@ -238,29 +244,21 @@ function IsosurfaceExtractionBegin(rootEl) {
   function FindBoundaryCells() {
     return TimedBlock('Find Boundary Cells', () => {
       state.cells = []
-      state.boundaryCells = []
       if (state.params.performSubdivision) {
         let radius = canvas.width / 2
         SubdivideSquare(state.cells, radius, radius, radius, state.params.maxSubdivisionDepth)
       } else {
-        state.cells = []
-        let radius = state.params.cellDiameter * 0.5
-        for (let x = 0; x < canvas.width; x += state.params.cellDiameter) {
-          for (let y = 0; y < canvas.height; y += state.params.cellDiameter) {
+        const diameter = state.params.cellDiameter
+        const radius = diameter * 0.5
 
-            let code = (
-              (SampleSDF(x, y) < 0) |
-              (SampleSDF(x + radius, y) < 0) |
-              (SampleSDF(x, y + radius) < 0) |
-              (SampleSDF(x + radius, y + radius) < 0)
-            )
-
-
+        for (let cx = radius; cx < canvas.width; cx += diameter) {
+          for (let cy = radius; cy < canvas.height; cy += diameter) {
+            let mortonCornerCode = SDFGetMortonCornerCode(cx, cy, radius)
             state.cells.push({
-              center: [x + radius, y + radius],
+              center: [cx, cy],
               radius: radius,
-              mortonCornerCode: code,
-              containsContour: code != 0 && code != 0b1111,
+              mortonCornerCode: mortonCornerCode,
+              containsContour: mortonCornerCode != 0 && mortonCornerCode != 0b1111,
             })
           }
         }
@@ -293,6 +291,7 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     if (state.dirty) {
       FindBoundaryCells()
+      console.log(`FindBoundaryCells cells: ${state.cells.length} boundaryCells: ${state.boundaryCells.length}`)
     }
 
     // Draw all cells
@@ -311,7 +310,7 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     // Draw boundary cells
     {
-      ctx.fillStyle = "#26854c"
+      ctx.fillStyle = "#1e4044"
       state.boundaryCells.forEach(cell => {
         let diameter = cell.radius * 2.0
         ctx.fillRect(
@@ -320,6 +319,36 @@ function IsosurfaceExtractionBegin(rootEl) {
           diameter,
           diameter
         )
+      })
+    }
+
+    // Draw cell corner states
+    {
+      let radius = state.boundaryCells[0].radius
+      let corners = [
+        [-radius, -radius],
+        [+radius, -radius],
+        [-radius, +radius],
+        [+radius, +radius],
+      ]
+
+      state.boundaryCells.forEach(cell => {
+        for (let cornerIndex = 0; cornerIndex < 4; cornerIndex++) {
+          let mask = 1 << cornerIndex
+          let corner = corners[cornerIndex]
+          ctx.fillStyle = (mask & cell.mortonCornerCode) != 0
+            ? '#9de64e'
+            : '#ec273f'
+          ctx.beginPath()
+          ctx.arc(
+            cell.center[0] + corner[0],
+            cell.center[1] + corner[1],
+            2.0 / state.camera.state.zoom,
+            0,
+            TAU
+          )
+          ctx.fill()
+        }
       })
     }
 
