@@ -9,6 +9,14 @@ function Now() {
   }
 }
 
+// see: https://mastodon.gamedev.place/@sjb3d/110957635606866131
+let isNegativeScratch = new Float64Array(1)
+function IsNegative(num) {
+  isNegativeScratch[0] = num
+  let uints = new Uint32Array(isNegativeScratch.buffer)
+  return (uints[1] & 1<<31) != 0
+}
+
 function IsosurfaceExtractionBegin(rootEl) {
   const TAU = Math.PI * 2.0
   const controlEl = rootEl.querySelector('.controls')
@@ -149,10 +157,6 @@ function IsosurfaceExtractionBegin(rootEl) {
     out[1] = ny / l
   }
 
-  function Sign(d) {
-    return d <= 0 ? -1 : 1
-  }
-
   function SDFGetMortonCornerCode(cx, cy, radius) {
     let bl = SampleSDF(cx - radius, cy - radius)
     let br = SampleSDF(cx + radius, cy - radius)
@@ -160,10 +164,10 @@ function IsosurfaceExtractionBegin(rootEl) {
     let ur = SampleSDF(cx + radius, cy + radius)
 
     return (
-      ((bl < 0.0 ? 1 : 0) << 0) |
-      ((br < 0.0 ? 1 : 0) << 1) |
-      ((ul < 0.0 ? 1 : 0) << 2) |
-      ((ur < 0.0 ? 1 : 0) << 3)
+      (IsNegative(bl) << 0) |
+      (IsNegative(br) << 1) |
+      (IsNegative(ul) << 2) |
+      (IsNegative(ur) << 3)
     )
   }
 
@@ -267,6 +271,8 @@ function IsosurfaceExtractionBegin(rootEl) {
       state.boundaryCells = state.cells.filter(cell => cell.containsContour)
     })
   }
+
+
 
   function DrawFrame() {
     ReadParams()
