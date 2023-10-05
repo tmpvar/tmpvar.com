@@ -40,13 +40,13 @@
                             2. build traversal map (e.g., node->node mapping for 4 edges)
                             3. traverse the boundary cells collecting a contour using the
                                user selected approach
-- isosurface-extraction/2d: tuck controls for each approach under their own section and show/hide
-                            based on selection
 - marching-squares: instead of line searching to the nearest cage point
-                    maybe raymarching would be a better way to avoid crossing
+                    maybe circle marching would be a better way to avoid crossing
                     multiple iso lines
 
 ## 2023-10-05
+- isosurface-extraction/2d: use sjb3d's floating point sign flip test to avoid the -0 case
+- isosurface-extraction/2d: make it easier to hide/show controls based on other control state
 - radiance-cascades: convert #flatland-2d-controls to `.controls`
 ## 2023-09-28
 - radiance-cascades/3d: re-enable level 0 ray count, but based on 6 instead of 8
