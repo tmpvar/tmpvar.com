@@ -34,15 +34,10 @@
 - radiance-cascades/3d: mipmap only changed regions
 
 ## Pending
-- radiance-cascades/3d: add slider for probe lattice diameter (level 0)
 
+
+## 2023-10-05
 - radiance-cascades: convert #flatland-2d-controls to `.controls`
-- radiance-cascades/3d: debug render probes
-- radiance-cascades/3d: rename volumeTexture to radianceTexture
-- radiance-cascades/3d: fix erroneous darkening for distant objects
-- radiance-cascades/3d: stop primary ray when acc.a >= 1.0
-
-
 ## 2023-09-28
 - radiance-cascades/3d: re-enable level 0 ray count, but based on 6 instead of 8
                         __this causes the gpu to crash when set to anything other than 6__
