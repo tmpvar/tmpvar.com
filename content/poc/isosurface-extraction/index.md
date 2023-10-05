@@ -8,12 +8,46 @@ description = "Playground for various isosurface extraction techniques"
 
 <section id="isosurface-extraction-2d-content">
   <section class="controls">
+    <div class="debugPerformance-control control">
+      <input type="checkbox" value="1" checked> show timings
+      <div class="performance-output shownBy-debugPerformance">
+        timings
+        <code><pre></pre></code>
+      </div>
+    </div>
+    <div class="epsilon-control control">
+      epsilon: <input type="range" min="0.1" max="10" value="0.5" step="0.1">
+      <output></output>
+    </div>
+    <div class="isolevel-control control">
+      isolevel: <input type="range" min="-500" max="500" value="0.0" step="0.1">
+      <output></output>
+    </div>
+    <div class="contourExtractionApproach-control control">
+      <select>
+          <option value="marching-squares">Marching Squares</option>
+          <option value="dual-contouring">Dual Contouring</option>
+          <!-- <option value="surface-nets">Surface Nets (WIP)</option> -->
+      </select>
+      contour extraction approach
+    </div>
+    <div class="performSubdivision-control control">
+      <input type="checkbox" value="1" checked>
+      subdivide
+    </div>
+    <div class="cellDiameter-control control hiddenBy-performSubdivision">
+      cell diameter: <input type="range" min="2" max="9" value="7">
+      <output></output>
+    </div>
+    <div class="maxSubdivisionDepth-control control shownBy-performSubdivision">
+      max subdivision depth: <input type="range" min="2" max="9" value="7">
+      <output></output>
+    </div>
   </section>
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
   <script type="module" src="2d/isosurface-extraction-2d.js"></script>
-
 </section>
 
 ### Marching Squares

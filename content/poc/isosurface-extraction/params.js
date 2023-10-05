@@ -72,6 +72,13 @@ export default function CreateParamReader(state, controlEl) {
         });
       }
 
+      if (!cb) {
+        let outputEl = parentEl.querySelector('output')
+        if (outputEl) {
+          outputEl.innerHTML = `${value}`
+        }
+      }
+
       state.params[paramName] = value
       state.dirty = true
       return true

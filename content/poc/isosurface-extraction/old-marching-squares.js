@@ -1,4 +1,4 @@
-import CreateParamReader from './params.js'
+import CreateParamReader from '../params.js'
 import CreateCamera from './camera.js'
 
 async function MarchingSquaresBegin() {
