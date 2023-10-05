@@ -14,7 +14,7 @@ let isNegativeScratch = new Float64Array(1)
 function IsNegative(num) {
   isNegativeScratch[0] = num
   let uints = new Uint32Array(isNegativeScratch.buffer)
-  return (uints[1] & 1<<31) != 0
+  return (uints[1] & 1 << 31) != 0
 }
 
 function IsosurfaceExtractionBegin(rootEl) {
@@ -171,6 +171,68 @@ function IsosurfaceExtractionBegin(rootEl) {
     )
   }
 
+  function MortonCornerCodeToMarchingSquaresCode(morton) {
+    /*
+     morton      marching squares
+       2    3      0    1
+        +--+        +--+
+        |  |   =>   |  |
+        +--+        +--+
+       0    1      3    2
+    */
+
+    return (
+      (((morton >> 2) & 1) << 0) |
+      (((morton >> 3) & 1) << 1) |
+      (((morton >> 1) & 1) << 2) |
+      (((morton >> 0) & 1) << 3)
+    )
+  }
+
+
+  /*
+    Vert ordering
+     0     1
+      +---+
+      |   |
+      +---+
+     3     2
+
+    Edge Ordering
+        0
+      +---+
+    3 |   | 1
+      +---+
+        2
+  */
+  const MarchingSquaresCodeToEdge = {
+    1: [[0, 3]],
+    2: [[1, 0]],
+    3: [[1, 3]],
+    4: [[2, 1]],
+    5: [[0, 3], [2, 1]],
+    6: [[2, 0]],
+    7: [[2, 3]],
+    8: [[3, 2]],
+    9: [[0, 2]],
+    10: [[1, 0], [3, 2]],
+    11: [[1, 2]],
+    12: [[3, 1]],
+    13: [[0, 1]],
+    14: [[3, 0]],
+  }
+
+  const TopEdgeIndex = 0
+  const LeftEdgeIndex = 3
+  const RightEdgeIndex = 1
+  const BottomEdgeIndex = 2
+
+  let EdgePairings = {}
+  EdgePairings[BottomEdgeIndex] = TopEdgeIndex
+  EdgePairings[TopEdgeIndex] = BottomEdgeIndex
+  EdgePairings[RightEdgeIndex] = LeftEdgeIndex
+  EdgePairings[LeftEdgeIndex] = RightEdgeIndex
+
   function SubdivideSquare(nodes, cx, cy, radius, remainingSteps) {
     ctx.strokeStyle = "#444"
     let padding = radius / remainingSteps
@@ -203,6 +265,7 @@ function IsosurfaceExtractionBegin(rootEl) {
       parent: -1,
       parentQuadrant: 0,
       mortonCornerCode: mortonCornerCode,
+      marchingSquaresCode: MortonCornerCodeToMarchingSquaresCode(mortonCornerCode),
       remainingSteps: remainingSteps,
       crossing: crossing,
       containsContour: containsContour
@@ -254,15 +317,20 @@ function IsosurfaceExtractionBegin(rootEl) {
       } else {
         const diameter = state.params.cellDiameter
         const radius = diameter * 0.5
-
-        for (let cx = radius; cx < canvas.width; cx += diameter) {
-          for (let cy = radius; cy < canvas.height; cy += diameter) {
+        state.uniformGridDiameter = canvas.width / diameter
+        for (let y = 0; y < state.uniformGridDiameter; y++) {
+          let yoff = y * state.uniformGridDiameter
+          let cy = y * diameter + radius
+          for (let x = 0; x < state.uniformGridDiameter; x++) {
+            let cx = x * diameter + radius
             let mortonCornerCode = SDFGetMortonCornerCode(cx, cy, radius)
+            let containsContour = mortonCornerCode != 0 && mortonCornerCode != 0b1111
             state.cells.push({
               center: [cx, cy],
               radius: radius,
               mortonCornerCode: mortonCornerCode,
-              containsContour: mortonCornerCode != 0 && mortonCornerCode != 0b1111,
+              marchingSquaresCode: MortonCornerCodeToMarchingSquaresCode(mortonCornerCode),
+              containsContour: containsContour,
             })
           }
         }
