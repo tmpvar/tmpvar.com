@@ -16,11 +16,11 @@ description = "Playground for various isosurface extraction techniques"
       </div>
     </div>
     <div class="epsilon-control control">
-      epsilon: <input type="range" min="0.1" max="10" value="0.5" step="0.1">
+      <input type="range" min="0.1" max="10" value="0.5" step="0.1"> epsilon
       <output></output>
     </div>
     <div class="isolevel-control control">
-      isolevel: <input type="range" min="-500" max="500" value="0.0" step="0.1">
+      <input type="range" min="-500" max="500" value="0.0" step="0.1"> isolevel
       <output></output>
     </div>
     <div class="contourExtractionApproach-control control">
@@ -36,11 +36,11 @@ description = "Playground for various isosurface extraction techniques"
       subdivide
     </div>
     <div class="cellDiameter-control control hiddenBy-performSubdivision">
-      cell diameter: <input type="range" min="2" max="9" value="7">
+      <input type="range" min="2" max="9" value="7"> cell diameter
       <output></output>
     </div>
     <div class="maxSubdivisionDepth-control control shownBy-performSubdivision">
-      max subdivision depth: <input type="range" min="2" max="9" value="7">
+      <input type="range" min="2" max="9" value="7"> max subdivision depth
       <output></output>
     </div>
   </section>
