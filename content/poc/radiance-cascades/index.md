@@ -872,7 +872,7 @@ click/drag to move the light
 ### Flatland (2D)
 
 <section id="flatland-2d-content" class="has-webgpu">
-  <section id="flatland-2d-controls" class="webgpu-required">
+  <section class="controls" class="webgpu-required">
     <h4>Debug/Development</h4>
     <div class="indent">
     <div class="debugPerformance-control control">
@@ -987,7 +987,7 @@ click/drag to move the light
 
     </section>
   </section>
-  <script src="flatland-2d.js" defer></script>
+  <script type="module" src="flatland-2d.js" defer></script>
 
   <section class="center-align webgpu-missing error-border">
     <img src="/img/webgpu-responsive.svg" width="768" height="768" />

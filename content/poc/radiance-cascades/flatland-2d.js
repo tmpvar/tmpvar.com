@@ -1,8 +1,12 @@
+import CreateParamReader from "./params.js"
+
 const DemoImage = document.createElement('img');
 DemoImage.src = window.location.pathname + "flatland-2d-demo.png"
 
 async function ProbeRayDDA2DBegin() {
   const rootEl = document.querySelector('#flatland-2d-content')
+  const controlEl = rootEl.querySelector('.controls')
+
   const shaders = {
     DebugWorldBlit(gpu, worldTexture, irradianceTexture) {
       const device = gpu.device
@@ -1348,6 +1352,8 @@ async function ProbeRayDDA2DBegin() {
     dirty: true,
   }
 
+  const Param = CreateParamReader(state, controlEl)
+
   function GPUResetTimers() {
     if (!state.gpu.hasTimestampQueryFeature) {
       return;
@@ -1374,11 +1380,11 @@ async function ProbeRayDDA2DBegin() {
   {
     let minProbeDiameter = Math.pow(
       2,
-      parseFloat(document.querySelector('#flatland-2d-controls .probeRadius-control input').min)
+      parseFloat(controlEl.querySelector('.probeRadius-control input').min)
     )
     let maxProbeRays = Math.pow(
       2,
-      parseFloat(document.querySelector('#flatland-2d-controls .probeRayCount-control input').max)
+      parseFloat(controlEl.querySelector('.probeRayCount-control input').max)
     )
     let maxProbeCount = (canvas.width / minProbeDiameter) * (canvas.height / minProbeDiameter)
     state.maxLevel0Rays = maxProbeRays * maxProbeCount;
@@ -1611,73 +1617,7 @@ async function ProbeRayDDA2DBegin() {
     state.gpu.device.queue.submit([commandEncoder.finish()])
   }
 
-  const ParseColor = (value) => {
-    let v = parseInt(value.replace("#", ""), 16)
-
-    let r = (v >> 16) & 0xFF
-    let g = (v >> 8) & 0xFF
-    let b = (v >> 0) & 0xFF
-    return r | (g << 8) | (b << 16) | 0xFF000000
-  }
-
-  const controlEl = document.getElementById('flatland-2d-controls')
-  const Param = (paramName, paramType, cb) => {
-    let selector = `.${paramName}-control`
-    let parentEl = controlEl.querySelector(selector)
-    let el = parentEl.querySelector(['input', 'select'])
-    if (!el) {
-      console.warn("could not locate '%s input'", selector)
-      return false
-    }
-
-    let value = 0;
-    switch (el.type) {
-      case 'checkbox': {
-        if (el.checked) {
-          value = el.value
-        }
-        break;
-      }
-      default: {
-        value = el.value;
-        break;
-      }
-    }
-
-    switch (paramType) {
-      case 'f32': {
-        value = parseFloat(value);
-        break;
-      }
-      case 'i32': {
-        value = parseFloat(value) | 0;
-        break;
-      }
-      case 'bool': {
-        value = !!parseFloat(value) ? 1 : 0;
-        break;
-      }
-      case 'color': {
-        value = ParseColor(value)
-        break;
-      }
-    }
-
-    if (cb) {
-      value = cb(parentEl, value)
-    }
-
-    if (state.params[paramName] != value) {
-      state.params[paramName] = value
-      state.dirty = true
-      return true
-    }
-    return false
-  }
-
-
-
-  document.querySelector('#flatland-2d-controls button[name="clear-button"]').addEventListener('click', (e) => {
+  controlEl.querySelector('button[name="clear-button"]').addEventListener('click', (e) => {
     WorldTextureClear();
   })
 
@@ -2031,7 +1971,7 @@ Example on Windows:
       output += `------\n`
       output += `${totalMs.toFixed(2)}ms total\n`
 
-      document.querySelector('#flatland-2d-controls .debugPerformance-control .performance-output code pre').innerText = output;
+      controlEl.querySelector('.debugPerformance-control .performance-output code pre').innerText = output;
     }
 
     window.requestAnimationFrame(RenderFrame)
