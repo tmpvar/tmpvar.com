@@ -16,6 +16,9 @@ description = "Playground for various isosurface extraction techniques"
       <div class="debugDrawNodeEdgeState-control control">
         <input type="checkbox" value="1" /> draw boundary cell edge state
       </div>
+      <div class="debugDrawLooseEdgeVertices-control control">
+        <input type="checkbox" value="1" checked /> draw loose edge vertices
+      </div>
     </div>
     <div class="debugPerformance-control control">
       <input type="checkbox" value="1" checked> show timings
