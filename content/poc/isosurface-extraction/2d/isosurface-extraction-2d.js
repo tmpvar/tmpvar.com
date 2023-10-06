@@ -617,7 +617,19 @@ function IsosurfaceExtractionBegin(rootEl) {
     })
 
     // cache the values from right and top edges
+    {
+      state.boundaryCells.forEach((cell, cellIndex) => {
+        let cellOffset = cellIndex * 4
 
+        let upperCellIndex = state.edges[cellOffset + TopEdgeIndex]
+        let upperVertexIndex = state.cellVertexIndices[upperCellIndex * 4 + BottomEdgeIndex]
+        state.cellVertexIndices[cellOffset + TopEdgeIndex] = upperVertexIndex
+
+        let rightCellIndex = state.edges[cellOffset + RightEdgeIndex]
+        let rightVertexIndex = state.cellVertexIndices[rightCellIndex * 4 + LeftEdgeIndex]
+        state.cellVertexIndices[cellOffset + RightEdgeIndex] = rightVertexIndex
+      })
+    }
   }
 
   function DrawFrame() {
