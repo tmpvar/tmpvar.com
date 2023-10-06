@@ -45,6 +45,8 @@ function IsosurfaceExtractionBegin(rootEl) {
   const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
     Param('debugPerformance', 'bool')
+    Param('debugDrawNodeCornerState', 'bool')
+    Param('debugDrawNodeEdgeState', 'bool')
     Param('performSubdivision', 'bool')
     Param('contourExtractionApproach', 'string')
 
@@ -307,6 +309,144 @@ function IsosurfaceExtractionBegin(rootEl) {
     return nodeIndex
   }
 
+  function HorizontalProc(nodes, edges, leftNodeIndex, rightNodeIndex) {
+    if (leftNodeIndex == -1 || rightNodeIndex == -1) {
+      return
+    }
+
+    let leftNode = nodes[leftNodeIndex]
+    let rightNode = nodes[rightNodeIndex]
+
+    if (rightNode.containsContour && leftNode.containsContour) {
+      let leftBoundaryCellIndex = leftNode.boundaryCellIndex
+      let rightBoundaryCellIndex = rightNode.boundaryCellIndex
+
+      edges[rightBoundaryCellIndex * 4 + LeftEdgeIndex] = leftBoundaryCellIndex
+      edges[leftBoundaryCellIndex * 4 + RightEdgeIndex] = rightBoundaryCellIndex
+      return
+    }
+
+    // left is a leaf
+    if (leftNode.boundaryCellIndex > -1) {
+      HorizontalProc(nodes, edges, leftNodeIndex, rightNode.children[0]);
+      HorizontalProc(nodes, edges, leftNodeIndex, rightNode.children[2]);
+      return;
+    }
+
+    // right is a leaf
+    if (rightNode.boundaryCellIndex > -1) {
+      HorizontalProc(nodes, edges, leftNode.children[1], rightNodeIndex);
+      HorizontalProc(nodes, edges, leftNode.children[3], rightNodeIndex);
+      return;
+    }
+
+    HorizontalProc(nodes, edges, leftNode.children[1], rightNode.children[0]);
+    HorizontalProc(nodes, edges, leftNode.children[3], rightNode.children[2]);
+  }
+
+  function VerticalProc(nodes, edges, upperNodeIndex, lowerNodeIndex) {
+    if (upperNodeIndex == -1 || lowerNodeIndex == -1) {
+      return
+    }
+
+    let upperNode = nodes[upperNodeIndex]
+    let lowerNode = nodes[lowerNodeIndex]
+
+    if (upperNode.containsContour && lowerNode.containsContour) {
+      let upperBoundaryCellIndex = upperNode.boundaryCellIndex
+      let lowerBoundaryCellIndex = lowerNode.boundaryCellIndex
+
+      edges[upperBoundaryCellIndex * 4 + BottomEdgeIndex] = lowerBoundaryCellIndex
+      edges[lowerBoundaryCellIndex * 4 + TopEdgeIndex] = upperBoundaryCellIndex
+      return
+    }
+
+    // upper is a leaf
+    if (upperNode.boundaryCellIndex > -1) {
+      VerticalProc(nodes, edges, upperNodeIndex, lowerNode.children[2]);
+      VerticalProc(nodes, edges, upperNodeIndex, lowerNode.children[3]);
+      return
+    }
+
+    // lower is a leaf
+    if (lowerNode.boundaryCellIndex > -1) {
+      VerticalProc(nodes, edges, upperNode.children[0], lowerNodeIndex);
+      VerticalProc(nodes, edges, upperNode.children[1], lowerNodeIndex);
+      return;
+    }
+
+    VerticalProc(nodes, edges, upperNode.children[0], lowerNode.children[2]);
+    VerticalProc(nodes, edges, upperNode.children[1], lowerNode.children[3]);
+  }
+
+  function FaceProc(nodes, edges, nodeIndex) {
+    let node = nodes[nodeIndex]
+    if (!nodes[nodeIndex].mask) {
+      return
+    }
+
+    for (let childIndex = 0; childIndex < 4; childIndex++) {
+      let childNodeIndex = node.children[childIndex]
+      if (childNodeIndex == -1) {
+        continue
+      }
+      FaceProc(nodes, edges, childNodeIndex)
+    }
+
+    VerticalProc(nodes, edges, node.children[2], node.children[0])
+    VerticalProc(nodes, edges, node.children[3], node.children[1])
+    HorizontalProc(nodes, edges, node.children[0], node.children[1])
+    HorizontalProc(nodes, edges, node.children[2], node.children[3])
+  }
+
+  function ComputeEdgeNeighbors() {
+    const EdgesPerCell = 4
+    const edgeCount = state.cells.length * EdgesPerCell
+    state.edges = new Int32Array(edgeCount)
+    state.edges.fill(-1)
+
+    /*
+      +---+---+---+---+
+      | X |   |   |   |
+      +-|-+---+---+---+
+      | X - X |   |   |
+      +---+-|-+---+---+
+      |   | X - X - X |
+      +---+---+---+---+
+    */
+
+
+    if (state.params.performSubdivision) {
+      FaceProc(state.cells, state.edges, 0)
+    } else {
+      let boundaryCellGrid = new Int32Array(state.cells.length)
+      boundaryCellGrid.fill(-1)
+
+      const CellEdgeTransition = [
+        state.uniformGridDiameter,
+        1,
+        -state.uniformGridDiameter,
+        -1
+      ]
+
+      state.boundaryCells.forEach((cell, cellIndex) => {
+        boundaryCellGrid[cell.gridIndex] = cellIndex
+      })
+
+      state.boundaryCells.forEach((cell, cellIndex) => {
+        let currentEdgeOffset = cellIndex * 4
+        for (let i=0; i<4; i++) {
+          let otherGridIndex = cell.gridIndex + CellEdgeTransition[i]
+          if (otherGridIndex < 0 || otherGridIndex > boundaryCellGrid.length) {
+            continue
+          }
+
+          state.edges[currentEdgeOffset + i] = boundaryCellGrid[otherGridIndex]
+        }
+      })
+    }
+
+  }
 
   function FindBoundaryCells() {
     return TimedBlock('Find Boundary Cells', () => {
@@ -331,16 +471,18 @@ function IsosurfaceExtractionBegin(rootEl) {
               mortonCornerCode: mortonCornerCode,
               marchingSquaresCode: MortonCornerCodeToMarchingSquaresCode(mortonCornerCode),
               containsContour: containsContour,
+              gridIndex: yoff + x,
             })
           }
         }
       }
 
       state.boundaryCells = state.cells.filter(cell => cell.containsContour)
+      state.boundaryCells.forEach((cell, boundaryCellIndex) => {
+        cell.boundaryCellIndex = boundaryCellIndex
+      })
     })
   }
-
-
 
   function DrawFrame() {
     ReadParams()
@@ -366,6 +508,8 @@ function IsosurfaceExtractionBegin(rootEl) {
     if (state.dirty) {
       FindBoundaryCells()
       console.log(`FindBoundaryCells cells: ${state.cells.length} boundaryCells: ${state.boundaryCells.length}`)
+
+      ComputeEdgeNeighbors()
     }
 
     // Draw all cells
@@ -384,12 +528,13 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     // Draw boundary cells
     {
-      ctx.fillStyle = "#1e4044"
+      ctx.fillStyle = "#888"
       state.boundaryCells.forEach(cell => {
-        let diameter = cell.radius * 2.0
+        let radius = cell.radius * 0.8
+        let diameter = radius * 2.0
         ctx.fillRect(
-          (cell.center[0] - cell.radius),
-          (cell.center[1] - cell.radius),
+          (cell.center[0] - radius),
+          (cell.center[1] - radius),
           diameter,
           diameter
         )
@@ -397,7 +542,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     // Draw cell corner states
-    {
+    if (state.params.debugDrawNodeCornerState) {
       let radius = state.boundaryCells[0].radius
       let corners = [
         [-radius, -radius],
@@ -422,6 +567,44 @@ function IsosurfaceExtractionBegin(rootEl) {
             TAU
           )
           ctx.fill()
+        }
+      })
+    }
+
+    // Draw cell edge states
+    if (state.params.debugDrawNodeEdgeState) {
+
+      let radius = state.boundaryCells[0].radius
+      let edgeVerts = [
+        [[-radius, +radius], [+radius, +radius]],
+        [[+radius, +radius], [+radius, -radius]],
+        [[+radius, -radius], [-radius, -radius]],
+        [[-radius, -radius], [-radius, +radius]],
+      ]
+
+      state.boundaryCells.forEach((cell, cellIndex) => {
+        let edgeOffset = cellIndex * 4
+        let padding = 0.85
+        for (let edgeIndex = 0; edgeIndex < 4; edgeIndex++) {
+
+          let edge = state.edges[edgeOffset + edgeIndex]
+          if (edge === - 1) {
+            continue;
+          }
+
+          ctx.strokeStyle = '#008b8b'
+          ctx.beginPath()
+          ctx.lineWidth = 1.0 / state.camera.state.zoom
+
+          ctx.moveTo(
+            cell.center[0] + edgeVerts[edgeIndex][0][0] * padding,
+            cell.center[1] + edgeVerts[edgeIndex][0][1] * padding
+          )
+          ctx.lineTo(
+            cell.center[0] + edgeVerts[edgeIndex][1][0] * padding,
+            cell.center[1] + edgeVerts[edgeIndex][1][1] * padding
+          )
+          ctx.stroke()
         }
       })
     }
