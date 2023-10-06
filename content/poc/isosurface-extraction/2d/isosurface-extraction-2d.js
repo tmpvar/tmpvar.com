@@ -275,12 +275,18 @@ function IsosurfaceExtractionBegin(rootEl) {
     2: [[1, 0]],
     3: [[1, 3]],
     4: [[2, 1]],
-    5: [[[0, 3], [2, 1]], [[0, 1], [2, 3]]],
+    5: [
+      [[0, 3], [2, 1]],
+      [[0, 1], [2, 3]]
+    ],
     6: [[2, 0]],
     7: [[2, 3]],
     8: [[3, 2]],
     9: [[0, 2]],
-    10: [[[1, 0], [3, 2]], [[3, 0], [1, 2]]],
+    10: [
+      [[1, 0], [3, 2]],
+      [[3, 0], [1, 2]]
+    ],
     11: [[1, 2]],
     12: [[3, 1]],
     13: [[0, 1]],
@@ -327,7 +333,6 @@ function IsosurfaceExtractionBegin(rootEl) {
       index: nodeIndex,
       center: [cx, cy],
       radius: radius,
-      distance: d,
       children: [-1, -1, -1, -1],
       parent: -1,
       parentQuadrant: 0,
@@ -666,14 +671,11 @@ function IsosurfaceExtractionBegin(rootEl) {
       }
 
       let edges = MarchingSquaresCodeToEdge[code]
+      // Disambiguate cases 5,10 by collecting the center distance
       if (edges.length > 1) {
-        let x00 = state.cellDistances[cellIndex * EdgesPerCell + TopLeftCornerIndex]
-        let x10 = state.cellDistances[cellIndex * EdgesPerCell + TopRightCornerIndex]
-        let x01 = state.cellDistances[cellIndex * EdgesPerCell + BottomLeftCornerIndex]
-        let x11 = state.cellDistances[cellIndex * EdgesPerCell + BottomRightCornerIndex]
-
-        let q = x00 * x11 - x10 * x01
-        if (q > 0) {
+        let cell = state.boundaryCells[cellIndex]
+        let d = SampleSDF(cell.center[0], cell.center[1])
+        if (IsNegative(d)) {
           edges = edges[1]
         } else {
           edges = edges[0]
@@ -682,11 +684,14 @@ function IsosurfaceExtractionBegin(rootEl) {
 
       const queueLength = queue.length
       for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex++) {
-
         let edgePair = edges[edgeIndex]
-
         let startEdge = edgePair[0]
         let endEdge = edgePair[1]
+
+        if (endEdge == job.edgeIndex) {
+          startEdge = edgePair[1]
+          endEdge = edgePair[0]
+        }
 
         let startMask = 1 << startEdge
         let endMask = 1 << endEdge
@@ -831,7 +836,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     // Draw cell corner states
-    if (state.params.debugDrawNodeCornerState) {
+    if (state.boundaryCells.length && state.params.debugDrawNodeCornerState) {
       let radius = state.boundaryCells[0].radius
       let corners = [
         [-radius, -radius],
@@ -861,7 +866,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     // Draw cell edge states
-    if (state.params.debugDrawNodeEdgeState) {
+    if (state.boundaryCells.length && state.params.debugDrawNodeEdgeState) {
       let radius = state.boundaryCells[0].radius
       let edgeVerts = [
         [[-radius, +radius], [+radius, +radius]],
@@ -957,7 +962,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     // Draw border cell text
     if (state.params.debugDrawCellTextualInfo) {
       // only draw text when the camera is zoomed in
-      if (state.camera.state.zoom >= 1.0) {
+      if (state.camera.state.zoom >= 2.0) {
         state.boundaryCells.forEach((cell, cellIndex) => {
           let code = cell.marchingSquaresCode
           if (code === 0 || code === 0b1111) {
@@ -976,8 +981,8 @@ function IsosurfaceExtractionBegin(rootEl) {
           )
           ctx.fillText(
             `${code.toString(2).padStart(4, '0')}b ${code}`,
-            cell.center[0] - cell.radius,
-            canvas.height - cell.center[1]
+            cell.center[0] - cell.radius * 0.5,
+            canvas.height - cell.center[1] - cell.radius * 0.5
           )
           ctx.restore()
         })
