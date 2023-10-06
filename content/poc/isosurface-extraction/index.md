@@ -8,7 +8,7 @@ description = "Playground for various isosurface extraction techniques"
 
 <section id="isosurface-extraction-2d-content">
   <section class="controls">
-     <h4>Debug</h4>
+    <h4>Debug</h4>
     <div class="indent">
       <div class="debugDrawNodeCornerState-control control">
         <input type="checkbox" value="1" checked /> draw boundary cell corner state
@@ -32,45 +32,48 @@ description = "Playground for various isosurface extraction techniques"
         <input type="range" min="-1" max="500" value="-1"> max loop collection steps
         <output></output>
       </div>
-    </div>
-    <div class="debugPerformance-control control">
-      <input type="checkbox" value="1" checked> show timings
-      <div class="performance-output shownBy-debugPerformance">
-        timings
-        <code><pre></pre></code>
+      <div class="epsilon-control control">
+        <input type="range" min="0.1" max="10" value="0.5" step="0.1"> epsilon
+        <output></output>
       </div>
     </div>
-    <div class="epsilon-control control">
-      <input type="range" min="0.1" max="10" value="0.5" step="0.1"> epsilon
-      <output></output>
-    </div>
-    <div class="isolevel-control control">
-      <input type="range" min="-500" max="500" value="0.0" step="0.1"> isolevel
-      <output></output>
-    </div>
-    <div class="lineSearchMaxSteps-control control">
-      <input type="range" min="0" max="100" value="20"> line search max steps
-      <output></output>
-    </div>
-    <div class="contourExtractionApproach-control control">
-      <select>
-          <option value="marching-squares">Marching Squares</option>
-          <option value="dual-contouring">Dual Contouring</option>
-          <!-- <option value="surface-nets">Surface Nets (WIP)</option> -->
-      </select>
-      contour extraction approach
-    </div>
-    <div class="performSubdivision-control control">
-      <input type="checkbox" value="1" checked >
-      subdivide
-    </div>
-    <div class="cellDiameter-control control hiddenBy-performSubdivision">
-      <input type="range" min="2" max="9" value="3"> cell diameter
-      <output></output>
-    </div>
-    <div class="maxSubdivisionDepth-control control shownBy-performSubdivision">
-      <input type="range" min="2" max="12" value="5"> max subdivision depth
-      <output></output>
+    <h4>Params</h4>
+    <div class="indent">
+      <div class="debugPerformance-control control">
+        <input type="checkbox" value="1" checked> show timings
+        <div class="performance-output shownBy-debugPerformance">
+          timings
+          <code><pre></pre></code>
+        </div>
+      </div>
+      <div class="isolevel-control control">
+        <input type="range" min="-500" max="500" value="0.0" step="0.1"> isolevel
+        <output></output>
+      </div>
+      <div class="lineSearchMaxSteps-control control">
+        <input type="range" min="0" max="100" value="20"> line search max steps
+        <output></output>
+      </div>
+      <div class="contourExtractionApproach-control control">
+        <select>
+            <option value="marching-squares">Marching Squares</option>
+            <option value="dual-contouring">Dual Contouring</option>
+            <!-- <option value="surface-nets">Surface Nets (WIP)</option> -->
+        </select>
+        contour extraction approach
+      </div>
+      <div class="performSubdivision-control control">
+        <input type="checkbox" value="1" checked >
+        subdivide
+      </div>
+      <div class="cellDiameter-control control hiddenBy-performSubdivision">
+        <input type="range" min="2" max="9" value="3"> cell diameter
+        <output></output>
+      </div>
+      <div class="maxSubdivisionDepth-control control shownBy-performSubdivision">
+        <input type="range" min="2" max="12" value="5"> max subdivision depth
+        <output></output>
+      </div>
     </div>
   </section>
   <section class="center-align">
