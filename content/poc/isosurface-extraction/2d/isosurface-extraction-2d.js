@@ -17,6 +17,10 @@ function IsNegative(num) {
   return (uints[1] & 1 << 31) != 0
 }
 
+function ContainsCrossing(a, b) {
+  return IsNegative(a) != IsNegative(b)
+}
+
 function IsosurfaceExtractionBegin(rootEl) {
   const TAU = Math.PI * 2.0
   const controlEl = rootEl.querySelector('.controls')
@@ -59,6 +63,7 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     Param('epsilon', 'f32')
     Param('isolevel', 'f32')
+    Param('lineSearchMaxSteps', 'i32')
     Param('maxSubdivisionDepth', 'i32')
   }
 
@@ -159,6 +164,51 @@ function IsosurfaceExtractionBegin(rootEl) {
     out[1] = ny / l
   }
 
+  function LineSearch(out, sx, sy, sd, ex, ey, ed, epsilon, remainingSteps) {
+    if (!ContainsCrossing(sd, ed)) {
+      throw new Error("invalid line distances")
+    }
+
+    if (Math.abs(sd) <= epsilon) {
+      out[0] = sx
+      out[1] = sy
+      return true
+    }
+
+    if (Math.abs(ed) <= epsilon) {
+      out[0] = ex
+      out[1] = ey
+      return true
+    }
+
+    let mx = (sx + ex) * 0.5
+    let my = (sy + ey) * 0.5
+
+
+    let md = SampleSDF(mx, my);
+    if (Math.abs(md) <= epsilon) {
+      out[0] = mx
+      out[1] = my
+      return true
+    }
+
+    if (remainingSteps < 0) {
+      throw new Error("ran out of steps")
+      return false
+    }
+
+
+    if (ContainsCrossing(sd, md)) {
+      return LineSearch(out, mx, my, md, sx, sy, sd, epsilon, remainingSteps - 1)
+    }
+
+    if (ContainsCrossing(md, ed)) {
+      return LineSearch(out, mx, my, md, ex, ey, ed, epsilon, remainingSteps - 1)
+    }
+
+    return false
+  }
+
   function SDFGetMortonCornerCode(cx, cy, radius) {
     let bl = SampleSDF(cx - radius, cy - radius)
     let br = SampleSDF(cx + radius, cy - radius)
@@ -184,10 +234,10 @@ function IsosurfaceExtractionBegin(rootEl) {
     */
 
     return (
-      (((morton >> 2) & 1) << 0) |
-      (((morton >> 3) & 1) << 1) |
-      (((morton >> 1) & 1) << 2) |
-      (((morton >> 0) & 1) << 3)
+      (((morton >> 0) & 1) << BottomLeftCornerIndex) |
+      (((morton >> 1) & 1) << BottomRightCornerIndex) |
+      (((morton >> 2) & 1) << TopLeftCornerIndex) |
+      (((morton >> 3) & 1) << TopRightCornerIndex)
     )
   }
 
@@ -228,6 +278,11 @@ function IsosurfaceExtractionBegin(rootEl) {
   const LeftEdgeIndex = 3
   const RightEdgeIndex = 1
   const BottomEdgeIndex = 2
+
+  const TopLeftCornerIndex = 0
+  const TopRightCornerIndex = 1
+  const BottomRightCornerIndex = 2
+  const BottomLeftCornerIndex = 3
 
   let EdgePairings = {}
   EdgePairings[BottomEdgeIndex] = TopEdgeIndex
@@ -307,6 +362,42 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     return nodeIndex
+  }
+
+  function FindBoundaryCells() {
+    return TimedBlock('Find Boundary Cells', () => {
+      state.cells = []
+      if (state.params.performSubdivision) {
+        let radius = canvas.width / 2
+        SubdivideSquare(state.cells, radius, radius, radius, state.params.maxSubdivisionDepth)
+      } else {
+        const diameter = state.params.cellDiameter
+        const radius = diameter * 0.5
+        state.uniformGridDiameter = canvas.width / diameter
+        for (let y = 0; y < state.uniformGridDiameter; y++) {
+          let yoff = y * state.uniformGridDiameter
+          let cy = y * diameter + radius
+          for (let x = 0; x < state.uniformGridDiameter; x++) {
+            let cx = x * diameter + radius
+            let mortonCornerCode = SDFGetMortonCornerCode(cx, cy, radius)
+            let containsContour = mortonCornerCode != 0 && mortonCornerCode != 0b1111
+            state.cells.push({
+              center: [cx, cy],
+              radius: radius,
+              mortonCornerCode: mortonCornerCode,
+              marchingSquaresCode: MortonCornerCodeToMarchingSquaresCode(mortonCornerCode),
+              containsContour: containsContour,
+              gridIndex: yoff + x,
+            })
+          }
+        }
+      }
+
+      state.boundaryCells = state.cells.filter(cell => cell.containsContour)
+      state.boundaryCells.forEach((cell, boundaryCellIndex) => {
+        cell.boundaryCellIndex = boundaryCellIndex
+      })
+    })
   }
 
   function HorizontalProc(nodes, edges, leftNodeIndex, rightNodeIndex) {
@@ -405,17 +496,6 @@ function IsosurfaceExtractionBegin(rootEl) {
     state.edges = new Int32Array(edgeCount)
     state.edges.fill(-1)
 
-    /*
-      +---+---+---+---+
-      | X |   |   |   |
-      +-|-+---+---+---+
-      | X - X |   |   |
-      +---+-|-+---+---+
-      |   | X - X - X |
-      +---+---+---+---+
-    */
-
-
     if (state.params.performSubdivision) {
       FaceProc(state.cells, state.edges, 0)
     } else {
@@ -435,7 +515,7 @@ function IsosurfaceExtractionBegin(rootEl) {
 
       state.boundaryCells.forEach((cell, cellIndex) => {
         let currentEdgeOffset = cellIndex * 4
-        for (let i=0; i<4; i++) {
+        for (let i = 0; i < 4; i++) {
           let otherGridIndex = cell.gridIndex + CellEdgeTransition[i]
           if (otherGridIndex < 0 || otherGridIndex > boundaryCellGrid.length) {
             continue
@@ -445,43 +525,99 @@ function IsosurfaceExtractionBegin(rootEl) {
         }
       })
     }
-
   }
 
-  function FindBoundaryCells() {
-    return TimedBlock('Find Boundary Cells', () => {
-      state.cells = []
-      if (state.params.performSubdivision) {
-        let radius = canvas.width / 2
-        SubdivideSquare(state.cells, radius, radius, radius, state.params.maxSubdivisionDepth)
-      } else {
-        const diameter = state.params.cellDiameter
-        const radius = diameter * 0.5
-        state.uniformGridDiameter = canvas.width / diameter
-        for (let y = 0; y < state.uniformGridDiameter; y++) {
-          let yoff = y * state.uniformGridDiameter
-          let cy = y * diameter + radius
-          for (let x = 0; x < state.uniformGridDiameter; x++) {
-            let cx = x * diameter + radius
-            let mortonCornerCode = SDFGetMortonCornerCode(cx, cy, radius)
-            let containsContour = mortonCornerCode != 0 && mortonCornerCode != 0b1111
-            state.cells.push({
-              center: [cx, cy],
-              radius: radius,
-              mortonCornerCode: mortonCornerCode,
-              marchingSquaresCode: MortonCornerCodeToMarchingSquaresCode(mortonCornerCode),
-              containsContour: containsContour,
-              gridIndex: yoff + x,
-            })
-          }
+  function ComputeVertices() {
+    const cellCount = state.boundaryCells.length
+    state.cellVertexIndices = new Int32Array(cellCount * 4)
+    state.cellDistances = new Float32Array(cellCount * 4)
+    state.cellVertices = []
+    let lineIntersection = [0, 0]
+    let radius = state.boundaryCells[0].radius
+    let corners = {}
+    corners[TopLeftCornerIndex] = [-radius, +radius]
+    corners[TopRightCornerIndex] = [+radius, +radius]
+    corners[BottomRightCornerIndex] = [+radius, -radius]
+    corners[BottomLeftCornerIndex] = [-radius, -radius]
+
+    // compute the distance to the upper left corner
+    state.boundaryCells.forEach((cell, cellIndex) => {
+      let cellOffset = cellIndex * 4
+      // TODO: cache these instead of recomputing them..
+      for (let cornerIndex = 0; cornerIndex < 4; cornerIndex++) {
+        let d = SampleSDF(
+          cell.center[0] + corners[cornerIndex][0],
+          cell.center[1] + corners[cornerIndex][1],
+        )
+
+        state.cellDistances[cellOffset + cornerIndex] = d
+      }
+    })
+
+    // compute the bottom and left edges
+    state.boundaryCells.forEach(cell => {
+
+      let ul = ((cell.marchingSquaresCode >> TopLeftCornerIndex) & 1) == 1
+      let ur = ((cell.marchingSquaresCode >> TopRightCornerIndex) & 1) == 1
+      let br = ((cell.marchingSquaresCode >> BottomRightCornerIndex) & 1) == 1
+      let bl = ((cell.marchingSquaresCode >> BottomLeftCornerIndex) & 1) == 1
+
+      let cellOffset = cell.boundaryCellIndex * 4
+      console.log(
+        'linesearch',
+        '\n  top-left     ', state.cellDistances[cellOffset + TopLeftCornerIndex].toFixed(2),
+        '\n  top-right    ', state.cellDistances[cellOffset + TopRightCornerIndex].toFixed(2),
+        '\n  bottom-right ', state.cellDistances[cellOffset + BottomRightCornerIndex].toFixed(2),
+        '\n  bottom-left  ', state.cellDistances[cellOffset + BottomLeftCornerIndex].toFixed(2),
+      )
+
+      if (bl != br) {
+        let r = LineSearch(
+          lineIntersection,
+          cell.center[0] + corners[BottomLeftCornerIndex][0],
+          cell.center[1] + corners[BottomLeftCornerIndex][1],
+          state.cellDistances[cellOffset + BottomLeftCornerIndex],
+          cell.center[0] + corners[BottomRightCornerIndex][0],
+          cell.center[1] + corners[BottomRightCornerIndex][1],
+          state.cellDistances[cellOffset + BottomRightCornerIndex],
+          0.1,
+          state.params.lineSearchMaxSteps
+        )
+        if (r) {
+          state.cellVertexIndices[cellOffset + BottomEdgeIndex] = state.cellVertices.length
+          state.cellVertices.push(lineIntersection.slice())
+        } else {
+          state.cellVertexIndices[cellOffset + BottomEdgeIndex] = -1
         }
+      } else {
+        state.cellVertexIndices[cellOffset + BottomEdgeIndex] = -1
       }
 
-      state.boundaryCells = state.cells.filter(cell => cell.containsContour)
-      state.boundaryCells.forEach((cell, boundaryCellIndex) => {
-        cell.boundaryCellIndex = boundaryCellIndex
-      })
+      if (bl != ul) {
+        let r = LineSearch(
+          lineIntersection,
+          cell.center[0] + corners[BottomLeftCornerIndex][0],
+          cell.center[1] + corners[BottomLeftCornerIndex][1],
+          state.cellDistances[cellOffset + BottomLeftCornerIndex],
+          cell.center[0] + corners[TopLeftCornerIndex][0],
+          cell.center[1] + corners[TopLeftCornerIndex][1],
+          state.cellDistances[cellOffset + TopLeftCornerIndex],
+          0.1,
+          state.params.lineSearchMaxSteps
+        )
+        if (r) {
+          state.cellVertexIndices[cellOffset + LeftEdgeIndex] = state.cellVertices.length
+          state.cellVertices.push(lineIntersection.slice())
+        } else {
+          state.cellVertexIndices[cellOffset + LeftEdgeIndex] = -1
+        }
+      } else {
+        state.cellVertexIndices[cellOffset + LeftEdgeIndex] = -1
+      }
     })
+
+    // cache the values from right and top edges
+
   }
 
   function DrawFrame() {
@@ -507,9 +643,9 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     if (state.dirty) {
       FindBoundaryCells()
-      console.log(`FindBoundaryCells cells: ${state.cells.length} boundaryCells: ${state.boundaryCells.length}`)
-
       ComputeEdgeNeighbors()
+
+      ComputeVertices()
     }
 
     // Draw all cells
@@ -605,6 +741,31 @@ function IsosurfaceExtractionBegin(rootEl) {
             cell.center[1] + edgeVerts[edgeIndex][1][1] * padding
           )
           ctx.stroke()
+        }
+      })
+    }
+
+    // Draw boundary cell vertices
+    {
+      state.boundaryCells.forEach((cell, cellIndex) => {
+        let cellOffset = cellIndex * 4
+        for (let edgeIndex = 0; edgeIndex < 4; edgeIndex++) {
+          let vertIndex = state.cellVertexIndices[cellOffset + edgeIndex]
+          if (vertIndex < 0) {
+            continue
+          }
+          let vert = state.cellVertices[vertIndex]
+          ctx.fillStyle = '#36c5f4'
+          ctx.beginPath()
+
+          ctx.arc(
+            vert[0],
+            vert[1],
+            4.0 / state.camera.state.zoom,
+            0,
+            TAU
+          )
+          ctx.fill()
         }
       })
     }

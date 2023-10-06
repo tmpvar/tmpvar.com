@@ -14,7 +14,7 @@ description = "Playground for various isosurface extraction techniques"
         <input type="checkbox" value="1" checked /> draw boundary cell corner state
       </div>
       <div class="debugDrawNodeEdgeState-control control">
-        <input type="checkbox" value="1" checked /> draw boundary cell edge state
+        <input type="checkbox" value="1" /> draw boundary cell edge state
       </div>
     </div>
     <div class="debugPerformance-control control">
@@ -30,6 +30,10 @@ description = "Playground for various isosurface extraction techniques"
     </div>
     <div class="isolevel-control control">
       <input type="range" min="-500" max="500" value="0.0" step="0.1"> isolevel
+      <output></output>
+    </div>
+    <div class="lineSearchMaxSteps-control control">
+      <input type="range" min="0" max="100" value="20"> line search max steps
       <output></output>
     </div>
     <div class="contourExtractionApproach-control control">
