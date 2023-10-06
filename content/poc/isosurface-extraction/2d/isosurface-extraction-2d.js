@@ -51,6 +51,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     Param('debugPerformance', 'bool')
     Param('debugDrawNodeCornerState', 'bool')
     Param('debugDrawNodeEdgeState', 'bool')
+    Param('debugDrawLooseEdgeVertices', 'bool')
     Param('performSubdivision', 'bool')
     Param('contourExtractionApproach', 'string')
 
@@ -556,20 +557,12 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     // compute the bottom and left edges
     state.boundaryCells.forEach(cell => {
-
       let ul = ((cell.marchingSquaresCode >> TopLeftCornerIndex) & 1) == 1
       let ur = ((cell.marchingSquaresCode >> TopRightCornerIndex) & 1) == 1
       let br = ((cell.marchingSquaresCode >> BottomRightCornerIndex) & 1) == 1
       let bl = ((cell.marchingSquaresCode >> BottomLeftCornerIndex) & 1) == 1
 
       let cellOffset = cell.boundaryCellIndex * 4
-      console.log(
-        'linesearch',
-        '\n  top-left     ', state.cellDistances[cellOffset + TopLeftCornerIndex].toFixed(2),
-        '\n  top-right    ', state.cellDistances[cellOffset + TopRightCornerIndex].toFixed(2),
-        '\n  bottom-right ', state.cellDistances[cellOffset + BottomRightCornerIndex].toFixed(2),
-        '\n  bottom-left  ', state.cellDistances[cellOffset + BottomLeftCornerIndex].toFixed(2),
-      )
 
       if (bl != br) {
         let r = LineSearch(
@@ -721,7 +714,6 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     // Draw cell edge states
     if (state.params.debugDrawNodeEdgeState) {
-
       let radius = state.boundaryCells[0].radius
       let edgeVerts = [
         [[-radius, +radius], [+radius, +radius]],
@@ -758,7 +750,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     // Draw boundary cell vertices
-    {
+    if (state.params.debugDrawLooseEdgeVertices) {
       state.boundaryCells.forEach((cell, cellIndex) => {
         let cellOffset = cellIndex * 4
         for (let edgeIndex = 0; edgeIndex < 4; edgeIndex++) {
