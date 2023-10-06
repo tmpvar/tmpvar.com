@@ -22,6 +22,7 @@ function ContainsCrossing(a, b) {
 }
 
 function IsosurfaceExtractionBegin(rootEl) {
+  const EdgesPerCell = 4
   const TAU = Math.PI * 2.0
   const controlEl = rootEl.querySelector('.controls')
   const canvas = rootEl.querySelector('canvas')
@@ -32,6 +33,12 @@ function IsosurfaceExtractionBegin(rootEl) {
     params: {},
     timings: [],
     camera: CreateCamera(ctx),
+  }
+
+  function Assert(cond, msg) {
+    if (!cond) {
+      throw new Error('assertion failure: ' + msg)
+    }
   }
 
   function TimedBlock(label, cb) {
@@ -52,6 +59,11 @@ function IsosurfaceExtractionBegin(rootEl) {
     Param('debugDrawNodeCornerState', 'bool')
     Param('debugDrawNodeEdgeState', 'bool')
     Param('debugDrawLooseEdgeVertices', 'bool')
+    Param('debugDrawBoundaryCells', 'bool')
+    Param('debugDrawGrid', 'bool')
+    Param('debugLoopCollectionMaxSteps', 'i32')
+    Param('debugDrawCellTextualInfo', 'bool')
+
     Param('performSubdivision', 'bool')
     Param('contourExtractionApproach', 'string')
 
@@ -263,12 +275,12 @@ function IsosurfaceExtractionBegin(rootEl) {
     2: [[1, 0]],
     3: [[1, 3]],
     4: [[2, 1]],
-    5: [[0, 3], [2, 1]],
+    5: [[[0, 3], [2, 1]], [[0, 1], [2, 3]]],
     6: [[2, 0]],
     7: [[2, 3]],
     8: [[3, 2]],
     9: [[0, 2]],
-    10: [[1, 0], [3, 2]],
+    10: [[[1, 0], [3, 2]], [[3, 0], [1, 2]]],
     11: [[1, 2]],
     12: [[3, 1]],
     13: [[0, 1]],
@@ -276,9 +288,9 @@ function IsosurfaceExtractionBegin(rootEl) {
   }
 
   const TopEdgeIndex = 0
-  const LeftEdgeIndex = 3
   const RightEdgeIndex = 1
   const BottomEdgeIndex = 2
+  const LeftEdgeIndex = 3
 
   const TopLeftCornerIndex = 0
   const TopRightCornerIndex = 1
@@ -286,22 +298,19 @@ function IsosurfaceExtractionBegin(rootEl) {
   const BottomLeftCornerIndex = 3
 
   let EdgePairings = {}
-  EdgePairings[BottomEdgeIndex] = TopEdgeIndex
   EdgePairings[TopEdgeIndex] = BottomEdgeIndex
   EdgePairings[RightEdgeIndex] = LeftEdgeIndex
+  EdgePairings[BottomEdgeIndex] = TopEdgeIndex
   EdgePairings[LeftEdgeIndex] = RightEdgeIndex
 
-  function SubdivideSquare(nodes, cx, cy, radius, remainingSteps) {
-    ctx.strokeStyle = "#444"
-    let padding = radius / remainingSteps
-    let diameter = radius * 2.0
-    ctx.strokeRect(
-      (cx - radius),
-      (cy - radius),
-      diameter,
-      diameter
-    )
+  let EdgeNames = {}
+  EdgeNames[TopEdgeIndex] = 'Top'
+  EdgeNames[RightEdgeIndex] = 'Right'
+  EdgeNames[BottomEdgeIndex] = 'Bottom'
+  EdgeNames[LeftEdgeIndex] = 'Left'
 
+
+  function SubdivideSquare(nodes, cx, cy, radius, remainingSteps) {
     let d = SampleSDF(cx, cy)
 
     let crossing = Math.abs(d) <= radius * 1.4142135623730951
@@ -413,8 +422,8 @@ function IsosurfaceExtractionBegin(rootEl) {
       let leftBoundaryCellIndex = leftNode.boundaryCellIndex
       let rightBoundaryCellIndex = rightNode.boundaryCellIndex
 
-      edges[rightBoundaryCellIndex * 4 + LeftEdgeIndex] = leftBoundaryCellIndex
-      edges[leftBoundaryCellIndex * 4 + RightEdgeIndex] = rightBoundaryCellIndex
+      edges[rightBoundaryCellIndex * EdgesPerCell + LeftEdgeIndex] = leftBoundaryCellIndex
+      edges[leftBoundaryCellIndex * EdgesPerCell + RightEdgeIndex] = rightBoundaryCellIndex
       return
     }
 
@@ -448,8 +457,8 @@ function IsosurfaceExtractionBegin(rootEl) {
       let upperBoundaryCellIndex = upperNode.boundaryCellIndex
       let lowerBoundaryCellIndex = lowerNode.boundaryCellIndex
 
-      edges[upperBoundaryCellIndex * 4 + BottomEdgeIndex] = lowerBoundaryCellIndex
-      edges[lowerBoundaryCellIndex * 4 + TopEdgeIndex] = upperBoundaryCellIndex
+      edges[upperBoundaryCellIndex * EdgesPerCell + BottomEdgeIndex] = lowerBoundaryCellIndex
+      edges[lowerBoundaryCellIndex * EdgesPerCell + TopEdgeIndex] = upperBoundaryCellIndex
       return
     }
 
@@ -492,7 +501,6 @@ function IsosurfaceExtractionBegin(rootEl) {
   }
 
   function ComputeEdgeNeighbors() {
-    const EdgesPerCell = 4
     const edgeCount = state.cells.length * EdgesPerCell
     state.edges = new Int32Array(edgeCount)
     state.edges.fill(-1)
@@ -515,7 +523,7 @@ function IsosurfaceExtractionBegin(rootEl) {
       })
 
       state.boundaryCells.forEach((cell, cellIndex) => {
-        let currentEdgeOffset = cellIndex * 4
+        let currentEdgeOffset = cellIndex * EdgesPerCell
         for (let i = 0; i < 4; i++) {
           let otherGridIndex = cell.gridIndex + CellEdgeTransition[i]
           if (otherGridIndex < 0 || otherGridIndex > boundaryCellGrid.length) {
@@ -530,8 +538,8 @@ function IsosurfaceExtractionBegin(rootEl) {
 
   function ComputeVertices() {
     const cellCount = state.boundaryCells.length
-    state.cellVertexIndices = new Int32Array(cellCount * 4)
-    state.cellDistances = new Float32Array(cellCount * 4)
+    state.cellVertexIndices = new Int32Array(cellCount * EdgesPerCell)
+    state.cellDistances = new Float32Array(cellCount * EdgesPerCell)
     state.cellVertices = []
     let lineIntersection = [0, 0]
     let radius = state.boundaryCells[0].radius
@@ -543,7 +551,7 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     // compute the distance to the upper left corner
     state.boundaryCells.forEach((cell, cellIndex) => {
-      let cellOffset = cellIndex * 4
+      let cellOffset = cellIndex * EdgesPerCell
       // TODO: cache these instead of recomputing them..
       for (let cornerIndex = 0; cornerIndex < 4; cornerIndex++) {
         let d = SampleSDF(
@@ -562,7 +570,7 @@ function IsosurfaceExtractionBegin(rootEl) {
       let br = ((cell.marchingSquaresCode >> BottomRightCornerIndex) & 1) == 1
       let bl = ((cell.marchingSquaresCode >> BottomLeftCornerIndex) & 1) == 1
 
-      let cellOffset = cell.boundaryCellIndex * 4
+      let cellOffset = cell.boundaryCellIndex * EdgesPerCell
 
       if (bl != br) {
         let r = LineSearch(
@@ -612,14 +620,14 @@ function IsosurfaceExtractionBegin(rootEl) {
     // cache the values from right and top edges
     {
       state.boundaryCells.forEach((cell, cellIndex) => {
-        let cellOffset = cellIndex * 4
+        let cellOffset = cellIndex * EdgesPerCell
 
         let upperCellIndex = state.edges[cellOffset + TopEdgeIndex]
-        let upperVertexIndex = state.cellVertexIndices[upperCellIndex * 4 + BottomEdgeIndex]
+        let upperVertexIndex = state.cellVertexIndices[upperCellIndex * EdgesPerCell + BottomEdgeIndex]
         state.cellVertexIndices[cellOffset + TopEdgeIndex] = upperVertexIndex
 
         let rightCellIndex = state.edges[cellOffset + RightEdgeIndex]
-        let rightVertexIndex = state.cellVertexIndices[rightCellIndex * 4 + LeftEdgeIndex]
+        let rightVertexIndex = state.cellVertexIndices[rightCellIndex * EdgesPerCell + LeftEdgeIndex]
         state.cellVertexIndices[cellOffset + RightEdgeIndex] = rightVertexIndex
       })
     }
@@ -643,7 +651,12 @@ function IsosurfaceExtractionBegin(rootEl) {
       })
     }
 
+    let step = 0
+
     while (queue.length) {
+      if (step++ > state.params.debugLoopCollectionMaxSteps && state.params.debugLoopCollectionMaxSteps > -1) {
+        break;
+      }
       let job = queue.pop()
       let cellIndex = job.cellIndex
 
@@ -653,6 +666,19 @@ function IsosurfaceExtractionBegin(rootEl) {
       }
 
       let edges = MarchingSquaresCodeToEdge[code]
+      if (edges.length > 1) {
+        let x00 = state.cellDistances[cellIndex * EdgesPerCell + TopLeftCornerIndex]
+        let x10 = state.cellDistances[cellIndex * EdgesPerCell + TopRightCornerIndex]
+        let x01 = state.cellDistances[cellIndex * EdgesPerCell + BottomLeftCornerIndex]
+        let x11 = state.cellDistances[cellIndex * EdgesPerCell + BottomRightCornerIndex]
+
+        let q = x00 * x11 - x10 * x01
+        if (q > 0) {
+          edges = edges[1]
+        } else {
+          edges = edges[0]
+        }
+      }
 
       const queueLength = queue.length
       for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex++) {
@@ -683,10 +709,28 @@ function IsosurfaceExtractionBegin(rootEl) {
           continue
         }
 
+        // mark the current cell edges as visited
         cellVisited[cellIndex] |= (startMask | endMask)
 
-        let startVertIndex = state.cellVertexIndices[cellIndex * 4 + startEdge]
-        let endVertIndex = state.cellVertexIndices[cellIndex * 4 + endEdge]
+        // mark the other cell's edge across from start as visited
+        // {
+        //   let otherCellIndex = state.edges[cellIndex * EdgesPerCell + startEdge]
+
+
+        //   console.log(cellIndex, 'start', otherCellIndex, EdgeNames[EdgePairings[startEdge]])
+        //   Assert(otherCellIndex > -1, 'invalid cell index')
+        //   cellVisited[otherCellIndex] |= 1 << EdgePairings[startEdge]
+        // }
+        // // mark the other cell's edge across from end as visited
+        // {
+        //   let otherCellIndex = state.edges[cellIndex * EdgesPerCell + endEdge]
+        //   console.log('end', otherCellIndex, EdgeNames[EdgePairings[endEdge]])
+        //   Assert(otherCellIndex > -1, 'invalid cell index')
+        //   cellVisited[otherCellIndex] |= 1 << EdgePairings[endEdge]
+        // }
+
+        let startVertIndex = state.cellVertexIndices[cellIndex * EdgesPerCell + startEdge]
+        let endVertIndex = state.cellVertexIndices[cellIndex * EdgesPerCell + endEdge]
         if (startVertIndex < 0 || endVertIndex < 0) {
           continue;
         }
@@ -696,8 +740,8 @@ function IsosurfaceExtractionBegin(rootEl) {
         }
 
         if (state.params.subdivideWhileCollectingLoops) {
-          let start = state.primalVertices[startVertIndex]
-          let end = state.primalVertices[endVertIndex]
+          let start = state.cellVertices[startVertIndex]
+          let end = state.cellVertices[endVertIndex]
           SubdivideSegment(start[0], start[1], end[0], end[1], loop, state.params.subdivideWhileCollectingLoopsMaxSubdivisions)
         }
 
@@ -717,6 +761,10 @@ function IsosurfaceExtractionBegin(rootEl) {
         state.loops.push(loop)
         loop = []
       }
+    }
+
+    if (loop.length > 0) {
+      state.loops.push(loop)
     }
   }
 
@@ -742,6 +790,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     ctx.lineWidth = 1.0 / state.camera.state.zoom
 
     if (state.dirty) {
+      console.clear()
       FindBoundaryCells()
       if (state.boundaryCells.length) {
         ComputeEdgeNeighbors()
@@ -753,7 +802,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     // Draw all cells
-    {
+    if (state.params.debugDrawGrid) {
       ctx.strokeStyle = "#444"
       state.cells.forEach(cell => {
         let diameter = cell.radius * 2.0
@@ -767,7 +816,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     // Draw boundary cells
-    {
+    if (state.params.debugDrawBoundaryCells) {
       ctx.fillStyle = "#888"
       state.boundaryCells.forEach(cell => {
         let radius = cell.radius * 0.8
@@ -883,7 +932,15 @@ function IsosurfaceExtractionBegin(rootEl) {
         ctx.beginPath()
         ctx.lineWidth = Math.min(4.0, 8.0 / state.camera.state.zoom)
         vertIndices.forEach((vertIndex, i) => {
+          if (vertIndex == -1) {
+            return;
+          }
+
           let vert = state.cellVertices[vertIndex]
+          if (!vert) {
+            return
+          }
+
           if (i == 0) {
             ctx.moveTo(vert[0], vert[1])
           } else {
@@ -893,6 +950,41 @@ function IsosurfaceExtractionBegin(rootEl) {
         ctx.stroke()
       })
     }
+
+    ctx.fillStyle = '#f0f'
+    ctx.fillRect(0, 0, 10, 10)
+
+    // Draw border cell text
+    if (state.params.debugDrawCellTextualInfo) {
+      // only draw text when the camera is zoomed in
+      if (state.camera.state.zoom >= 1.0) {
+        state.boundaryCells.forEach((cell, cellIndex) => {
+          let code = cell.marchingSquaresCode
+          if (code === 0 || code === 0b1111) {
+            return
+          }
+
+          ctx.save()
+          ctx.scale(1, -1)
+          ctx.translate(0, -canvas.height)
+          ctx.fillStyle = '#ffd1d5'
+          ctx.font = `${Math.min(30, 12 / state.camera.state.zoom)}px Hack, monospace`
+          ctx.fillText(
+            `${cellIndex}`,
+            cell.center[0],
+            canvas.height - cell.center[1]
+          )
+          ctx.fillText(
+            `${code.toString(2).padStart(4, '0')}b ${code}`,
+            cell.center[0] - cell.radius,
+            canvas.height - cell.center[1]
+          )
+          ctx.restore()
+        })
+
+      }
+    }
+
 
     state.camera.end()
     state.dirty = false

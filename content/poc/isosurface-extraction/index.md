@@ -11,13 +11,26 @@ description = "Playground for various isosurface extraction techniques"
      <h4>Debug</h4>
     <div class="indent">
       <div class="debugDrawNodeCornerState-control control">
-        <input type="checkbox" value="1" /> draw boundary cell corner state
+        <input type="checkbox" value="1" checked /> draw boundary cell corner state
       </div>
       <div class="debugDrawNodeEdgeState-control control">
         <input type="checkbox" value="1" /> draw boundary cell edge state
       </div>
       <div class="debugDrawLooseEdgeVertices-control control">
         <input type="checkbox" value="1" /> draw loose edge vertices
+      </div>
+      <div class="debugDrawBoundaryCells-control control">
+        <input type="checkbox" value="1" /> draw boundary cells
+      </div>
+      <div class="debugDrawGrid-control control">
+        <input type="checkbox" value="1" /> draw grid
+      </div>
+      <div class="debugDrawCellTextualInfo-control control">
+        <input type="checkbox" value="1" /> draw cell textual info
+      </div>
+      <div class="debugLoopCollectionMaxSteps-control control">
+        <input type="range" min="-1" max="500" value="-1"> max loop collection steps
+        <output></output>
       </div>
     </div>
     <div class="debugPerformance-control control">
@@ -56,7 +69,7 @@ description = "Playground for various isosurface extraction techniques"
       <output></output>
     </div>
     <div class="maxSubdivisionDepth-control control shownBy-performSubdivision">
-      <input type="range" min="2" max="12" value="7"> max subdivision depth
+      <input type="range" min="2" max="12" value="5"> max subdivision depth
       <output></output>
     </div>
   </section>
