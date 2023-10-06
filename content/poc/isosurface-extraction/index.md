@@ -11,13 +11,13 @@ description = "Playground for various isosurface extraction techniques"
      <h4>Debug</h4>
     <div class="indent">
       <div class="debugDrawNodeCornerState-control control">
-        <input type="checkbox" value="1" checked /> draw boundary cell corner state
+        <input type="checkbox" value="1" /> draw boundary cell corner state
       </div>
       <div class="debugDrawNodeEdgeState-control control">
         <input type="checkbox" value="1" /> draw boundary cell edge state
       </div>
       <div class="debugDrawLooseEdgeVertices-control control">
-        <input type="checkbox" value="1" checked /> draw loose edge vertices
+        <input type="checkbox" value="1" /> draw loose edge vertices
       </div>
     </div>
     <div class="debugPerformance-control control">

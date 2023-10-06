@@ -625,6 +625,101 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
   }
 
+  function CollectPolyLoops() {
+    let cellCount = state.boundaryCells.length
+    let cellVisited = new Uint8Array(cellCount)
+    state.loops = []
+    let loop = []
+    let queue = []
+    // Populate the queue with a single item
+    {
+      state.boundaryCells.forEach((cell, cellIndex) => {
+
+        let edges = MarchingSquaresCodeToEdge[cell.marchingSquaresCode]
+        queue.push({
+          cellIndex,
+          edgeIndex: edges[0][0]
+        })
+      })
+    }
+
+    while (queue.length) {
+      let job = queue.pop()
+      let cellIndex = job.cellIndex
+
+      let code = state.boundaryCells[cellIndex].marchingSquaresCode
+      if (cellVisited[cellIndex] == code) {
+        continue;
+      }
+
+      let edges = MarchingSquaresCodeToEdge[code]
+
+      const queueLength = queue.length
+      for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex++) {
+
+        let edgePair = edges[edgeIndex]
+
+        let startEdge = edgePair[0]
+        let endEdge = edgePair[1]
+
+        let startMask = 1 << startEdge
+        let endMask = 1 << endEdge
+        let visited = cellVisited[cellIndex]
+        if ((visited & startMask) != 0) {
+          continue
+        }
+        if ((cellVisited[cellIndex] & endMask) != 0) {
+          continue
+        }
+
+        // Skip edges that do not continue the current contour
+        if (startEdge != job.edgeIndex) {
+          // Note: put this at the front of the queue so that we don't end up processing it first
+          //       the priority is to continue the contour that got us to this cell
+          queue.unshift({
+            cellIndex: cellIndex,
+            edgeIndex: startEdge
+          })
+          continue
+        }
+
+        cellVisited[cellIndex] |= (startMask | endMask)
+
+        let startVertIndex = state.cellVertexIndices[cellIndex * 4 + startEdge]
+        let endVertIndex = state.cellVertexIndices[cellIndex * 4 + endEdge]
+        if (startVertIndex < 0 || endVertIndex < 0) {
+          continue;
+        }
+
+        if (loop.length == 0) {
+          loop.push(startVertIndex)
+        }
+
+        if (state.params.subdivideWhileCollectingLoops) {
+          let start = state.primalVertices[startVertIndex]
+          let end = state.primalVertices[endVertIndex]
+          SubdivideSegment(start[0], start[1], end[0], end[1], loop, state.params.subdivideWhileCollectingLoopsMaxSubdivisions)
+        }
+
+        loop.push(endVertIndex)
+
+        let nextCellIndex = state.edges[cellIndex * 4 + endEdge]
+        if (nextCellIndex > -1) {
+          queue.push({
+            cellIndex: nextCellIndex,
+            edgeIndex: EdgePairings[endEdge]
+          })
+        }
+      }
+
+      // finalize the current loop
+      if (queueLength == queue.length && loop.length) {
+        state.loops.push(loop)
+        loop = []
+      }
+    }
+  }
+
   function DrawFrame() {
     ReadParams()
     const dirty = state.dirty || state.camera.dirty
@@ -648,9 +743,13 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     if (state.dirty) {
       FindBoundaryCells()
-      ComputeEdgeNeighbors()
-
-      ComputeVertices()
+      if (state.boundaryCells.length) {
+        ComputeEdgeNeighbors()
+        ComputeVertices()
+        CollectPolyLoops()
+      } else if (state.loops) {
+        state.loops.length = 0
+      }
     }
 
     // Draw all cells
@@ -771,6 +870,27 @@ function IsosurfaceExtractionBegin(rootEl) {
           )
           ctx.fill()
         }
+      })
+    }
+
+    // Draw collected polyline loops
+    {
+      state.loops.forEach((vertIndices, loopIndex) => {
+        let r = ((loopIndex + 1) * 158) % 255
+        let g = ((loopIndex + 1) * 2 * 156) % 255
+        let b = ((loopIndex + 1) * 3 * 159) % 127
+        ctx.strokeStyle = `rgb(${r},${g},${b})`
+        ctx.beginPath()
+        ctx.lineWidth = Math.min(4.0, 8.0 / state.camera.state.zoom)
+        vertIndices.forEach((vertIndex, i) => {
+          let vert = state.cellVertices[vertIndex]
+          if (i == 0) {
+            ctx.moveTo(vert[0], vert[1])
+          } else {
+            ctx.lineTo(vert[0], vert[1])
+          }
+        })
+        ctx.stroke()
       })
     }
 
