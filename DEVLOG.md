@@ -44,6 +44,10 @@
                     maybe circle marching would be a better way to avoid crossing
                     multiple iso lines
 
+## 2023-10-06
+- isosurface-extraction/2d: create an edges list (cellCount * 4) and use
+                            FaceProc from keeter to populate only the containsContour
+                            leaf cells
 ## 2023-10-05
 - isosurface-extraction/2d: use sjb3d's floating point sign flip test to avoid the -0 case
 - isosurface-extraction/2d: make it easier to hide/show controls based on other control state

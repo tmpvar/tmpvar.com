@@ -8,6 +8,15 @@ description = "Playground for various isosurface extraction techniques"
 
 <section id="isosurface-extraction-2d-content">
   <section class="controls">
+     <h4>Debug</h4>
+    <div class="indent">
+      <div class="debugDrawNodeCornerState-control control">
+        <input type="checkbox" value="1" checked /> draw boundary cell corner state
+      </div>
+      <div class="debugDrawNodeEdgeState-control control">
+        <input type="checkbox" value="1" checked /> draw boundary cell edge state
+      </div>
+    </div>
     <div class="debugPerformance-control control">
       <input type="checkbox" value="1" checked> show timings
       <div class="performance-output shownBy-debugPerformance">
@@ -32,7 +41,7 @@ description = "Playground for various isosurface extraction techniques"
       contour extraction approach
     </div>
     <div class="performSubdivision-control control">
-      <input type="checkbox" value="1" >
+      <input type="checkbox" value="1" checked >
       subdivide
     </div>
     <div class="cellDiameter-control control hiddenBy-performSubdivision">
