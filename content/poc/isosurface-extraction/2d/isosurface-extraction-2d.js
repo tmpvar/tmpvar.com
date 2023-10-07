@@ -1,5 +1,6 @@
 import CreateParamReader from "../params.js"
 import CreateCamera from "./camera.js"
+import { orient2d } from "./orient2d.js"
 
 function Now() {
   if (window.performance && window.performance.now) {
@@ -24,12 +25,14 @@ function ContainsCrossing(a, b) {
 }
 
 function IsosurfaceExtractionBegin(rootEl) {
+  const Min = Math.min
+  const Max = Math.max
+
   const EdgesPerCell = 4
   const TAU = Math.PI * 2.0
   const controlEl = rootEl.querySelector('.controls')
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('2d')
-
   const state = {
     dirty: true,
     params: {},
@@ -82,10 +85,24 @@ function IsosurfaceExtractionBegin(rootEl) {
     Param('maxSubdivisionDepth', 'i32')
   }
 
+  function Clamp(v, lo, hi) {
+    return Min(hi, Max(v, lo))
+  }
+
+  function Length(x, y) {
+    return Math.sqrt(x * x + y * y)
+  }
+
+  function LengthSquared(x, y) {
+    return x * x + y * y
+  }
+
+  function Dot(ax, ay, bx, by) {
+    return ax * bx + ay * by
+  }
+
   function SDFSphere(px, py, cx, cy, r) {
-    let dx = px - cx
-    let dy = py - cy
-    return Math.sqrt(dx * dx + dy * dy) - r
+    return Length(px - cx, py - cy) - r
   }
 
   function SDFBox(px, py, bx, by) {
@@ -93,10 +110,84 @@ function IsosurfaceExtractionBegin(rootEl) {
     let dy = Math.abs(py) - by;
 
     let l = Math.sqrt(
-      Math.pow(Math.max(dx, 0.0), 2) +
-      Math.pow(Math.max(dy, 0.0), 2)
+      Math.pow(Max(dx, 0.0), 2) +
+      Math.pow(Max(dy, 0.0), 2)
     )
-    return l + Math.min(Math.max(dx, dy), 0.0);
+    return l + Min(Max(dx, dy), 0.0);
+  }
+
+  function SDFSegment(px, py, ax, ay, bx, by, segmentEpsilon = 1e-1) {
+    let pax = px - ax
+    let pay = py - ay
+    let bax = bx - ax
+    let bay = by - ay
+
+    let h = Clamp(
+      Dot(pax, pay, bax, bay) / Dot(bax, bay, bax, bay),
+      0.0,
+      1.0
+    );
+
+    let d = Length(
+      pax - bax * h,
+      pay - bay * h
+    )
+
+    // We only count crossings, but a segment has no area so it needs
+    // to be inflated by a small value
+    return d - segmentEpsilon;
+  }
+
+  function SDFPolygon(px, py, loop) {
+    let d = Dot(
+      px - loop[0][0],
+      px - loop[0][0],
+      py - loop[0][1],
+      py - loop[0][1]
+    );
+
+    let s = 1.0;
+    let N = loop.length
+    for (let i = 0, j = N - 1; i < N; j = i, i++ ) {
+      let ix = loop[i][0]
+      let iy = loop[i][1]
+      let jx = loop[j][0]
+      let jy = loop[j][1]
+      let ex = jx - ix
+      let ey = jy - iy
+
+      let wx = px - ix;
+      let wy = py - iy;
+      let ed = LengthSquared(ex, ey)
+      let r = Clamp(
+        Dot(wx, wy, ex, ey) / ed,
+        0.0,
+        1.0
+      )
+
+      let bx = wx - ex * r;
+      let by = wy - ey * r;
+      d = Min(d, LengthSquared(bx, by) + 1);
+
+      let nextIndex = (i + 1) % N
+      let inside = !IsNegative(orient2d(
+        jx,
+        jy,
+        ix,
+        iy,
+        loop[nextIndex][0],
+        loop[nextIndex][1]
+      ))
+
+      if (inside) {
+        s = -1
+      }
+      // if (py >= iy && py < jy && ex * wy > ey * wx) {
+      //   s *= -1
+      // }
+    }
+
+    return s * Math.sqrt(d);
   }
 
   function SampleSDF(x, y) {
@@ -157,8 +248,8 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     d -= state.params.isolevel
     // clamp the sdf into the box
-    d = Math.max(d, SDFBox(rx - x, ry - y, rx - 10, ry - 10))
-    // d = Math.min(d, SDFBox(rx - x, ry - y, rx, ry))
+    d = Max(d, SDFBox(rx - x, ry - y, rx - 10, ry - 10))
+    // d = Min(d, SDFBox(rx - x, ry - y, rx, ry))
 
     return d
   }
@@ -181,7 +272,8 @@ function IsosurfaceExtractionBegin(rootEl) {
 
   function LineSearch(out, sx, sy, sd, ex, ey, ed, epsilon, remainingSteps) {
     if (!ContainsCrossing(sd, ed)) {
-      throw new Error("invalid line distances")
+      console.error("invalid line distances")
+      return false
     }
 
     if (Math.abs(sd) <= epsilon) {
@@ -208,7 +300,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     if (remainingSteps < 0) {
-      throw new Error("ran out of steps")
+      console.warn("ran out of steps")
       return false
     }
 
@@ -588,7 +680,7 @@ function IsosurfaceExtractionBegin(rootEl) {
           cell.center[0] + corners[BottomRightCornerIndex][0],
           cell.center[1] + corners[BottomRightCornerIndex][1],
           state.cellDistances[cellOffset + BottomRightCornerIndex],
-          0.1,
+          state.params.epsilon,
           state.params.lineSearchMaxSteps
         )
         if (r) {
@@ -610,7 +702,7 @@ function IsosurfaceExtractionBegin(rootEl) {
           cell.center[0] + corners[TopLeftCornerIndex][0],
           cell.center[1] + corners[TopLeftCornerIndex][1],
           state.cellDistances[cellOffset + TopLeftCornerIndex],
-          0.1,
+          state.params.epsilon,
           state.params.lineSearchMaxSteps
         )
         if (r) {
@@ -649,8 +741,10 @@ function IsosurfaceExtractionBegin(rootEl) {
     // Populate the queue with a single item
     {
       state.boundaryCells.forEach((cell, cellIndex) => {
-
         let edges = MarchingSquaresCodeToEdge[cell.marchingSquaresCode]
+        if (!edges) {
+          return
+        }
         queue.push({
           cellIndex,
           edgeIndex: edges[0][0]
@@ -788,6 +882,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     ctx.reset()
+    ctx.lineCap = 'round'
     state.camera.begin()
     ctx.fillStyle = "rgb(11, 11, 11)"
     ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -930,14 +1025,14 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
 
     // Draw collected polyline loops
-    {
+    if (state.loops) {
       state.loops.forEach((vertIndices, loopIndex) => {
         let r = ((loopIndex + 1) * 158) % 255
         let g = ((loopIndex + 1) * 2 * 156) % 255
         let b = ((loopIndex + 1) * 3 * 159) % 127
         ctx.strokeStyle = `rgb(${r},${g},${b})`
         ctx.beginPath()
-        ctx.lineWidth = Math.min(4.0, 8.0 / state.camera.state.zoom)
+        ctx.lineWidth = Min(4.0, 8.0 / state.camera.state.zoom)
         vertIndices.forEach((vertIndex, i) => {
           if (vertIndex == -1) {
             return;
@@ -972,7 +1067,7 @@ function IsosurfaceExtractionBegin(rootEl) {
           ctx.scale(1, -1)
           ctx.translate(0, -canvas.height)
           ctx.fillStyle = '#ffd1d5'
-          ctx.font = `${Math.min(30, 12 / state.camera.state.zoom)}px Hack, monospace`
+          ctx.font = `${Min(30, 12 / state.camera.state.zoom)}px Hack, monospace`
           ctx.fillText(
             `${cellIndex}`,
             cell.center[0],
