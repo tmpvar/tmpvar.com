@@ -956,9 +956,6 @@ function IsosurfaceExtractionBegin(rootEl) {
       })
     }
 
-    ctx.fillStyle = '#f0f'
-    ctx.fillRect(0, 0, 10, 10)
-
     // Draw border cell text
     if (state.params.debugDrawCellTextualInfo) {
       // only draw text when the camera is zoomed in
