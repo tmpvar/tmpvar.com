@@ -1,6 +1,7 @@
 import CreateParamReader from "../params.js"
 import CreateCamera from "./camera.js"
 import { orient2d } from "./orient2d.js"
+import RobustPointInPolygon from "./robust-point-in-polygon.js"
 
 function Now() {
   if (window.performance && window.performance.now) {
@@ -139,16 +140,15 @@ function IsosurfaceExtractionBegin(rootEl) {
   }
 
   function SDFPolygon(px, py, loop) {
-    let d = Dot(
+    let s = RobustPointInPolygon(loop, px, py) ? 1.0 : -1.0
+    let d = LengthSquared(
       px - loop[0][0],
-      px - loop[0][0],
-      py - loop[0][1],
       py - loop[0][1]
-    );
+    )
 
-    let s = 1.0;
+    // let s = 1.0
     let N = loop.length
-    for (let i = 0, j = N - 1; i < N; j = i, i++ ) {
+    for (let i = 0, j = N - 1; i < N; j = i, i++) {
       let ix = loop[i][0]
       let iy = loop[i][1]
       let jx = loop[j][0]
@@ -167,34 +167,39 @@ function IsosurfaceExtractionBegin(rootEl) {
 
       let bx = wx - ex * r;
       let by = wy - ey * r;
-      d = Min(d, LengthSquared(bx, by) + 1);
 
-      let nextIndex = (i + 1) % N
-      let inside = !IsNegative(orient2d(
-        jx,
-        jy,
-        ix,
-        iy,
-        loop[nextIndex][0],
-        loop[nextIndex][1]
-      ))
-
-      if (inside) {
-        s = -1
-      }
-      // if (py >= iy && py < jy && ex * wy > ey * wx) {
-      //   s *= -1
+      // iq's crossing counter
+      // let ca = py >= iy
+      // let cb = py < j.y
+      // let cc = ex * wy > ey * wx
+      // if ((ca && cb && cc) || (!ca && !cb && !cc)) {
+      //   s = -s;
       // }
+
+
+      d = Min(d, LengthSquared(bx, by));
     }
 
     return s * Math.sqrt(d);
   }
 
   function SampleSDF(x, y) {
-    let d = 1000.0;
+    let d = Infinity;
+
+    // Polyloop
+    // TODO: this works when the isolevel is != 0, probably because we use a sign
+    //       crossing to split cells and collect contours
+    if (0) {
+      d = Min(d, SDFPolygon(x, y, [
+        [512, 250],
+        [768, 250],
+        [768, 500],
+        [512, 500],
+      ]))
+    }
 
     // spheres
-    {
+    if (1) {
       d = SDFSphere(
         x,
         y,
