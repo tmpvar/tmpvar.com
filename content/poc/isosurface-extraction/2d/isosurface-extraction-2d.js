@@ -16,7 +16,7 @@ const IsNegative = (function () {
   return function IsNegative(value) {
     isNegativeScratch.setFloat64(0, value, true)
     let uints = isNegativeScratch.getUint32(4, true)
-    return (uints & 1 << 31) != 0
+    return (uints & 1 << 31) != 0 ? 1 : 0
   }
 })();
 
@@ -413,13 +413,10 @@ function IsosurfaceExtractionBegin(rootEl) {
   function SubdivideSquare(nodes, cx, cy, radius, remainingSteps) {
     let d = SampleSDF(cx, cy)
 
-    let crossing = Math.abs(d) <= radius * 1.4142135623730951
-    let containsContour = false
+    let containsContour = Math.abs(d) <= radius * 1.4142135623730951
     let mortonCornerCode = 0
     if (remainingSteps === 0) {
       mortonCornerCode = SDFGetMortonCornerCode(cx, cy, radius)
-      crossing = mortonCornerCode !== 0 && mortonCornerCode != 0b1111
-      containsContour = crossing
     }
 
     let nodeIndex = nodes.length
@@ -433,7 +430,7 @@ function IsosurfaceExtractionBegin(rootEl) {
       mortonCornerCode: mortonCornerCode,
       marchingSquaresCode: MortonCornerCodeToMarchingSquaresCode(mortonCornerCode),
       remainingSteps: remainingSteps,
-      crossing: crossing,
+      leaf: remainingSteps === 0,
       containsContour: containsContour
     }
     nodes.push(node)
@@ -442,7 +439,7 @@ function IsosurfaceExtractionBegin(rootEl) {
       return nodeIndex
     }
 
-    if (crossing) {
+    if (containsContour) {
       let nextRadius = radius * 0.5
       let coords = [
         [cx - nextRadius, cy - nextRadius],
@@ -495,6 +492,7 @@ function IsosurfaceExtractionBegin(rootEl) {
               radius: radius,
               mortonCornerCode: mortonCornerCode,
               marchingSquaresCode: MortonCornerCodeToMarchingSquaresCode(mortonCornerCode),
+              leaf: true,
               containsContour: containsContour,
               gridIndex: yoff + x,
             })
@@ -502,7 +500,7 @@ function IsosurfaceExtractionBegin(rootEl) {
         }
       }
 
-      state.boundaryCells = state.cells.filter(cell => cell.containsContour)
+      state.boundaryCells = state.cells.filter(cell => cell.leaf && cell.containsContour)
       state.boundaryCells.forEach((cell, boundaryCellIndex) => {
         cell.boundaryCellIndex = boundaryCellIndex
       })
@@ -517,7 +515,10 @@ function IsosurfaceExtractionBegin(rootEl) {
     let leftNode = nodes[leftNodeIndex]
     let rightNode = nodes[rightNodeIndex]
 
-    if (rightNode.containsContour && leftNode.containsContour) {
+    if (
+      rightNode.leaf && rightNode.containsContour &&
+      leftNode.leaf && leftNode.containsContour
+    ) {
       let leftBoundaryCellIndex = leftNode.boundaryCellIndex
       let rightBoundaryCellIndex = rightNode.boundaryCellIndex
 
@@ -552,7 +553,10 @@ function IsosurfaceExtractionBegin(rootEl) {
     let upperNode = nodes[upperNodeIndex]
     let lowerNode = nodes[lowerNodeIndex]
 
-    if (upperNode.containsContour && lowerNode.containsContour) {
+    if (
+      upperNode.leaf && upperNode.containsContour &&
+      lowerNode.leaf && lowerNode.containsContour
+    ) {
       let upperBoundaryCellIndex = upperNode.boundaryCellIndex
       let lowerBoundaryCellIndex = lowerNode.boundaryCellIndex
 
@@ -812,24 +816,6 @@ function IsosurfaceExtractionBegin(rootEl) {
 
         // mark the current cell edges as visited
         cellVisited[cellIndex] |= (startMask | endMask)
-
-        // mark the other cell's edge across from start as visited
-        // {
-        //   let otherCellIndex = state.edges[cellIndex * EdgesPerCell + startEdge]
-
-
-        //   console.log(cellIndex, 'start', otherCellIndex, EdgeNames[EdgePairings[startEdge]])
-        //   Assert(otherCellIndex > -1, 'invalid cell index')
-        //   cellVisited[otherCellIndex] |= 1 << EdgePairings[startEdge]
-        // }
-        // // mark the other cell's edge across from end as visited
-        // {
-        //   let otherCellIndex = state.edges[cellIndex * EdgesPerCell + endEdge]
-        //   console.log('end', otherCellIndex, EdgeNames[EdgePairings[endEdge]])
-        //   Assert(otherCellIndex > -1, 'invalid cell index')
-        //   cellVisited[otherCellIndex] |= 1 << EdgePairings[endEdge]
-        // }
-
         let startVertIndex = state.cellVertexIndices[cellIndex * EdgesPerCell + startEdge]
         let endVertIndex = state.cellVertexIndices[cellIndex * EdgesPerCell + endEdge]
         if (startVertIndex < 0 || endVertIndex < 0) {
