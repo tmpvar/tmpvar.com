@@ -10,12 +10,14 @@ function Now() {
 }
 
 // see: https://mastodon.gamedev.place/@sjb3d/110957635606866131
-let isNegativeScratch = new Float64Array(1)
-function IsNegative(num) {
-  isNegativeScratch[0] = num
-  let uints = new Uint32Array(isNegativeScratch.buffer)
-  return (uints[1] & 1 << 31) != 0
-}
+const IsNegative = (function () {
+  let isNegativeScratch = new DataView(new ArrayBuffer(8))
+  return function IsNegative(value) {
+    isNegativeScratch.setFloat64(0, value, true)
+    let uints = isNegativeScratch.getUint32(4, true)
+    return (uints & 1 << 31) != 0
+  }
+})();
 
 function ContainsCrossing(a, b) {
   return IsNegative(a) != IsNegative(b)
