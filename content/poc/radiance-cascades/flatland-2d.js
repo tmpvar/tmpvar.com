@@ -8,7 +8,7 @@ async function ProbeRayDDA2DBegin() {
   const controlEl = rootEl.querySelector('.controls')
 
   const shaders = {
-    DebugWorldBlit(gpu, worldTexture, irradianceTexture) {
+    DebugWorldBlit(gpu, worldTexture, fluenceTexture) {
       const device = gpu.device
       const presentationFormat = gpu.presentationFormat
 
@@ -71,8 +71,8 @@ async function ProbeRayDDA2DBegin() {
         const TAU: f32 = PI * 2;
 
         @group(0) @binding(0) var worldTexture: texture_2d<f32>;
-        @group(0) @binding(1) var irradianceTexture: texture_2d<f32>;
-        @group(0) @binding(2) var irradianceSampler: sampler;
+        @group(0) @binding(1) var fluenceTexture: texture_2d<f32>;
+        @group(0) @binding(2) var fluenceSampler: sampler;
         @group(0) @binding(3) var<uniform> ubo: UBOParams;
 
         @fragment
@@ -96,7 +96,7 @@ async function ProbeRayDDA2DBegin() {
             );
           }
 
-          let sample = textureSample(irradianceTexture, irradianceSampler, fragData.uv / scale);
+          let sample = textureSample(fluenceTexture, fluenceSampler, fragData.uv / scale);
           return vec4f(
             sample.rgb,
             1.0
@@ -176,7 +176,7 @@ async function ProbeRayDDA2DBegin() {
           },
           {
             binding: 1,
-            resource: irradianceTexture.createView()
+            resource: fluenceTexture.createView()
           },
           {
             binding: 2,
@@ -752,7 +752,7 @@ async function ProbeRayDDA2DBegin() {
       }
     },
 
-    BuildIrradianceTexture(device, probeBuffer, irradianceTexture, workgroupSize) {
+    BuildFluenceTexture(device, probeBuffer, fluenceTexture, workgroupSize) {
       const uboFields = [
         "probeRayCount",
         "cascadeWidth",
@@ -787,7 +787,7 @@ async function ProbeRayDDA2DBegin() {
           radiance: f32,
         };
 
-        @group(0) @binding(0) var irradianceTexture: texture_storage_2d<rgba8unorm, write>;
+        @group(0) @binding(0) var fluenceTexture: texture_storage_2d<rgba8unorm, write>;
         @group(0) @binding(1) var<storage,read_write> probes: array<vec4f>;
         @group(0) @binding(2) var<uniform> ubo: UBOParams;
         @compute @workgroup_size(${workgroupSize.join(',')})
@@ -795,7 +795,7 @@ async function ProbeRayDDA2DBegin() {
           if (i32(id.x) >= ubo.width || i32(id.y) >= ubo.width) {
             return;
           }
-          textureStore(irradianceTexture, id.xy, vec4f(0.0));
+          textureStore(fluenceTexture, id.xy, vec4f(0.0));
 
           let uv = vec2f(id.xy) / f32(ubo.width);
           let Index = uv * f32(ubo.cascadeWidth);
@@ -816,7 +816,7 @@ async function ProbeRayDDA2DBegin() {
             // {
             //   var col = i32(rayIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
             //   col = col % vec3<i32>(255, 253, 127);
-            //   textureStore(irradianceTexture, id.xy, vec4(vec3f(col) / 255.0, 1.0));
+            //   textureStore(fluenceTexture, id.xy, vec4(vec3f(col) / 255.0, 1.0));
             // }
 
             {
@@ -828,7 +828,7 @@ async function ProbeRayDDA2DBegin() {
                 return;
               }
 
-              textureStore(irradianceTexture, id.xy, probes[StartIndex + rayIndex]);
+              textureStore(fluenceTexture, id.xy, probes[StartIndex + rayIndex]);
             }
             return;
           }
@@ -838,7 +838,7 @@ async function ProbeRayDDA2DBegin() {
             let probeRayIndex = StartIndex + rayIndex;
             acc += probes[probeRayIndex];
           }
-          textureStore(irradianceTexture, id.xy, acc / f32(ubo.probeRayCount));
+          textureStore(fluenceTexture, id.xy, acc / f32(ubo.probeRayCount));
         }
       `
 
@@ -847,7 +847,7 @@ async function ProbeRayDDA2DBegin() {
       })
 
       const bindGroupLayout = device.createBindGroupLayout({
-        label: 'BuildIrradianceTeture - BindGroupLayout',
+        label: 'BuildFluenceTeture - BindGroupLayout',
         entries: [
           {
             binding: 0,
@@ -874,7 +874,7 @@ async function ProbeRayDDA2DBegin() {
       })
 
       const pipeline = device.createComputePipeline({
-        label: 'BuildIrradianceTeture - Pipeline',
+        label: 'BuildFluenceTeture - Pipeline',
         compute: {
           module: shaderModule,
           entryPoint: 'ComputeMain',
@@ -887,11 +887,11 @@ async function ProbeRayDDA2DBegin() {
       })
 
       const bindGroup = device.createBindGroup({
-        label: 'BuildIrradianceTeture - BindGroup',
+        label: 'BuildFluenceTeture - BindGroup',
         layout: pipeline.getBindGroupLayout(0),
         entries: [
           {
-            binding: 0, resource: irradianceTexture.createView()
+            binding: 0, resource: fluenceTexture.createView()
           },
           {
             binding: 1,
@@ -908,7 +908,7 @@ async function ProbeRayDDA2DBegin() {
         ]
       })
 
-      return function BuildIrradianceTexture(
+      return function BuildFluenceTexture(
         queue,
         computePass,
         probeRayCount,
@@ -1501,10 +1501,10 @@ async function ProbeRayDDA2DBegin() {
     })
   }
 
-  // Create the irradiance texture
+  // Create the fluence texture
   {
-    state.irradianceTexture = state.gpu.device.createTexture({
-      label: 'IrradianceTexture',
+    state.fluenceTexture = state.gpu.device.createTexture({
+      label: 'FluenceTexture',
       size: [canvas.width, canvas.height, 1],
       dimension: '2d',
       format: 'rgba8unorm',
@@ -1512,7 +1512,7 @@ async function ProbeRayDDA2DBegin() {
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.STORAGE_BINDING
       ),
-      label: 'IrradianceTexture'
+      label: 'FluenceTexture'
     })
   }
 
@@ -1525,7 +1525,7 @@ async function ProbeRayDDA2DBegin() {
       debugWorldBlit: shaders.DebugWorldBlit(
         state.gpu,
         state.worldAndBrushPreviewTexture,
-        state.irradianceTexture
+        state.fluenceTexture
       ),
       probeAtlasRaymarch: shaders.ProbeAtlasRaymarch(
         state.gpu,
@@ -1534,10 +1534,10 @@ async function ProbeRayDDA2DBegin() {
         [256, 1, 1],
         state.maxLevel0Rays
       ),
-      buildIrradianceTexture: shaders.BuildIrradianceTexture(
+      buildFluenceTexture: shaders.BuildFluenceTexture(
         state.gpu.device,
         state.probeBuffer,
-        state.irradianceTexture,
+        state.fluenceTexture,
         [16, 16, 1],
       ),
       worldClear: shaders.WorldClear(
@@ -1890,13 +1890,13 @@ Example on Windows:
 
     }
 
-    // Populate the irradiance texture
+    // Populate the fluence texture
     {
       GPUTimedBlock(
         commandEncoder,
-        `populate irradiance texture`, () => {
+        `populate fluence texture`, () => {
           let pass = commandEncoder.beginComputePass()
-          state.gpu.programs.buildIrradianceTexture(
+          state.gpu.programs.buildFluenceTexture(
             state.gpu.device.queue,
             pass,
             state.params.probeRayCount,
