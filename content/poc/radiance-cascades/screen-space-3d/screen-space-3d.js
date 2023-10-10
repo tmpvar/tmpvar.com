@@ -1,6 +1,8 @@
 import CreateOrbitCamera from './orbit-camera.js'
 import CreateParamReader from './params.js'
 import * as mesh from './primitives.js'
+import * as mat4 from './gl-matrix/mat4.js'
+import * as vec3 from './gl-matrix/vec3.js'
 
 async function ScreenSpace3DBegin(rootEl) {
 
@@ -30,6 +32,55 @@ async function ScreenSpace3DBegin(rootEl) {
   state.camera.state.targetDistance = 5
   state.camera.state.distance = state.camera.state.targetDistance
   state.camera.state.scrollSensitivity = 0.01;
+
+
+
+  const MoveMouse = (x, y) => {
+    let ratioX = canvas.width / canvas.clientWidth
+    let ratioY = canvas.height / canvas.clientHeight
+    state.mouse.pos[0] = x * ratioX
+    state.mouse.pos[1] = y * ratioY
+    state.dirty = true;
+  }
+
+  window.addEventListener("mouseup", e => {
+    state.mouse.down = false
+  })
+
+  canvas.addEventListener("mousedown", (e) => {
+    state.mouse.down = true
+    MoveMouse(e.offsetX, e.offsetY);
+    state.mouse.lastPos[0] = state.mouse.pos[0]
+    state.mouse.lastPos[1] = state.mouse.pos[1]
+
+    e.preventDefault()
+  }, { passive: false })
+
+  canvas.addEventListener("mousemove", e => {
+    MoveMouse(e.offsetX, e.offsetY)
+    e.preventDefault()
+
+    if (state.mouse.down) {
+      let dx = state.mouse.lastPos[0] - state.mouse.pos[0]
+      let dy = -(state.mouse.lastPos[1] - state.mouse.pos[1])
+
+      state.mouse.lastPos[0] = state.mouse.pos[0]
+      state.mouse.lastPos[1] = state.mouse.pos[1]
+
+      if (Math.abs(dx) < 1.0 && Math.abs(dy) < 1.0) {
+        return;
+      }
+
+      state.camera.rotate(-dx, -dy)
+    }
+  }, { passive: false })
+
+  canvas.addEventListener("wheel", e => {
+    state.camera.zoom(e.deltaY)
+    state.dirty = true
+    e.preventDefault()
+  }, { passive: false })
+
 
   let minProbeDiameter = Math.pow(
     2,
@@ -183,7 +234,7 @@ async function ScreenSpace3DBegin(rootEl) {
   }
 
   const shaders = {
-    RenderTriangleSoup(gpu, presentationFormat) {
+    RenderTriangleSoup(gpu, instances, presentationFormat) {
       const labelPrefix = gpu.labelPrefix + 'RenderMesh/'
       const device = gpu.device
       const uboFields = [
@@ -213,23 +264,27 @@ async function ScreenSpace3DBegin(rootEl) {
         };
 
         @group(0) @binding(0) var<uniform> ubo: UBOParams;
+        @group(0) @binding(1) var<storage> instanceTransforms: array<mat4x4<f32>>;
 
         @vertex
         fn VertexMain(
           @location(0) inPosition: vec3f,
           @location(1) inNormal: vec3f,
+          @location(2) color: vec3f,
+          @builtin(instance_index) instanceIndex: u32
         ) -> VertexOut {
           var out: VertexOut;
-          out.position = ubo.worldToScreen * vec4(inPosition, 1.0);
+          out.position = ubo.worldToScreen * instanceTransforms[instanceIndex] * vec4(inPosition, 1.0);
           out.color = inPosition * 0.5 + 0.5;
-          out.color = inNormal;
+          out.color = inNormal * 0.5 + 0.5;
+          out.color = color;
           return out;
         }
 
         @fragment
         fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f{
           // return vec4(1.0, 0.0, 1.0, 1.0);
-          return vec4(fragData.color * 0.5 + 0.5, 1.0);
+          return vec4(fragData.color, 1.0);
         }
       `
 
@@ -247,6 +302,13 @@ async function ScreenSpace3DBegin(rootEl) {
             buffer: {
               type: 'uniform',
             }
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.VERTEX,
+            buffer: {
+              type: 'read-only-storage',
+            },
           },
         ]
       })
@@ -288,6 +350,16 @@ async function ScreenSpace3DBegin(rootEl) {
               arrayStride: 12,
               stepMode: 'vertex'
             },
+            // instance color
+            {
+              attributes: [{
+                shaderLocation: 2,
+                offset: 0,
+                format: 'float32x3',
+              }],
+              arrayStride: 3 * 4,
+              stepMode: 'instance'
+            },
           ]
         },
         fragment: {
@@ -324,11 +396,20 @@ async function ScreenSpace3DBegin(rootEl) {
               buffer: ubo
             }
           },
+          {
+            binding: 1,
+            resource: {
+              buffer: instances.transformsBuffer,
+            }
+          },
         ]
       })
 
 
-      return function RenderMesh(commandEncoder, mesh, worldToScreen) {
+      return function RenderMesh(commandEncoder, worldToScreen) {
+        // update the instances buffer
+        instances.upload()
+
         // update the uniform buffer
         {
           let byteOffset = 0
@@ -368,19 +449,13 @@ async function ScreenSpace3DBegin(rootEl) {
         pass.setBindGroup(0, bindGroup)
         pass.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
         pass.setScissorRect(0, 0, canvas.width, canvas.height);
-        pass.setVertexBuffer(0, mesh.positionBuffer);
-        pass.setVertexBuffer(1, mesh.normalBuffer);
-        pass.draw(mesh.vertexCount);
+        pass.setVertexBuffer(0, instances.mesh.positionBuffer);
+        pass.setVertexBuffer(1, instances.mesh.normalBuffer);
+        pass.setVertexBuffer(2, instances.colorsBuffer);
+        pass.draw(instances.mesh.vertexCount, instances.count);
         pass.end();
       }
     }
-  }
-
-  const programs = {
-    renderTriangleSoup: shaders.RenderTriangleSoup(
-      state.gpu,
-      state.gpu.presentationFormat
-    ),
   }
 
   const meshes = {
@@ -388,52 +463,93 @@ async function ScreenSpace3DBegin(rootEl) {
     sphere: mesh.CreateSphere(state.gpu, 3),
   }
 
-  const MoveMouse = (x, y) => {
-    let ratioX = canvas.width / canvas.clientWidth
-    let ratioY = canvas.height / canvas.clientHeight
-    state.mouse.pos[0] = x * ratioX
-    state.mouse.pos[1] = y * ratioY
-    state.dirty = true;
+  function CreateMeshInstances(gpu, mesh, label, count) {
+    const instances = {
+      count: count,
+      mesh: mesh,
+      transforms: new Float32Array(count * 4 * 16),
+      colors: new Float32Array(count * 4 * 3),
+
+      getTransform(index, out) {
+        let start = index * 16;
+        for (let i = 0; i < 16; i++) {
+          out[i] = this.transforms[start + i]
+        }
+      },
+
+      setTransform(index, transform) {
+        let start = index * 16;
+
+        for (let i = 0; i < 16; i++) {
+          this.transforms[start + i] = transform[i]
+        }
+      },
+
+      getColor(index, out) {
+        let start = index * 3
+        out[0] = this.colors[start + 0]
+        out[1] = this.colors[start + 1]
+        out[2] = this.colors[start + 2]
+      },
+      setColor(index, color) {
+        let start = index * 3
+        this.colors[start + 0] = color[0]
+        this.colors[start + 1] = color[1]
+        this.colors[start + 2] = color[2]
+      },
+
+      add(transform, color) {
+        let index = this.count++
+        this.setTransform(index, transform)
+        this.setColor(index, color)
+        return index
+      },
+
+      upload() {
+        gpu.device.queue.writeBuffer(this.transformsBuffer, 0, this.transforms)
+        gpu.device.queue.writeBuffer(this.colorsBuffer, 0, this.colors)
+      },
+    }
+
+    instances.transformsBuffer = gpu.device.createBuffer({
+      label: `${mesh.label}Instance/${label}/Transforms`,
+      size: instances.transforms.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    })
+
+    instances.colorsBuffer = gpu.device.createBuffer({
+      label: `${mesh.label}Instance/${label}/Colors`,
+      size: instances.transforms.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    })
+
+    return instances
   }
 
-  window.addEventListener("mouseup", e => {
-    state.mouse.down = false
-  })
+  const instances = {
+    cube: CreateMeshInstances(state.gpu, meshes.cube, 'cube', 2)
+  }
 
-  canvas.addEventListener("mousedown", (e) => {
-    state.mouse.down = true
-    MoveMouse(e.offsetX, e.offsetY);
-    state.mouse.lastPos[0] = state.mouse.pos[0]
-    state.mouse.lastPos[1] = state.mouse.pos[1]
+  const programs = {
+    renderCubes: shaders.RenderTriangleSoup(
+      state.gpu,
+      instances.cube,
+      state.gpu.presentationFormat
+    ),
+  }
 
-    e.preventDefault()
-  }, { passive: false })
 
-  canvas.addEventListener("mousemove", e => {
-    MoveMouse(e.offsetX, e.offsetY)
-    e.preventDefault()
+  // setup instance data
+  {
+    let scratch = mat4.create()
+    mat4.fromTranslation(scratch, [2, 0, 0])
+    instances.cube.setTransform(0, scratch)
+    instances.cube.setColor(0, [1, 0, 1])
 
-    if (state.mouse.down) {
-      let dx = state.mouse.lastPos[0] - state.mouse.pos[0]
-      let dy = -(state.mouse.lastPos[1] - state.mouse.pos[1])
-
-      state.mouse.lastPos[0] = state.mouse.pos[0]
-      state.mouse.lastPos[1] = state.mouse.pos[1]
-
-      if (Math.abs(dx) < 1.0 && Math.abs(dy) < 1.0) {
-        return;
-      }
-
-      state.camera.rotate(-dx, -dy)
-    }
-  }, { passive: false })
-
-  canvas.addEventListener("wheel", e => {
-    state.camera.zoom(e.deltaY)
-    state.dirty = true
-    e.preventDefault()
-  }, { passive: false })
-
+    mat4.fromTranslation(scratch, [-2, 0, 0])
+    instances.cube.setTransform(1, scratch)
+    instances.cube.setColor(1, [1, 1, 0])
+  }
 
   function RenderFrame() {
     ReadParams()
@@ -450,12 +566,10 @@ async function ScreenSpace3DBegin(rootEl) {
       return
     }
     state.dirty = false
+
     let commandEncoder = state.gpu.device.createCommandEncoder()
-    programs.renderTriangleSoup(
-      commandEncoder,
-      meshes.sphere,
-      state.camera.state.worldToScreen
-    )
+
+    programs.renderCubes(commandEncoder, state.camera.state.worldToScreen)
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
 
