@@ -183,7 +183,8 @@ async function ProbeRayDDA2DBegin() {
             resource: sampler,
           },
           {
-            binding: 3, resource: {
+            binding: 3,
+            resource: {
               buffer: ubo
             }
           },
