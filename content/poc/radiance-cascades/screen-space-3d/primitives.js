@@ -119,6 +119,7 @@ export function CreateCube(gpu) {
   ])
 
   const mesh = {
+    label: labelPrefix,
     vertexCount: positions.length / 3,
     positions: positions,
     normals: normals,
@@ -171,6 +172,7 @@ export function CreateSphere(gpu, subdivisions) {
   })
 
   const mesh = {
+    label: labelPrefix,
     vertexCount: positions.length / 3,
     positions: positions,
     normals: normals,
