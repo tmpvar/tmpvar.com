@@ -26,13 +26,16 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
-- radiance-cascades/3d: generate and render a cube mesh
-- radiance-cascades/3d: generate and render a sphere mesh
+- radiance-cascades/3d: add machinery to instance and position objects around the scene
+- radiance-cascades/3d: output object id into texture (red uint16)
+- radiance-cascades/3d: collect depth buffer and mipmap it into a
+                        red/green (min/max) f32 texture
 - radiance-cascades/3d: add a toggle for screenspace vs worldspace ray casting
-- radiance-cascades/3d: collect depth buffer and mipmap it into an red/green (min/max) texture
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-10
+- radiance-cascades/3d: generate and render a cube mesh
+- radiance-cascades/3d: generate and render a sphere mesh
 - radiance-cascades/3d: create a mesh rendering pipeline
 - radiance-cascades/3d: begin a demo for a screenspace probe approach
 - radiance-cascades/2d: rename irradiance to fluence

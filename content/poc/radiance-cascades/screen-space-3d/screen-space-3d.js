@@ -28,6 +28,7 @@ async function ScreenSpace3DBegin(rootEl) {
     },
   }
   state.camera.state.targetDistance = 5
+  state.camera.state.distance = state.camera.state.targetDistance
   state.camera.state.scrollSensitivity = 0.01;
 
   let minProbeDiameter = Math.pow(
@@ -383,9 +384,9 @@ async function ScreenSpace3DBegin(rootEl) {
   }
 
   const meshes = {
-    cube: mesh.CreateCube(state.gpu)
+    cube: mesh.CreateCube(state.gpu),
+    sphere: mesh.CreateSphere(state.gpu, 3),
   }
-
 
   const MoveMouse = (x, y) => {
     let ratioX = canvas.width / canvas.clientWidth
@@ -452,7 +453,7 @@ async function ScreenSpace3DBegin(rootEl) {
     let commandEncoder = state.gpu.device.createCommandEncoder()
     programs.renderTriangleSoup(
       commandEncoder,
-      meshes.cube,
+      meshes.sphere,
       state.camera.state.worldToScreen
     )
 
