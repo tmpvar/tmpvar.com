@@ -1,13 +1,8 @@
 ## future
+- marching-squares: instead of line searching to the nearest cage point
+                    maybe circle marching would be a better way to avoid crossing
+                    multiple iso lines
 - poc: dual-marching-squares
-- article: generating marching cubes lookup tables
-- article: sand sim w/ box2d
-- article: hashmap-like datastructures
-- article: allocators
-- article: rawkit postmortem / retrospective
-- article: lbvh
-- article: hotcart & hotcart redux
-- article: pullstream
 - radiance-cascades/2d: raytrace approach for comparison's sake
 - radiance-cascades/2d: add a ring of probes along the outside of the bounds to correctly sample
                      upper probes from lower probes that live on the edge
@@ -22,29 +17,27 @@
                         volume via a slider, and we'll want to rebuild the bindGroup when
                         that happens
 ## Next
-- radiance-cascades/3d: mipmap volume whenever it changes, instead
-                        of every frame (pending perf timers)
+- radiance-cascades/2d: collect all of the images and bugs into the radiance cascades 'lessons learned' seection
 - radiance-cascades/2d: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades/2d: 'proper' transparency accumulation
 - radiance-cascades/2d: suslik's blend between cascades
 - radiance-cascades/2d: how to fix the ringing artifacts?
-- radiance-cascades/2d: rename irradiance to fluence
 - radiance-cascades/3d: render a mesh
 - radiance-cascades/3d: render an analytic primitive
 - radiance-cascades/3d: mipmap only changed regions
 
 ## Pending
+
+
+## 2023-10-10
+- radiance-cascades/2d: rename irradiance to fluence
+## 2023-10-06
 - isosurface-extraction/2d: merge marching squares and subdivision
                             process:
                             1. collect boundary cells
                             2. build traversal map (e.g., node->node mapping for 4 edges)
-                            3. traverse the boundary cells collecting a contour using the
-                               user selected approach
-- marching-squares: instead of line searching to the nearest cage point
-                    maybe circle marching would be a better way to avoid crossing
-                    multiple iso lines
-
-## 2023-10-06
+                            3. traverse the boundary cells collecting a contour using
+                               the user selected approach
 - isosurface-extraction/2d: create an edges list (cellCount * 4) and use
                             FaceProc from keeter to populate only the containsContour
                             leaf cells
