@@ -1,15 +1,4 @@
-function ParseColor(value) {
-  let v = parseInt(value.replace("#", ""), 16)
-
-  let r = (v >> 16) & 0xFF
-  let g = (v >> 8) & 0xFF
-  let b = (v >> 0) & 0xFF
-  return r | (g << 8) | (b << 16) | 0xFF000000
-}
-
 export default function CreateParamReader(state, controlEl) {
-
-
   return function Param(paramName, paramType, cb) {
     let selector = `.${paramName}-control`
     let parentEl = controlEl.querySelector(selector)
@@ -58,10 +47,38 @@ export default function CreateParamReader(state, controlEl) {
     }
 
     if (cb) {
-      value = cb(parentEl, value)
+      value = cb(parentEl, value, state.params[paramName])
     }
 
     if (state.params[paramName] != value) {
+      if (el.type == 'checkbox') {
+        controlEl.querySelectorAll(
+          `.disabledBy-${paramName} input, .disabledBy-${paramName} select`
+        ).forEach(el => {
+          el.disabled = !!value
+        });
+        controlEl.querySelectorAll(
+          `.enabledBy-${paramName} input, .enabledBy-${paramName} select`
+        ).forEach(el => {
+          el.disabled = !value
+        });
+
+        controlEl.querySelectorAll(`.hiddenBy-${paramName} `).forEach(el => {
+          el.style.display = value ? 'none' : 'block'
+        });
+
+        controlEl.querySelectorAll(`.shownBy-${paramName}`).forEach(el => {
+          el.style.display = !value ? 'none' : 'block'
+        });
+      }
+
+      if (!cb) {
+        let outputEl = parentEl.querySelector('output')
+        if (outputEl) {
+          outputEl.innerHTML = `${value}`
+        }
+      }
+
       state.params[paramName] = value
       state.dirty = true
       return true
