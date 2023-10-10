@@ -987,7 +987,7 @@ click/drag to move the light
 
     </section>
   </section>
-  <script type="module" src="flatland-2d.js" defer></script>
+  <script type="module" src="flatland-2d/flatland-2d.js" defer></script>
 
   <section class="center-align webgpu-missing error-border">
     <img src="/img/webgpu-responsive.svg" width="768" height="768" />
@@ -1083,7 +1083,66 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
   </script>
 </section>
 
+### Screen Space (3D)
+<span class="highlight-blue">(Work in progress)</span>
+<section id="screen-space-3d-content" class="has-webgpu">
+  <section class="controls">
+    <h4>Debug/Development</h4>
+    <div class="indent">
+      <div class="scene-control control">
+        scene:
+        <select>
+          <option value="single-centered-sphere" selected>Single Sphere</option>
+          <!-- <option value="occluder">Occluder</option>
+          <option value="fractal-with-sphere">Fractal</option> -->
+        </select>
+      </div>
+      <div class="debugRaymarchFixedSizeStepMultiplier-control control">
+        raymarch fixed size step multiplier: <input type="range" min="0.1" max="100.0" step="0.01" value="2.0">
+        <output></output>
+      </div>
+      <div class="debugMaxProbeLevel-control control">
+        max probe level: <input type="range" min="0" max="6" step="1" value="1">
+        <output></output>
+      </div>
+      <div class="debugRenderRawFluence-control control">
+        render fluence <input type="checkbox" value="1" checked/>
+      </div>
+    </div>
+    <h4>Radiance Cascade Parameters</h4>
+    <div class="indent">
+      <div class="probeRayCount-control control">
+        4<sup>r</sup> raycount (level 0): <input type="range" min="0" max="1" value="0" disabled>
+        <output></output>
+      </div>
+      <div class="branchingFactor-control control">
+        branching factor: <input type="range" min="1" max="1" value="1" disabled>
+        <output></output>
+      </div>
+      <div class="intervalRadius-control control">
+        interval radius (level 0): <input type="range" min="0" max="256" value="70">
+        <output></output>
+      </div>
+      <div class="probeLatticeDiameter-control control">
+        probe lattice diameter (level 0): <input type="range" min="2" max="6" value="5">
+        <output></output>
+      </div>
+    </div>
+  </section>
 
+  <section class="center-align webgpu-required">
+    <canvas width="1024" height="1024"></canvas>
+  </section>
+
+  <script src="screen-space-3d/screen-space-3d.js" defer type="module"></script>
+
+  <section class="center-align webgpu-missing error-border">
+    <img src="/img/webgpu-responsive.svg" width="768" height="768" />
+    <p class="error">
+      This demo requires <a href="https://en.wikipedia.org/wiki/WebGPU">WebGPU</a> - in other words, you should open this page in Chrome or Edge.
+    <p>
+  </section>
+</section>
 
 <!--
 ### Fuzz World (3D)
