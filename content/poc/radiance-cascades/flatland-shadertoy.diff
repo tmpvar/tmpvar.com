@@ -1,0 +1,83 @@
+59c59,65
+< vec4 radiance(vec2 ro, vec2 rd, float tMax) {
+---
+> struct RayHit
+> {
+>     vec4 radiance;
+>     float dist;
+> };
+>
+> RayHit radiance(vec2 ro, vec2 rd, float tMax) {
+62c68
+<
+---
+>     float t = 0.0f;
+64c70
+<         float t = intersect(ro, rd, tMax);
+---
+>         t = intersect(ro, rd, tMax);
+67c73
+<             return vec4(0.0, 0.0, 0.0, 1.0);
+---
+>             return RayHit(vec4(0.0, 0.0, 0.0, 1.0), 1e5f);
+73c79
+<     return vec4(p.gba, 0.0);
+---
+>     return RayHit(vec4(p.gba, 0.0), t);
+75a82
+>
+105a113,117
+> float smoothDist(int cascadeIndex)
+> {
+>     return float(1 << cascadeIndex);
+> }
+>
+122,123d133
+<     int nPixels =
+<         int(float(6 * int(iResolution.x) * int(iResolution.y)) * cubemapUsage);
+125,128d134
+<     ivec2 c0_sRes = ivec2(sqrt(
+<         4.0 * float(nPixels) / (4.0 + float(c_dRes * (nCascades - 1))) *
+<         screenRes / screenRes.yx
+<     ));
+130,131c136,137
+<         c0_sRes.x * c0_sRes.y +
+<         c0_sRes.x * c0_sRes.y * c_dRes * (nCascades - 1) / 4;
+---
+>         c_sRes.x * c_sRes.y +
+>         c_sRes.x * c_sRes.y * c_dRes * (nCascades - 1) / 4;
+137,138c143,144
+<     int n = i < c0_sRes.x * c0_sRes.y ? 0 : int(
+<         (4.0 * float(i) / float(c0_sRes.x * c0_sRes.y) - 4.0) / float(c_dRes)
+---
+>     int n = i < c_sRes.x * c_sRes.y ? 0 : int(
+>         (4.0 * float(i) / float(c_sRes.x * c_sRes.y) - 4.0) / float(c_dRes)
+143c149
+<         ? c0_sRes.x * c0_sRes.y + (c0_sRes.x * c0_sRes.y * c_dRes * (n - 1)) / 4
+---
+>         ? c_sRes.x * c_sRes.y + (c_sRes.x * c_sRes.y * c_dRes * (n - 1)) / 4
+146c152
+<     ivec2 cn_sRes = c0_sRes >> n;
+---
+>     ivec2 cn_sRes = c_sRes >> n;
+159c165
+<     float t1 = c0_intervalLength;
+---
+>     float t1 = c_intervalLength;
+169c175,181
+<         vec4 si = radiance(ro + rd * tMin, rd, tMax - tMin);
+---
+>         float sMin = smoothDist(n) * c_smoothDistScale;
+>         float sMax = smoothDist(n + 1) * c_smoothDistScale;
+>
+>         float tMinSmoothed = tMin - sMin * 0.5f;
+>         float tMaxSmoothed = tMax + sMax * 0.5f;
+>
+>         float tMinClamped = max(0.0f, tMinSmoothed);
+170a183,187
+>         RayHit hit = radiance(ro + rd * tMinClamped, rd, tMaxSmoothed - tMinClamped);
+>         vec4 empty_radiance = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+>         hit.radiance = mix(hit.radiance, empty_radiance, 1.0f - clamp((tMinClamped - tMinSmoothed + hit.dist) / sMin, 0.0f, 1.0f));
+>         hit.radiance = mix(hit.radiance, empty_radiance, clamp(((tMinClamped + hit.dist) - (tMaxSmoothed)) / sMax + 1.0f, 0.0f, 1.0f));
+>         vec4 si = hit.radiance;
+
