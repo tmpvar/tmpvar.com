@@ -1,5 +1,6 @@
 import CreateOrbitCamera from './orbit-camera.js'
 import CreateParamReader from './params.js'
+import * as mesh from './primitives.js'
 
 async function ScreenSpace3DBegin(rootEl) {
 
@@ -26,8 +27,8 @@ async function ScreenSpace3DBegin(rootEl) {
       down: false
     },
   }
-  state.camera.state.targetDistance = 200
-  state.camera.state.scrollSensitivity = 0.1;
+  state.camera.state.targetDistance = 5
+  state.camera.state.scrollSensitivity = 0.01;
 
   let minProbeDiameter = Math.pow(
     2,
@@ -181,7 +182,7 @@ async function ScreenSpace3DBegin(rootEl) {
   }
 
   const shaders = {
-    RenderMesh(gpu, presentationFormat) {
+    RenderTriangleSoup(gpu, presentationFormat) {
       const labelPrefix = gpu.labelPrefix + 'RenderMesh/'
       const device = gpu.device
       const uboFields = [
@@ -220,13 +221,14 @@ async function ScreenSpace3DBegin(rootEl) {
           var out: VertexOut;
           out.position = ubo.worldToScreen * vec4(inPosition, 1.0);
           out.color = inPosition * 0.5 + 0.5;
+          out.color = inNormal;
           return out;
         }
 
         @fragment
         fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f{
-          return vec4(1.0, 0.0, 1.0, 1.0);
-          // return vec4(fragData.color, 1.0);
+          // return vec4(1.0, 0.0, 1.0, 1.0);
+          return vec4(fragData.color * 0.5 + 0.5, 1.0);
         }
       `
 
@@ -247,6 +249,17 @@ async function ScreenSpace3DBegin(rootEl) {
           },
         ]
       })
+
+      const depthTexture = gpu.device.createTexture({
+        label: `${labelPrefix}/DepthTexture`,
+        size: [canvas.width, canvas.height],
+        dimension: '2d',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        format: 'depth24plus-stencil8'
+      })
+
+      const depthTextureView = depthTexture.createView()
+
 
       const pipeline = device.createRenderPipeline({
         label: `${labelPrefix}RenderPipeline`,
@@ -285,11 +298,13 @@ async function ScreenSpace3DBegin(rootEl) {
         },
         primitive: {
           topology: 'triangle-list',
+          cullMode: 'back',
+          frontFace: 'cw',
         },
         depthStencil: {
           depthWriteEnabled: true,
           depthCompare: 'less',
-          format: 'depth24plus-stencil8',
+          format: depthTexture.format,
         },
         layout: device.createPipelineLayout({
           bindGroupLayouts: [
@@ -311,6 +326,7 @@ async function ScreenSpace3DBegin(rootEl) {
         ]
       })
 
+
       return function RenderMesh(commandEncoder, mesh, worldToScreen) {
         // update the uniform buffer
         {
@@ -324,6 +340,28 @@ async function ScreenSpace3DBegin(rootEl) {
           gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
         }
 
+        let colorAttachment = {
+          view: ctx.getCurrentTexture().createView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear',
+          storeOp: 'store'
+        };
+
+        let depthAttachment = {
+          view: depthTextureView,
+          depthClearValue: 1,
+          depthLoadOp: 'clear',
+          depthStoreOp: 'store',
+          stencilClearValue: 0,
+          stencilLoadOp: 'clear',
+          stencilStoreOp: 'store',
+        }
+
+        const renderPassDesc = {
+          colorAttachments: [colorAttachment],
+          depthStencilAttachment: depthAttachment,
+        };
+
         let pass = commandEncoder.beginRenderPass(renderPassDesc);
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, bindGroup)
@@ -331,32 +369,94 @@ async function ScreenSpace3DBegin(rootEl) {
         pass.setScissorRect(0, 0, canvas.width, canvas.height);
         pass.setVertexBuffer(0, mesh.positionBuffer);
         pass.setVertexBuffer(1, mesh.normalBuffer);
-        pass.setIndexBuffer(mesh.indexBuffer, 'uint16');
-        pass.drawIndexed(mesh.indexBuffer.length);
+        pass.draw(mesh.vertexCount);
         pass.end();
       }
     }
   }
 
   const programs = {
-    renderMesh: shaders.RenderMesh(
+    renderTriangleSoup: shaders.RenderTriangleSoup(
       state.gpu,
       state.gpu.presentationFormat
     ),
   }
 
+  const meshes = {
+    cube: mesh.CreateCube(state.gpu)
+  }
+
+
+  const MoveMouse = (x, y) => {
+    let ratioX = canvas.width / canvas.clientWidth
+    let ratioY = canvas.height / canvas.clientHeight
+    state.mouse.pos[0] = x * ratioX
+    state.mouse.pos[1] = y * ratioY
+    state.dirty = true;
+  }
+
+  window.addEventListener("mouseup", e => {
+    state.mouse.down = false
+  })
+
+  canvas.addEventListener("mousedown", (e) => {
+    state.mouse.down = true
+    MoveMouse(e.offsetX, e.offsetY);
+    state.mouse.lastPos[0] = state.mouse.pos[0]
+    state.mouse.lastPos[1] = state.mouse.pos[1]
+
+    e.preventDefault()
+  }, { passive: false })
+
+  canvas.addEventListener("mousemove", e => {
+    MoveMouse(e.offsetX, e.offsetY)
+    e.preventDefault()
+
+    if (state.mouse.down) {
+      let dx = state.mouse.lastPos[0] - state.mouse.pos[0]
+      let dy = -(state.mouse.lastPos[1] - state.mouse.pos[1])
+
+      state.mouse.lastPos[0] = state.mouse.pos[0]
+      state.mouse.lastPos[1] = state.mouse.pos[1]
+
+      if (Math.abs(dx) < 1.0 && Math.abs(dy) < 1.0) {
+        return;
+      }
+
+      state.camera.rotate(-dx, -dy)
+    }
+  }, { passive: false })
+
+  canvas.addEventListener("wheel", e => {
+    state.camera.zoom(e.deltaY)
+    state.dirty = true
+    e.preventDefault()
+  }, { passive: false })
+
+
   function RenderFrame() {
     ReadParams()
+    const now = Now()
+    const deltaTime = (now - state.lastFrameTime) / 1000.0
+    state.lastFrameTime = now
+
+    if (state.camera.tick(canvas.width, canvas.height, deltaTime)) {
+      state.dirty = true;
+    }
+
     if (!state.dirty) {
       requestAnimationFrame(RenderFrame)
       return
     }
     state.dirty = false
+    let commandEncoder = state.gpu.device.createCommandEncoder()
+    programs.renderTriangleSoup(
+      commandEncoder,
+      meshes.cube,
+      state.camera.state.worldToScreen
+    )
 
-
-
-
-
+    state.gpu.device.queue.submit([commandEncoder.finish()])
 
     requestAnimationFrame(RenderFrame)
   }
