@@ -10,6 +10,8 @@ enableSampleImage = false
 
 ### Flatland
 
+### Screen Space Probes
+
 ### World Space (3D)
 
 - the memory requirements are very high

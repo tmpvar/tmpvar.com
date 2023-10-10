@@ -29,7 +29,6 @@ async function ScreenSpace3DBegin(rootEl) {
   state.camera.state.targetDistance = 200
   state.camera.state.scrollSensitivity = 0.1;
 
-
   let minProbeDiameter = Math.pow(
     2,
     parseFloat(controlEl.querySelector('.probeRadius-control input').min)
@@ -48,6 +47,15 @@ async function ScreenSpace3DBegin(rootEl) {
 
   try {
     state.gpu = await InitGPU(ctx, probeBufferByteSize);
+    state.gpu.labelPrefix = "ScreenSpace3D/"
+
+    state.gpu.buffers = {
+      probes: state.gpu.device.createBuffer({
+        label: `${state.gpu.labelPrefix}Buffers/Probes`,
+        size: probeBufferByteSize,
+        usage: GPUBufferUsage.STORAGE
+      })
+    }
   } catch (e) {
     console.error(e)
     rootEl.className = rootEl.className.replace('has-webgpu', '')
@@ -172,6 +180,171 @@ async function ScreenSpace3DBegin(rootEl) {
     }
   }
 
+  const shaders = {
+    RenderMesh(gpu, presentationFormat) {
+      const labelPrefix = gpu.labelPrefix + 'RenderMesh/'
+      const device = gpu.device
+      const uboFields = [
+        ['worldToScreen', 'mat4x4<f32>', 16 * 4],
+      ]
+
+      let uboBufferSize = uboFields.reduce((p, c) => {
+        return p + c[2]
+      }, 0)
+      uboBufferSize = Math.floor(uboBufferSize / 16 + 1) * 16
+      const uboBuffer = new ArrayBuffer(uboBufferSize)
+      const uboData = new DataView(uboBuffer)
+      const ubo = device.createBuffer({
+        label: `${labelPrefix}UBO`,
+        size: uboBuffer.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+
+      const source = /* wgsl */`
+        struct VertexOut {
+          @builtin(position) position : vec4f,
+          @location(0) color: vec3f,
+        }
+
+        struct UBOParams {
+          worldToScreen: mat4x4<f32>,
+        };
+
+        @group(0) @binding(0) var<uniform> ubo: UBOParams;
+
+        @vertex
+        fn VertexMain(
+          @location(0) inPosition: vec3f,
+          @location(1) inNormal: vec3f,
+        ) -> VertexOut {
+          var out: VertexOut;
+          out.position = ubo.worldToScreen * vec4(inPosition, 1.0);
+          out.color = inPosition * 0.5 + 0.5;
+          return out;
+        }
+
+        @fragment
+        fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f{
+          return vec4(1.0, 0.0, 1.0, 1.0);
+          // return vec4(fragData.color, 1.0);
+        }
+      `
+
+      const shaderModule = gpu.device.createShaderModule({
+        label: `${labelPrefix}ShaderModule`,
+        code: source,
+      })
+
+      const bindGroupLayout = gpu.device.createBindGroupLayout({
+        label: `${labelPrefix}BindGroupLayout`,
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.VERTEX,
+            buffer: {
+              type: 'uniform',
+            }
+          },
+        ]
+      })
+
+      const pipeline = device.createRenderPipeline({
+        label: `${labelPrefix}RenderPipeline`,
+        vertex: {
+          module: shaderModule,
+          entryPoint: 'VertexMain',
+          buffers: [
+            // position
+            {
+              attributes: [{
+                shaderLocation: 0,
+                offset: 0,
+                format: 'float32x3',
+              }],
+              arrayStride: 12,
+              stepMode: 'vertex',
+            },
+            // normal
+            {
+              attributes: [{
+                shaderLocation: 1,
+                offset: 0,
+                format: 'float32x3',
+              }],
+              arrayStride: 12,
+              stepMode: 'vertex'
+            },
+          ]
+        },
+        fragment: {
+          module: shaderModule,
+          entryPoint: 'FragmentMain',
+          targets: [{
+            format: presentationFormat
+          }]
+        },
+        primitive: {
+          topology: 'triangle-list',
+        },
+        depthStencil: {
+          depthWriteEnabled: true,
+          depthCompare: 'less',
+          format: 'depth24plus-stencil8',
+        },
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout
+          ]
+        })
+      })
+
+      const bindGroup = device.createBindGroup({
+        label: `${labelPrefix}BindGroup`,
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: {
+              buffer: ubo
+            }
+          },
+        ]
+      })
+
+      return function RenderMesh(commandEncoder, mesh, worldToScreen) {
+        // update the uniform buffer
+        {
+          let byteOffset = 0
+
+          worldToScreen.forEach(v => {
+            uboData.setFloat32(byteOffset, v, true)
+            byteOffset += 4;
+          })
+
+          gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
+        }
+
+        let pass = commandEncoder.beginRenderPass(renderPassDesc);
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bindGroup)
+        pass.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
+        pass.setScissorRect(0, 0, canvas.width, canvas.height);
+        pass.setVertexBuffer(0, mesh.positionBuffer);
+        pass.setVertexBuffer(1, mesh.normalBuffer);
+        pass.setIndexBuffer(mesh.indexBuffer, 'uint16');
+        pass.drawIndexed(mesh.indexBuffer.length);
+        pass.end();
+      }
+    }
+  }
+
+  const programs = {
+    renderMesh: shaders.RenderMesh(
+      state.gpu,
+      state.gpu.presentationFormat
+    ),
+  }
+
   function RenderFrame() {
     ReadParams()
     if (!state.dirty) {
@@ -179,11 +352,16 @@ async function ScreenSpace3DBegin(rootEl) {
       return
     }
     state.dirty = false
+
+
+
+
+
+
     requestAnimationFrame(RenderFrame)
   }
 
   RenderFrame()
-
 }
 
 ScreenSpace3DBegin(
