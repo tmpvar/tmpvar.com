@@ -17,17 +17,20 @@
                         volume via a slider, and we'll want to rebuild the bindGroup when
                         that happens
 ## Next
-- radiance-cascades/2d: collect all of the images and bugs into the radiance cascades 'lessons learned' seection
+- radiance-cascades/2d: collect all of the images and bugs into the radiance cascades 'lessons learned' section
 - radiance-cascades/2d: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades/2d: 'proper' transparency accumulation
-- radiance-cascades/2d: suslik's blend between cascades
+- radiance-cascades/2d: suslik's blend between cascades - causes light leaks
 - radiance-cascades/2d: how to fix the ringing artifacts?
 - radiance-cascades/3d: render a mesh
 - radiance-cascades/3d: render an analytic primitive
-- radiance-cascades/3d: mipmap only changed regions
 
 ## Pending
-
+- radiance-cascades/3d: begin a demo for a scattered probe approach
+- radiance-cascades/3d: add a toggle for screenspace vs worldspace ray casting
+- radiance-cascades/3d: render a cube mesh
+- radiance-cascades/3d: collect depth buffer and mipmap it into an red/green (min/max) texture
+- radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-10
 - radiance-cascades/2d: rename irradiance to fluence
