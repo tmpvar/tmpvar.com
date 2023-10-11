@@ -212,6 +212,7 @@ async function ScreenSpace3DBegin(rootEl) {
       Param('debugMaxProbeLevel', 'i32')
 
       Param('debugRenderObjectIDBuffer', 'bool')
+      Param('debugRenderObjectTypeIDBuffer', 'bool')
 
       Param('debugRenderRawFluence', 'bool')
     }
@@ -254,8 +255,18 @@ async function ScreenSpace3DBegin(rootEl) {
     }
   }
 
+  const WGSLObjectDataStruct = /* wgsl */`
+    struct ObjectData {
+      // rgb, a=objectType
+      albedo: vec4f,
+      // rgb, a=unused
+      emission: vec4f,
+      transform: mat4x4<f32>,
+    };
+  `
+
   const shaders = {
-    DebugBlitBase(gpu, outputTexture, fragCode) {
+    DebugBlitBase(gpu, outputTexture, objectsBuffer, fragCode) {
       const labelPrefix = `${outputTexture.label}DebugBlit/`
       const device = gpu.device
       const presentationFormat = gpu.presentationFormat
@@ -273,6 +284,11 @@ async function ScreenSpace3DBegin(rootEl) {
           @location(0) uv: vec2f,
         };
 
+        ${WGSLObjectDataStruct}
+
+        @group(0) @binding(0) var outputTexture: texture_2d<${textureFormat}>;
+        @group(0) @binding(1) var<storage> objectData: array<ObjectData>;
+
         @vertex
         fn VertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
           var vertPos = array<vec2<f32>, 3>(
@@ -288,8 +304,6 @@ async function ScreenSpace3DBegin(rootEl) {
           output.uv.y = 1.0 - output.uv.y;
           return output;
         }
-
-        @group(0) @binding(0) var outputTexture: texture_2d<${textureFormat}>;
 
         ${fragCode}
       `;
@@ -307,6 +321,13 @@ async function ScreenSpace3DBegin(rootEl) {
             visibility: GPUShaderStage.FRAGMENT,
             texture: {
               sampleType: outputTexture.format.indexOf('uint') > -1 ? 'uint' : 'float',
+            },
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: {
+              type: 'read-only-storage',
             },
           },
         ]
@@ -343,6 +364,12 @@ async function ScreenSpace3DBegin(rootEl) {
             binding: 0,
             resource: outputTexture.createView()
           },
+          {
+            binding: 1,
+            resource: {
+              buffer: objectsBuffer,
+            }
+          },
         ]
       })
 
@@ -373,7 +400,7 @@ async function ScreenSpace3DBegin(rootEl) {
       }
     },
 
-    DebugBlitObjectID(gpu, outputTexture) {
+    DebugBlitObjectID(gpu, outputTexture, objectsBuffer) {
       const fragCode = /* wgsl */`
         @fragment
         fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
@@ -388,7 +415,26 @@ async function ScreenSpace3DBegin(rootEl) {
           return vec4(vec3f(col) / 255.0, 1.0);
         }
       `
-      return this.DebugBlitBase(gpu, outputTexture, fragCode)
+      return this.DebugBlitBase(gpu, outputTexture, objectsBuffer, fragCode)
+    },
+
+    DebugBlitObjectTypeID(gpu, outputTexture, objectsBuffer) {
+      const fragCode = /* wgsl */`
+        @fragment
+        fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
+          let pos = vec2<i32>(fragData.uv * vec2f(textureDimensions(outputTexture)));
+          let objectID = textureLoad(outputTexture, pos, 0).r;
+          if (objectID == 0xFFFF) {
+            return vec4(0.0);
+          }
+
+          let typeID = objectData[objectID].albedo.a;
+          var col = i32(typeID + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+          col = col % vec3<i32>(255, 253, 127);
+          return vec4(vec3f(col) / 255.0, 1.0);
+        }
+      `
+      return this.DebugBlitBase(gpu, outputTexture, objectsBuffer, fragCode)
     },
 
     RenderTriangleSoup(
@@ -429,13 +475,7 @@ async function ScreenSpace3DBegin(rootEl) {
           worldToScreen: mat4x4<f32>,
         };
 
-        struct ObjectData {
-          // rgb, a=objectType
-          albedo: vec4f,
-          // rgb, a=unused
-          emission: vec4f,
-          transform: mat4x4<f32>,
-        };
+        ${WGSLObjectDataStruct}
 
         @group(0) @binding(0) var<uniform> ubo: UBOParams;
         @group(0) @binding(1) var<storage> objectData: array<ObjectData>;
@@ -693,7 +733,13 @@ async function ScreenSpace3DBegin(rootEl) {
     debugObjectsBuffer: shaders.DebugBlitObjectID(
       state.gpu,
       textures.objectID,
+      state.gpu.buffers.objects
     ),
+    debugObjectTypesBuffer: shaders.DebugBlitObjectTypeID(
+      state.gpu,
+      textures.objectID,
+      state.gpu.buffers.objects
+    )
   }
 
   const scenes = {}
@@ -894,6 +940,9 @@ async function ScreenSpace3DBegin(rootEl) {
 
     if (state.params.debugRenderObjectIDBuffer) {
       programs.debugObjectsBuffer(commandEncoder, frameTextureView)
+    }
+    if (state.params.debugRenderObjectTypeIDBuffer) {
+      programs.debugObjectTypesBuffer(commandEncoder, frameTextureView)
     }
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
