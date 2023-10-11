@@ -1099,6 +1099,13 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
       <div class="debugRenderRawFluence-control control">
         render fluence <input type="checkbox" value="1" checked/>
       </div>
+      <div class="approach-control control">
+        raycasting approach:
+        <select>
+          <option value="screen-space/brute-force" selected>Screen Space Brute Force</option>
+          <option value="screen-space/brute-force">World Space Brute Force</option>
+        </select>
+      </div>
     </div>
     <h4>Scene Parameters</h4>
     <div class="indent">

@@ -33,8 +33,6 @@ async function ScreenSpace3DBegin(rootEl) {
   state.camera.state.distance = state.camera.state.targetDistance
   state.camera.state.scrollSensitivity = 0.01;
 
-
-
   const MoveMouse = (x, y) => {
     let ratioX = canvas.width / canvas.clientWidth
     let ratioY = canvas.height / canvas.clientHeight
@@ -81,7 +79,6 @@ async function ScreenSpace3DBegin(rootEl) {
     e.preventDefault()
   }, { passive: false })
 
-
   let minProbeDiameter = Math.pow(
     2,
     parseFloat(controlEl.querySelector('.probeRadius-control input').min)
@@ -97,22 +94,41 @@ async function ScreenSpace3DBegin(rootEl) {
   ]).length * 4;
 
   const probeBufferByteSize = state.maxLevel0Rays * raySize * 2
-
+  const ObjectBufferEntrySize = (
+    4 * 4 +     // albedo (rgb, a=objectType)
+    4 * 4 +     // emission (rgb, a=unused)
+    4 * 4 * 4   // transform
+  )
+  const maxSceneObjects = 1 << 4;
   try {
     state.gpu = await InitGPU(ctx, probeBufferByteSize);
     state.gpu.labelPrefix = "ScreenSpace3D/"
+
+    const objectsBufferSize = maxSceneObjects * ObjectBufferEntrySize
+    state.objectsArrayBuffer = new ArrayBuffer(objectsBufferSize)
 
     state.gpu.buffers = {
       probes: state.gpu.device.createBuffer({
         label: `${state.gpu.labelPrefix}Buffers/Probes`,
         size: probeBufferByteSize,
         usage: GPUBufferUsage.STORAGE
+      }),
+      objects: state.gpu.device.createBuffer({
+        label: `${state.gpu.labelPrefix}Buffers/Probes`,
+        size: objectsBufferSize,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
       })
     }
   } catch (e) {
     console.error(e)
     rootEl.className = rootEl.className.replace('has-webgpu', '')
     return;
+  }
+
+  // Build Meshes
+  state.meshes = {
+    box: { typeID: 0, mesh: mesh.CreateCube(state.gpu) },
+    sphere: { typeID: 1, mesh: mesh.CreateSphere(state.gpu, 3) },
   }
 
   async function InitGPU(ctx, probeBufferByteSize) {
@@ -378,6 +394,7 @@ async function ScreenSpace3DBegin(rootEl) {
     RenderTriangleSoup(
       gpu,
       instances,
+      objectsBuffer,
       objectIDStart,
       objectIDTexture,
       depthTexture,
@@ -412,23 +429,28 @@ async function ScreenSpace3DBegin(rootEl) {
           worldToScreen: mat4x4<f32>,
         };
 
+        struct ObjectData {
+          // rgb, a=objectType
+          albedo: vec4f,
+          // rgb, a=unused
+          emission: vec4f,
+          transform: mat4x4<f32>,
+        };
+
         @group(0) @binding(0) var<uniform> ubo: UBOParams;
-        @group(0) @binding(1) var<storage> instanceTransforms: array<mat4x4<f32>>;
+        @group(0) @binding(1) var<storage> objectData: array<ObjectData>;
 
         @vertex
         fn VertexMain(
           @location(0) inPosition: vec3f,
           @location(1) inNormal: vec3f,
-          @location(2) albedo: vec3f,
-          @location(3) emission: vec3f,
           @builtin(instance_index) instanceIndex: u32
         ) -> VertexOut {
           var out: VertexOut;
-          out.position = ubo.worldToScreen * instanceTransforms[instanceIndex] * vec4(inPosition, 1.0);
-          out.color = inPosition * 0.5 + 0.5;
-          out.color = inNormal * 0.5 + 0.5;
-          out.color = albedo;
-          out.objectID = ${objectIDStart} + instanceIndex;
+          let objectID = ${objectIDStart} + instanceIndex;
+          out.position = ubo.worldToScreen * objectData[objectID].transform * vec4(inPosition, 1.0);
+          out.color = objectData[objectID].albedo.rgb;
+          out.objectID = objectID;
           return out;
         }
 
@@ -497,26 +519,6 @@ async function ScreenSpace3DBegin(rootEl) {
               arrayStride: 12,
               stepMode: 'vertex'
             },
-            // instance albedo
-            {
-              attributes: [{
-                shaderLocation: 2,
-                offset: 0,
-                format: 'float32x3',
-              }],
-              arrayStride: 3 * 4,
-              stepMode: 'instance'
-            },
-            // instance emission
-            {
-              attributes: [{
-                shaderLocation: 3,
-                offset: 0,
-                format: 'float32x3',
-              }],
-              arrayStride: 3 * 4,
-              stepMode: 'instance'
-            },
           ]
         },
         fragment: {
@@ -559,16 +561,13 @@ async function ScreenSpace3DBegin(rootEl) {
           {
             binding: 1,
             resource: {
-              buffer: instances.transformsBuffer,
+              buffer: objectsBuffer,
             }
           },
         ]
       })
 
-      return function RenderMesh(commandEncoder, pass, worldToScreen) {
-        // update the instances buffer
-        instances.upload()
-
+      return function RenderMesh(pass, worldToScreen) {
         // update the uniform buffer
         {
           let byteOffset = 0
@@ -587,11 +586,18 @@ async function ScreenSpace3DBegin(rootEl) {
         pass.setScissorRect(0, 0, canvas.width, canvas.height);
         pass.setVertexBuffer(0, instances.mesh.positionBuffer);
         pass.setVertexBuffer(1, instances.mesh.normalBuffer);
-        pass.setVertexBuffer(2, instances.albedoBuffer);
-        pass.setVertexBuffer(3, instances.emissionBuffer);
         pass.draw(instances.mesh.vertexCount, instances.count);
       }
+    },
+
+    ScreenSpaceBruteForce(gpu, fluenceTexture, depthTexture, objectIDTexture,) {
+
+
+      return function ScreenSpaceBruteForce() {
+
+      }
     }
+
   }
 
   const textures = {
@@ -612,101 +618,75 @@ async function ScreenSpace3DBegin(rootEl) {
       //       r16uint is not supported for storage textures..
       format: 'r32uint',
 
-    })
+    }),
+
+    fluence: state.gpu.device.createTexture({
+      label: `${state.gpu.labelPrefix}Fluence/`,
+      size: [canvas.width, canvas.height],
+      dimension: '2d',
+      usage: GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
+      format: 'rgba32float',
+    }),
   }
 
-  const meshes = {
-    cube: mesh.CreateCube(state.gpu),
-    sphere: mesh.CreateSphere(state.gpu, 3),
-  }
+  function CreateMeshInstances(gpu, mesh, dataView, count) {
 
-  function CreateMeshInstances(gpu, mesh, label, count) {
+    // store the mesh typeID in the albedo.a channel
+    {
+      for (let i = 0; i < count; i++) {
+        let offset = i * ObjectBufferEntrySize;
+        dataView.setFloat32(offset, mesh.typeID, true)
+      }
+    }
+
     const instances = {
       count: count,
+      dataView: dataView,
       mesh: mesh,
-      transforms: new Float32Array(count * 4 * 16),
-      albedos: new Float32Array(count * 4 * 3),
-      emissions: new Float32Array(count * 4 * 3),
 
       getTransform(index, out) {
-        let start = index * 16;
+        let start = index * ObjectBufferEntrySize + 4 * 4 * 2;
         for (let i = 0; i < 16; i++) {
-          out[i] = this.transforms[start + i]
+          out[i] = dataView.setFloat32(start + i * 4, true)
         }
       },
 
       setTransform(index, transform) {
-        let start = index * 16;
+        let start = index * ObjectBufferEntrySize + 4 * 4 * 2;
 
         for (let i = 0; i < 16; i++) {
-          this.transforms[start + i] = transform[i]
+          dataView.setFloat32(start + i * 4, transform[i], true)
         }
       },
 
       getAlbedo(index, out) {
-        let start = index * 3
-        out[0] = this.albedos[start + 0]
-        out[1] = this.albedos[start + 1]
-        out[2] = this.albedos[start + 2]
+        let start = index * ObjectBufferEntrySize
+        out[0] = dataView.getFloat32(start + 0, true)
+        out[1] = dataView.getFloat32(start + 4, true)
+        out[2] = dataView.getFloat32(start + 8, true)
       },
-      setAlbedo(index, color) {
-        let start = index * 3
-        this.albedos[start + 0] = color[0]
-        this.albedos[start + 1] = color[1]
-        this.albedos[start + 2] = color[2]
+      setAlbedo(index, value) {
+        let start = index * ObjectBufferEntrySize
+        dataView.setFloat32(start + 0, value[0], true)
+        dataView.setFloat32(start + 4, value[1], true)
+        dataView.setFloat32(start + 8, value[2], true)
       },
 
       getEmissions(index, out) {
-        let start = index * 3
-        out[0] = this.emissions[start + 0]
-        out[1] = this.emissions[start + 1]
-        out[2] = this.emissions[start + 2]
+        let start = index * ObjectBufferEntrySize + 16
+        out[0] = dataView.getFloat32(start + 0, true)
+        out[1] = dataView.getFloat32(start + 4, true)
+        out[2] = dataView.getFloat32(start + 8, true)
       },
-      setEmissions(index, color) {
-        let start = index * 3
-        this.emissions[start + 0] = color[0]
-        this.emissions[start + 1] = color[1]
-        this.emissions[start + 2] = color[2]
-      },
-
-      add(transform, color) {
-        let index = this.count++
-        this.setTransform(index, transform)
-        this.setAlbedo(index, color)
-        return index
-      },
-
-      upload() {
-        gpu.device.queue.writeBuffer(this.transformsBuffer, 0, this.transforms)
-        gpu.device.queue.writeBuffer(this.albedoBuffer, 0, this.albedos)
-        gpu.device.queue.writeBuffer(this.emissionBuffer, 0, this.emissions)
+      setEmissions(index, value) {
+        let start = index * ObjectBufferEntrySize + 16
+        dataView.setFloat32(start + 0, value[0], true)
+        dataView.setFloat32(start + 4, value[1], true)
+        dataView.setFloat32(start + 8, value[2], true)
       },
     }
 
-    instances.transformsBuffer = gpu.device.createBuffer({
-      label: `${mesh.label}Instance/${label}/Transforms`,
-      size: instances.transforms.byteLength,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-    })
-
-    instances.albedoBuffer = gpu.device.createBuffer({
-      label: `${mesh.label}Instance/${label}/Albedo`,
-      size: instances.transforms.byteLength,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-    })
-
-    instances.emissionBuffer = gpu.device.createBuffer({
-      label: `${mesh.label}Instance/${label}/Emission`,
-      size: instances.transforms.byteLength,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-    })
-
     return instances
-  }
-
-
-  const instances = {
-    cube: CreateMeshInstances(state.gpu, meshes.cube, 'cube', 2)
   }
 
   const programs = {
@@ -719,64 +699,71 @@ async function ScreenSpace3DBegin(rootEl) {
   const scenes = {}
 
   const quatIdentity = [0.0, 0.0, 0.0, 1.0]
+  function SceneAddInstances(scene, mesh, instanceCount) {
+    let dataView = new DataView(
+      state.objectsArrayBuffer,
+      scene.objectCount * ObjectBufferEntrySize,
+      instanceCount * ObjectBufferEntrySize
+    )
+    let instances = CreateMeshInstances(state.gpu, mesh.mesh, dataView, instanceCount)
+
+
+    scene.renderSteps.push(
+      shaders.RenderTriangleSoup(
+        state.gpu,
+        instances,
+        state.gpu.buffers.objects,
+        scene.objectCount,
+        textures.objectID,
+        textures.depth,
+        state.gpu.presentationFormat
+      )
+    )
+
+    scene.objectCount += instanceCount
+
+    return instances;
+  }
   // scene: single emissive sphere
   {
     let sceneName = 'simple/emissive-sphere'
-    let objectIDStart = 0
-    const scene = []
 
+    const scene = {
+      objectCount: 0,
+      renderSteps: []
+    }
 
-    let boxes = CreateMeshInstances(state.gpu, meshes.cube, `${sceneName}/boxes`, 1)
-    let spheres = CreateMeshInstances(state.gpu, meshes.sphere, `${sceneName}/spheres`, 1)
     let scratch = mat4.create()
+    let floor = SceneAddInstances(scene, state.meshes.box, 1)
+    let sphere = SceneAddInstances(scene, state.meshes.sphere, 1)
 
-    // floor instance data
-    {
-      mat4.fromRotationTranslationScale(
-        scratch,
-        quatIdentity,
-        [-2, 0, 0],
-        [0.1, 20, 20]
-      )
-      boxes.setTransform(0, scratch)
-      boxes.setAlbedo(0, [.5, .5, .5])
-      boxes.setEmissions(0, [0, 0, 0])
+    scene.update = function () {
+      // floor instance data
+      {
+        mat4.fromRotationTranslationScale(
+          scratch,
+          quatIdentity,
+          [-2, 0, 0],
+          [0.1, 20, 20]
+        )
+        floor.setTransform(0, scratch)
+        floor.setAlbedo(0, [.5, .5, .5])
+        floor.setEmissions(0, [0, 0, 0])
+      }
+
+      // sphere instance data
+      {
+        mat4.fromRotationTranslationScale(
+          scratch,
+          quatIdentity,
+          [0, 0, 0],
+          [1, 1, 1]
+        )
+        sphere.setTransform(0, scratch)
+        sphere.setAlbedo(0, [1, 1, 1])
+        sphere.setEmissions(0, [1, 1, 1])
+      }
     }
-
-    // sphere instance data
-    {
-      mat4.fromRotationTranslationScale(
-        scratch,
-        quatIdentity,
-        [0, 0, 0],
-        [1, 1, 1]
-      )
-      spheres.setTransform(0, scratch)
-      spheres.setAlbedo(0, [1, 1, 1])
-      spheres.setEmissions(0, [1, 1, 1])
-    }
-
-
-    scene.push(shaders.RenderTriangleSoup(
-      state.gpu,
-      boxes,
-      objectIDStart,
-      textures.objectID,
-      textures.depth,
-      state.gpu.presentationFormat
-    ))
-    objectIDStart += instances.cube.count
-
-    scene.push(shaders.RenderTriangleSoup(
-      state.gpu,
-      spheres,
-      objectIDStart,
-      textures.objectID,
-      textures.depth,
-      state.gpu.presentationFormat
-    ))
-
-    objectIDStart += instances.cube.count
 
     scenes[sceneName] = scene
   }
@@ -785,74 +772,57 @@ async function ScreenSpace3DBegin(rootEl) {
   {
     let sceneName = 'simple/emissive-sphere-with-occluder'
     let objectIDStart = 0
-    const scene = []
+    const scene = {
+      objectCount: 0,
+      renderSteps: []
+    }
 
-
-    let boxes = CreateMeshInstances(state.gpu, meshes.cube, `${sceneName}/boxes`, 2)
-    let spheres = CreateMeshInstances(state.gpu, meshes.sphere, `${sceneName}/spheres`, 1)
+    let boxes = SceneAddInstances(scene, state.meshes.box, 2)
+    let spheres = SceneAddInstances(scene, state.meshes.sphere, 1)
     let scratch = mat4.create()
 
-    let floory = -2
-    // floor instance data
-    {
-      mat4.fromRotationTranslationScale(
-        scratch,
-        quatIdentity,
-        [0, floory, 0],
-        [10, 1, 10]
-      )
-      boxes.setTransform(0, scratch)
-      boxes.setAlbedo(0, [.5, .5, .5])
-      boxes.setEmissions(0, [0, 0, 0])
+    scene.update = function () {
+      let floory = -2
+      // floor instance data
+      {
+        mat4.fromRotationTranslationScale(
+          scratch,
+          quatIdentity,
+          [0, floory, 0],
+          [10, 1, 10]
+        )
+        boxes.setTransform(0, scratch)
+        boxes.setAlbedo(0, [.5, .5, .5])
+        boxes.setEmissions(0, [0, 0, 0])
+      }
+
+      // occluder instance data
+      {
+        let yradius = 4
+        mat4.fromRotationTranslationScale(
+          scratch,
+          quatIdentity,
+          [0, yradius + floory, 0],
+          [2, yradius, 2]
+        )
+        boxes.setTransform(1, scratch)
+        boxes.setAlbedo(1, [.5, .5, .5])
+        boxes.setEmissions(1, [0, 0, 0])
+      }
+
+      // sphere instance data
+      {
+        mat4.fromRotationTranslationScale(
+          scratch,
+          quatIdentity,
+          [0, 0, -4],
+          [1, 1, 1]
+        )
+        spheres.setTransform(0, scratch)
+        spheres.setAlbedo(0, [1, 1, 1])
+        spheres.setEmissions(0, [1, 1, 1])
+      }
     }
-
-    // occluder instance data
-    {
-      let yradius = 4
-      mat4.fromRotationTranslationScale(
-        scratch,
-        quatIdentity,
-        [0, yradius + floory, 0],
-        [2, yradius, 2]
-      )
-      boxes.setTransform(1, scratch)
-      boxes.setAlbedo(1, [.5, .5, .5])
-      boxes.setEmissions(1, [0, 0, 0])
-    }
-
-    // sphere instance data
-    {
-      mat4.fromRotationTranslationScale(
-        scratch,
-        quatIdentity,
-        [0, 0, -4],
-        [1, 1, 1]
-      )
-      spheres.setTransform(0, scratch)
-      spheres.setAlbedo(0, [1, 1, 1])
-      spheres.setEmissions(0, [1, 1, 1])
-    }
-
-    scene.push(shaders.RenderTriangleSoup(
-      state.gpu,
-      boxes,
-      objectIDStart,
-      textures.objectID,
-      textures.depth,
-      state.gpu.presentationFormat
-    ))
-    objectIDStart += instances.cube.count
-
-    scene.push(shaders.RenderTriangleSoup(
-      state.gpu,
-      spheres,
-      objectIDStart,
-      textures.objectID,
-      textures.depth,
-      state.gpu.presentationFormat
-    ))
-
-    objectIDStart += instances.cube.count
 
     scenes[sceneName] = scene
   }
@@ -877,6 +847,13 @@ async function ScreenSpace3DBegin(rootEl) {
     let frameTextureView = ctx.getCurrentTexture().createView()
     // Render the current scene
     {
+      scenes[state.params.scene].update()
+
+      state.gpu.device.queue.writeBuffer(
+        state.gpu.buffers.objects,
+        0,
+        state.objectsArrayBuffer
+      )
 
       let colorAttachment = {
         view: frameTextureView,
@@ -908,8 +885,8 @@ async function ScreenSpace3DBegin(rootEl) {
       };
 
       let pass = commandEncoder.beginRenderPass(renderPassDesc);
-      scenes[state.params.scene].forEach((fn) => {
-        fn(commandEncoder, pass, state.camera.state.worldToScreen)
+      scenes[state.params.scene].renderSteps.forEach(fn => {
+        fn(pass, state.camera.state.worldToScreen)
       })
 
       pass.end();
