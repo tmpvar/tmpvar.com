@@ -26,7 +26,12 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
-- radiance-cascades/3d: add an 'infinite' floor box
+- radiance-cascades/3d: add raymarching approach selector
+- radiance-cascades/3d: add raymarching approach: Brute Force Screen Space
+- radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
+- radiance-cascades/3d: add raymarching approach: Cascades World Space RayMarch
+- radiance-cascades/3d: add raymarching approach: Brute Force World Space
+
 - radiance-cascades/3d: compute the per-pixel normals and output into a separate texture
 - radiance-cascades/3d: collect depth buffer and mipmap it into a
                         red/green (min/max) f32 texture
@@ -35,6 +40,7 @@
 
 ## 2023-10-11
 - radiance-cascades/3d: add multiple, switchable scenes
+- radiance-cascades/3d: add an 'infinite' floor box
 ## 2023-10-10
 - radiance-cascades/3d: output object id into texture (red uint16)
 - radiance-cascades/3d: render a mesh
