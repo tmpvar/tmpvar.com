@@ -234,7 +234,135 @@ async function ScreenSpace3DBegin(rootEl) {
   }
 
   const shaders = {
-    RenderTriangleSoup(gpu, instances, presentationFormat) {
+    DebugBlit(gpu, outputTexture, textureFormat, sampleCode) {
+      const labelPrefix = `${outputTexture.label}DebugBlit/`
+      const device = gpu.device
+      const presentationFormat = gpu.presentationFormat
+
+      const source = /* wgsl */`
+        struct VertexOut {
+          @builtin(position) position : vec4f,
+          @location(0) uv: vec2f,
+        };
+
+        @vertex
+        fn VertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
+          var vertPos = array<vec2<f32>, 3>(
+            vec2f(-1.0,-1.0),
+            vec2f(-1.0, 4.0),
+            vec2f( 4.0,-1.0)
+          );
+
+          var output : VertexOut;
+          var pos = vertPos[vertexIndex];
+          output.position = vec4f(pos, 0.0, 1.0);
+          output.uv = pos * 0.5 + 0.5;
+          output.uv.y = 1.0 - output.uv.y;
+          return output;
+        }
+
+        const PI: f32 = 3.141592653589793;
+        const TAU: f32 = PI * 2;
+
+        @group(0) @binding(0) var outputTexture: texture_2d<${textureFormat}>;
+
+        @fragment
+        fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
+          let pos = vec2<i32>(fragData.uv * vec2f(textureDimensions(outputTexture)));
+          let sample = textureLoad(outputTexture, pos, 0);
+          return ${sampleCode ? sampleCode : 'vec4f(sample.rgb, 1.0);'}
+        }
+      `;
+
+      console.log(source)
+
+      const shaderModule = device.createShaderModule({
+        label: `${labelPrefix}ShaderModule`,
+        code: source
+      })
+
+      const bindGroupLayout = device.createBindGroupLayout({
+        label: `${labelPrefix}BindGroupLayout`,
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: {
+              sampleType: outputTexture.format.indexOf('uint') > -1 ? 'uint': 'float',
+            },
+          },
+        ]
+      })
+
+      const pipeline = device.createRenderPipeline({
+        label: `${labelPrefix}RenderPipeline`,
+        vertex: {
+          module: shaderModule,
+          entryPoint: 'VertexMain',
+        },
+        fragment: {
+          module: shaderModule,
+          entryPoint: 'FragmentMain',
+          targets: [{
+            format: presentationFormat
+          }]
+        },
+        primitive: {
+          topology: 'triangle-list'
+        },
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout,
+          ]
+        }),
+      })
+
+      const bindGroup = device.createBindGroup({
+        label: `${labelPrefix}BindGroup`,
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: outputTexture.createView()
+          },
+        ]
+      })
+
+      return async function DebugWorldBlit(
+        commandEncoder,
+        frameTextureView,
+      ) {
+
+        // Note: apparently mapping the staging buffer can take multiple frames?
+        let colorAttachment = {
+          view: frameTextureView,
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear',
+          storeOp: 'store'
+        };
+
+        const renderPassDesc = {
+          colorAttachments: [colorAttachment],
+        };
+
+        let pass = commandEncoder.beginRenderPass(renderPassDesc);
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bindGroup)
+        pass.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
+        pass.setScissorRect(0, 0, canvas.width, canvas.height);
+        pass.draw(3);
+        pass.end();
+      }
+    },
+
+    RenderTriangleSoup(
+      gpu,
+      instances,
+      objectIDStart,
+      objectIDTexture,
+      depthTexture,
+      presentationFormat
+    ) {
       const labelPrefix = gpu.labelPrefix + 'RenderMesh/'
       const device = gpu.device
       const uboFields = [
@@ -257,6 +385,7 @@ async function ScreenSpace3DBegin(rootEl) {
         struct VertexOut {
           @builtin(position) position : vec4f,
           @location(0) color: vec3f,
+          @interpolate(flat) @location(1) objectID: u32,
         }
 
         struct UBOParams {
@@ -278,13 +407,21 @@ async function ScreenSpace3DBegin(rootEl) {
           out.color = inPosition * 0.5 + 0.5;
           out.color = inNormal * 0.5 + 0.5;
           out.color = color;
+          out.objectID = ${objectIDStart} + instanceIndex;
           return out;
         }
 
+        struct FragmentOut {
+          @location(0) color: vec4f,
+          @location(1) objectID: u32
+        };
+
         @fragment
-        fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f{
-          // return vec4(1.0, 0.0, 1.0, 1.0);
-          return vec4(fragData.color, 1.0);
+        fn FragmentMain(fragData: VertexOut) -> FragmentOut {
+          var out: FragmentOut;
+          out.color = vec4(fragData.color, 1.0);
+          out.objectID = ${objectIDStart} + fragData.objectID;
+          return out;
         }
       `
 
@@ -312,17 +449,6 @@ async function ScreenSpace3DBegin(rootEl) {
           },
         ]
       })
-
-      const depthTexture = gpu.device.createTexture({
-        label: `${labelPrefix}/DepthTexture`,
-        size: [canvas.width, canvas.height],
-        dimension: '2d',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
-        format: 'depth24plus-stencil8'
-      })
-
-      const depthTextureView = depthTexture.createView()
-
 
       const pipeline = device.createRenderPipeline({
         label: `${labelPrefix}RenderPipeline`,
@@ -366,7 +492,10 @@ async function ScreenSpace3DBegin(rootEl) {
           module: shaderModule,
           entryPoint: 'FragmentMain',
           targets: [{
-            format: presentationFormat
+            format: presentationFormat,
+          }, {
+            format: objectIDTexture.format,
+            writeMask: GPUColorWrite.RED,
           }]
         },
         primitive: {
@@ -405,8 +534,10 @@ async function ScreenSpace3DBegin(rootEl) {
         ]
       })
 
+      let objectIDTextureView = objectIDTexture.createView()
+      let depthTextureView = depthTexture.createView()
 
-      return function RenderMesh(commandEncoder, worldToScreen) {
+      return function RenderMesh(commandEncoder, frameTextureView, worldToScreen) {
         // update the instances buffer
         instances.upload()
 
@@ -423,8 +554,15 @@ async function ScreenSpace3DBegin(rootEl) {
         }
 
         let colorAttachment = {
-          view: ctx.getCurrentTexture().createView(),
+          view: frameTextureView,
           clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear',
+          storeOp: 'store'
+        };
+
+        let objectAttachment = {
+          view: objectIDTextureView,
+          clearValue: { r: 0xFFFF, g: 0, b: 0, a: 0 },
           loadOp: 'clear',
           storeOp: 'store'
         };
@@ -440,7 +578,7 @@ async function ScreenSpace3DBegin(rootEl) {
         }
 
         const renderPassDesc = {
-          colorAttachments: [colorAttachment],
+          colorAttachments: [colorAttachment, objectAttachment],
           depthStencilAttachment: depthAttachment,
         };
 
@@ -456,6 +594,27 @@ async function ScreenSpace3DBegin(rootEl) {
         pass.end();
       }
     }
+  }
+
+  const textures = {
+    depth: state.gpu.device.createTexture({
+      label: `${state.gpu.labelPrefix}DepthTexture/`,
+      size: [canvas.width, canvas.height],
+      dimension: '2d',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      format: 'depth24plus-stencil8'
+    }),
+
+    objectID: state.gpu.device.createTexture({
+      label: `${state.gpu.labelPrefix}ObjectIDTexture/`,
+      size: [canvas.width, canvas.height],
+      dimension: '2d',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
+      // Note: I'm using u32 here because I want to use the format property to setup DebugBlit and
+      //       r16uint is not supported for storage textures..
+      format: 'r32uint',
+
+    })
   }
 
   const meshes = {
@@ -531,11 +690,30 @@ async function ScreenSpace3DBegin(rootEl) {
   }
 
   const programs = {
-    renderCubes: shaders.RenderTriangleSoup(
+
+
+  }
+
+  {
+    let objectIDStart = 0
+    programs.renderCubes = shaders.RenderTriangleSoup(
       state.gpu,
       instances.cube,
+      objectIDStart,
+      textures.objectID,
+      textures.depth,
       state.gpu.presentationFormat
-    ),
+    )
+
+    objectIDStart += instances.cube.count
+
+    programs.debugObjectsBuffer = shaders.DebugBlit(
+      state.gpu,
+      textures.objectID,
+      'u32',
+      `vec4(f32(sample.r) / ${objectIDStart}.0, 0.0, 0.0, 1.0);`
+    );
+
   }
 
 
@@ -569,7 +747,10 @@ async function ScreenSpace3DBegin(rootEl) {
 
     let commandEncoder = state.gpu.device.createCommandEncoder()
 
-    programs.renderCubes(commandEncoder, state.camera.state.worldToScreen)
+    const frameTextureView = ctx.getCurrentTexture().createView()
+
+    programs.renderCubes(commandEncoder, frameTextureView, state.camera.state.worldToScreen)
+    // programs.debugObjectsBuffer(commandEncoder, frameTextureView)
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
 

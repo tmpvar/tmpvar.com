@@ -11,29 +11,30 @@
 - radiance-cascades/2d: consider adding an environment light to the 2d demo
 - radiance-cascades/2d: consider adding a dumb FPS counter when the "run continuously" without
                      timer queries
-- radiance-cascades/3d: add touch events when this works on any mobile device
+- radiance-cascades/3d: add touch events when webgpu works on any mobile device
 - radiance-cascades/3d: texture wrapper that tracks version
                         will be used for resizing the
                         volume via a slider, and we'll want to rebuild the bindGroup when
                         that happens
-## Next
 - radiance-cascades/2d: collect all of the images and bugs into the radiance cascades 'lessons learned' section
 - radiance-cascades/2d: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades/2d: 'proper' transparency accumulation
 - radiance-cascades/2d: suslik's blend between cascades - causes light leaks
 - radiance-cascades/2d: how to fix the ringing artifacts?
-- radiance-cascades/3d: render a mesh
+
+## Next
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
-- radiance-cascades/3d: add machinery to instance and position objects around the scene
-- radiance-cascades/3d: output object id into texture (red uint16)
 - radiance-cascades/3d: collect depth buffer and mipmap it into a
                         red/green (min/max) f32 texture
 - radiance-cascades/3d: add a toggle for screenspace vs worldspace ray casting
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-10
+- radiance-cascades/3d: output object id into texture (red uint16)
+- radiance-cascades/3d: render a mesh
+- radiance-cascades/3d: add machinery to instance and position objects around the scene
 - radiance-cascades/3d: generate and render a cube mesh
 - radiance-cascades/3d: generate and render a sphere mesh
 - radiance-cascades/3d: create a mesh rendering pipeline
