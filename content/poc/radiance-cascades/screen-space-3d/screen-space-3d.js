@@ -29,7 +29,7 @@ async function ScreenSpace3DBegin(rootEl) {
       down: false
     },
   }
-  state.camera.state.targetDistance = 5
+  state.camera.state.targetDistance = 10
   state.camera.state.distance = state.camera.state.targetDistance
   state.camera.state.scrollSensitivity = 0.01;
 
@@ -194,6 +194,9 @@ async function ScreenSpace3DBegin(rootEl) {
     // debug params
     {
       Param('debugMaxProbeLevel', 'i32')
+
+      Param('debugRenderObjectIDBuffer', 'bool')
+
       Param('debugRenderRawFluence', 'bool')
     }
 
@@ -732,8 +735,8 @@ async function ScreenSpace3DBegin(rootEl) {
       mat4.fromRotationTranslationScale(
         scratch,
         quatIdentity,
-        [0, -2, 0],
-        [200, 1, 200]
+        [-2, 0, 0],
+        [0.1, 20, 20]
       )
       boxes.setTransform(0, scratch)
       boxes.setAlbedo(0, [.5, .5, .5])
@@ -778,7 +781,7 @@ async function ScreenSpace3DBegin(rootEl) {
     scenes[sceneName] = scene
   }
 
-  // scene: single emissive sphere
+  // scene: single emissive sphere with occluder
   {
     let sceneName = 'simple/emissive-sphere-with-occluder'
     let objectIDStart = 0
@@ -822,7 +825,7 @@ async function ScreenSpace3DBegin(rootEl) {
       mat4.fromRotationTranslationScale(
         scratch,
         quatIdentity,
-        [4, 0, 0],
+        [0, 0, -4],
         [1, 1, 1]
       )
       spheres.setTransform(0, scratch)
@@ -912,7 +915,9 @@ async function ScreenSpace3DBegin(rootEl) {
       pass.end();
     }
 
-    programs.debugObjectsBuffer(commandEncoder, frameTextureView)
+    if (state.params.debugRenderObjectIDBuffer) {
+      programs.debugObjectsBuffer(commandEncoder, frameTextureView)
+    }
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
 
