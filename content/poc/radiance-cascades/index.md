@@ -1084,24 +1084,30 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
 </section>
 
 ### Screen Space (3D)
-<span class="highlight-blue">(Work in progress)</span>
+<span class="highlight-blue">🚧 Work in progress 🚧</span>
 <section id="screen-space-3d-content" class="has-webgpu">
   <section class="controls">
     <h4>Debug/Development</h4>
+    <div class="indent">
+      <div class="debugMaxProbeLevel-control control">
+        max probe level: <input type="range" min="0" max="6" step="1" value="1">
+        <output></output>
+      </div>
+      <div class="debugRenderObjectIDBuffer-control control">
+        render objectIDs <input type="checkbox" value="1" />
+      </div>
+      <div class="debugRenderRawFluence-control control">
+        render fluence <input type="checkbox" value="1" checked/>
+      </div>
+    </div>
+    <h4>Scene Parameters</h4>
     <div class="indent">
       <div class="scene-control control">
         scene:
         <select>
           <option value="simple/emissive-sphere" selected>Single Emissive Sphere</option>
-          <option value="simple/emissive-sphere-with-occluder" selected>Single Emissive Sphere + Occluder</option>
+          <option value="simple/emissive-sphere-with-occluder">Single Emissive Sphere + Occluder</option>
         </select>
-      </div>
-      <div class="debugMaxProbeLevel-control control">
-        max probe level: <input type="range" min="0" max="6" step="1" value="1">
-        <output></output>
-      </div>
-      <div class="debugRenderRawFluence-control control">
-        render fluence <input type="checkbox" value="1" checked/>
       </div>
     </div>
     <h4>Radiance Cascade Parameters</h4>
