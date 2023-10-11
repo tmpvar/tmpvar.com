@@ -1092,9 +1092,8 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
       <div class="scene-control control">
         scene:
         <select>
-          <option value="single-centered-sphere" selected>Single Sphere</option>
-          <!-- <option value="occluder">Occluder</option>
-          <option value="fractal-with-sphere">Fractal</option> -->
+          <option value="simple/emissive-sphere" selected>Single Emissive Sphere</option>
+          <option value="simple/emissive-sphere-with-occluder" selected>Single Emissive Sphere + Occluder</option>
         </select>
       </div>
       <div class="debugMaxProbeLevel-control control">
