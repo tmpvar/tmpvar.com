@@ -26,11 +26,15 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
+- radiance-cascades/3d: add an 'infinite' floor box
+- radiance-cascades/3d: compute the per-pixel normals and output into a separate texture
 - radiance-cascades/3d: collect depth buffer and mipmap it into a
                         red/green (min/max) f32 texture
 - radiance-cascades/3d: add a toggle for screenspace vs worldspace ray casting
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
+## 2023-10-11
+- radiance-cascades/3d: add multiple, switchable scenes
 ## 2023-10-10
 - radiance-cascades/3d: output object id into texture (red uint16)
 - radiance-cascades/3d: render a mesh
