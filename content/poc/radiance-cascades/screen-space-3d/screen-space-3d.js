@@ -97,8 +97,6 @@ async function ScreenSpace3DBegin(rootEl) {
   const ObjectBufferEntrySize = (
     16 +      //   albedo (rgb, a=objectType)
     16 +      //   emission (rgb, a=unused)
-    16 +      //   padding
-    16 +      //   padding
     16 * 4    // transform
   )
   const maxSceneObjects = 1 << 4;
@@ -237,7 +235,6 @@ async function ScreenSpace3DBegin(rootEl) {
         let probeRayCount = state.params.probeRayCount;
         let displayValue = Math.pow(2, value)
         let examples = ([0, 1, 2, 3]).map(level => {
-          let shifted = state.params.probeRayCount << (value * level)
           let powed = probeRayCount * Math.pow(2, value * level)
           return powed
         })
@@ -264,8 +261,6 @@ async function ScreenSpace3DBegin(rootEl) {
       albedo: vec4f,
       // // rgb, a=unused
       emission: vec4f,
-      pad0: vec4f,
-      pad1: vec4f,
       transform: mat4x4<f32>,
     };
   `
@@ -433,7 +428,7 @@ async function ScreenSpace3DBegin(rootEl) {
             return vec4(0.0);
           }
 
-          let typeID = objectData[objectID].albedo.r;
+          let typeID = objectData[objectID].albedo.a;
           var col = i32(typeID + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
           col = col % vec3<i32>(255, 253, 127);
           return vec4(vec3f(col) / 255.0, 1.0);
@@ -508,7 +503,7 @@ async function ScreenSpace3DBegin(rootEl) {
         fn FragmentMain(fragData: VertexOut) -> FragmentOut {
           var out: FragmentOut;
           out.color = vec4(fragData.color, 1.0);
-          out.objectID = ${objectIDStart} + fragData.objectID;
+          out.objectID = fragData.objectID;
           return out;
         }
       `
@@ -690,15 +685,14 @@ async function ScreenSpace3DBegin(rootEl) {
       mesh: mesh,
 
       getTransform(index, out) {
-        let start = index * ObjectBufferEntrySize + 64;
+        let start = index * ObjectBufferEntrySize + 16 * 2;
         for (let i = 0; i < 16; i++) {
           out[i] = dataView.getFloat32(start + i * 4, true)
         }
       },
 
       setTransform(index, transform) {
-        let start = index * ObjectBufferEntrySize + 64;
-
+        let start = index * ObjectBufferEntrySize + 16 * 2;
         for (let i = 0; i < 16; i++) {
           dataView.setFloat32(start + i * 4, transform[i], true)
         }
@@ -848,7 +842,7 @@ async function ScreenSpace3DBegin(rootEl) {
           [10, 1, 10]
         )
         boxes.setTransform(0, scratch)
-        boxes.setAlbedo(0, [3.0, 0.0, 0.0])
+        boxes.setAlbedo(0, [0.5, 0.5, 0.5])
         boxes.setEmissions(0, [0, 0, 0])
       }
 
@@ -862,7 +856,7 @@ async function ScreenSpace3DBegin(rootEl) {
           [2, yradius, 2]
         )
         boxes.setTransform(1, scratch)
-        boxes.setAlbedo(1, [3.0, 0.0, 0.0])
+        boxes.setAlbedo(1, [0.45, 0.45, 0.45])
         boxes.setEmissions(1, [0, 0, 0])
       }
 
@@ -875,7 +869,7 @@ async function ScreenSpace3DBegin(rootEl) {
           [1, 1, 1]
         )
         spheres.setTransform(0, scratch)
-        spheres.setAlbedo(0, [3.0, 0.0, 0.0])
+        spheres.setAlbedo(0, [1.0, 1.0, 1.0])
         spheres.setEmissions(0, [1, 1, 1])
       }
     }
@@ -905,19 +899,6 @@ async function ScreenSpace3DBegin(rootEl) {
     // Render the current scene
     {
       scenes[state.params.scene].update()
-
-      {
-        console.group('object buffer contents')
-        let a = new Float32Array(state.objectsArrayBuffer)
-        for (
-          let i = 0;
-          i < a.length - ObjectBufferEntrySize * scenes[state.params.scene].objectCount;
-          i += ObjectBufferEntrySize / 4
-        ) {
-          console.log(a[i + 0], a[i + 1], a[i + 2], a[i + 3])
-        }
-        console.groupEnd()
-      }
 
       state.gpu.device.queue.writeBuffer(
         state.gpu.buffers.objects,
