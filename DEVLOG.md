@@ -26,7 +26,6 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
-- radiance-cascades/3d: add raymarching approach selector
 - radiance-cascades/3d: add raymarching approach: Brute Force Screen Space
 - radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
 - radiance-cascades/3d: add raymarching approach: Cascades World Space RayMarch
@@ -38,7 +37,10 @@
 - radiance-cascades/3d: add a toggle for screenspace vs worldspace ray casting
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
+## 2023-10-12
+- radiance-cascades/3d: add fluence debug output
 ## 2023-10-11
+- radiance-cascades/3d: add raymarching approach selector
 - radiance-cascades/3d: add multiple, switchable scenes
 - radiance-cascades/3d: add an 'infinite' floor box
 ## 2023-10-10
