@@ -215,6 +215,7 @@ async function ScreenSpace3DBegin(rootEl) {
       Param('debugRenderObjectTypeIDBuffer', 'bool')
 
       Param('debugRenderRawFluence', 'bool')
+      Param('debugRenderNormals', 'bool')
     }
 
     // probe params
@@ -453,6 +454,17 @@ async function ScreenSpace3DBegin(rootEl) {
       return this.DebugBlitBase(gpu, fluenceTexture, objectsBuffer, fragCode)
     },
 
+    DebugBlitNormals(gpu, normalTexture, objectsBuffer) {
+      const fragCode = /* wgsl */`
+        @fragment
+        fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
+          let pos = vec2<i32>(fragData.uv * vec2f(textureDimensions(outputTexture)));
+          return vec4(textureLoad(outputTexture, pos, 0).rgb * 0.5 + 0.5, 1.0);
+        }
+      `
+      return this.DebugBlitBase(gpu, normalTexture, objectsBuffer, fragCode)
+    },
+
     RenderTriangleSoup(
       gpu,
       instances,
@@ -460,6 +472,7 @@ async function ScreenSpace3DBegin(rootEl) {
       objectIDStart,
       objectIDTexture,
       depthTexture,
+      normalTexture,
       presentationFormat
     ) {
       const labelPrefix = gpu.labelPrefix + 'RenderMesh/'
@@ -485,6 +498,7 @@ async function ScreenSpace3DBegin(rootEl) {
           @builtin(position) position : vec4f,
           @location(0) color: vec3f,
           @interpolate(flat) @location(1) objectID: u32,
+          @location(2) worldPosition: vec3f,
         }
 
         struct UBOParams {
@@ -504,7 +518,9 @@ async function ScreenSpace3DBegin(rootEl) {
         ) -> VertexOut {
           var out: VertexOut;
           let objectID = ${objectIDStart} + instanceIndex;
-          out.position = ubo.worldToScreen * objectData[objectID].transform * vec4(inPosition, 1.0);
+          let worldPosition = objectData[objectID].transform * vec4(inPosition, 1.0);
+          out.worldPosition = worldPosition.xyz;
+          out.position = ubo.worldToScreen * worldPosition;
           out.color = objectData[objectID].albedo.rgb;
           out.objectID = objectID;
           return out;
@@ -512,7 +528,8 @@ async function ScreenSpace3DBegin(rootEl) {
 
         struct FragmentOut {
           @location(0) color: vec4f,
-          @location(1) objectID: u32
+          @location(1) objectID: u32,
+          @location(2) normal: vec4f,
         };
 
         @fragment
@@ -520,6 +537,12 @@ async function ScreenSpace3DBegin(rootEl) {
           var out: FragmentOut;
           out.color = vec4(fragData.color, 1.0);
           out.objectID = fragData.objectID;
+
+          let dFdxPos = dpdx(fragData.worldPosition);
+          let dFdyPos = dpdy(fragData.worldPosition);
+          out.normal = vec4f(normalize(cross(dFdxPos,dFdyPos )), 1.0);
+
+          // TODO: compute screen space normal
           return out;
         }
       `
@@ -585,6 +608,8 @@ async function ScreenSpace3DBegin(rootEl) {
           }, {
             format: objectIDTexture.format,
             writeMask: GPUColorWrite.RED,
+          }, {
+            format: normalTexture.format
           }]
         },
         primitive: {
@@ -916,7 +941,6 @@ async function ScreenSpace3DBegin(rootEl) {
         computePass.end()
       }
     }
-
   }
 
   const textures = {
@@ -941,6 +965,17 @@ async function ScreenSpace3DBegin(rootEl) {
       //       r16uint is not supported for storage textures..
       format: 'r32uint',
 
+    }),
+
+    normals: state.gpu.device.createTexture({
+      label: `${state.gpu.labelPrefix}Normals`,
+      size: [canvas.width, canvas.height],
+      dimension: '2d',
+      usage: (
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.TEXTURE_BINDING
+      ),
+      format: 'rgba16float',
     }),
 
     fluenceCurrent: state.gpu.device.createTexture({
@@ -1045,6 +1080,11 @@ async function ScreenSpace3DBegin(rootEl) {
       textures.fluenceCurrent,
       state.gpu.buffers.objects
     ),
+    debugNormals: shaders.DebugBlitNormals(
+      state.gpu,
+      textures.normals,
+      state.gpu.buffers.objects
+    ),
     screenSpaceBruteForce: shaders.ScreenSpaceBruteForce(
       state.gpu,
       textures.fluencePrevious,
@@ -1077,6 +1117,7 @@ async function ScreenSpace3DBegin(rootEl) {
         scene.objectCount,
         textures.objectID,
         textures.depth,
+        textures.normals,
         state.gpu.presentationFormat
       )
     )
@@ -1231,6 +1272,13 @@ async function ScreenSpace3DBegin(rootEl) {
         storeOp: 'store'
       };
 
+      let normalAttachment = {
+        view: textures.normals.createView(),
+        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        loadOp: 'clear',
+        storeOp: 'store'
+      };
+
       let depthAttachment = {
         view: textures.depth.createView(),
         depthClearValue: 1,
@@ -1242,7 +1290,11 @@ async function ScreenSpace3DBegin(rootEl) {
       }
 
       const renderPassDesc = {
-        colorAttachments: [colorAttachment, objectAttachment],
+        colorAttachments: [
+          colorAttachment,
+          objectAttachment,
+          normalAttachment
+        ],
         depthStencilAttachment: depthAttachment,
       };
 
@@ -1266,6 +1318,9 @@ async function ScreenSpace3DBegin(rootEl) {
     }
     if (state.params.debugRenderRawFluence) {
       programs.debugFluence(commandEncoder, frameTextureView)
+    }
+    if (state.params.debugRenderNormals) {
+      programs.debugNormals(commandEncoder, frameTextureView)
     }
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
