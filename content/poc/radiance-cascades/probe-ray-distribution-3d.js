@@ -517,7 +517,6 @@ async function ProbeRayDistribution3dBegin() {
 
     Param('rayPackingApproach', 'string', (parentEl, value, oldValue) => {
       if (value !== oldValue) {
-        console.log('ray packing approach', value, oldValue)
         state.rebuildLineBuffer = true
       }
       return value

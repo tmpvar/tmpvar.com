@@ -1097,7 +1097,7 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
         render object IDs <input type="checkbox" value="1" />
       </div>
       <div class="debugRenderObjectTypeIDBuffer-control control">
-        render object type IDs <input type="checkbox" value="1" checked />
+        render object type IDs <input type="checkbox" value="1" />
       </div>
       <div class="debugRenderRawFluence-control control">
         render fluence <input type="checkbox" value="1" />
@@ -1115,8 +1115,8 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
       <div class="scene-control control">
         scene:
         <select>
-          <option value="simple/emissive-sphere" >Single Emissive Sphere</option>
-          <option value="simple/emissive-sphere-with-occluder" selected>Single Emissive Sphere + Occluder</option>
+          <option value="simple/emissive-sphere" selected>Single Emissive Sphere</option>
+          <option value="simple/emissive-sphere-with-occluder" >Single Emissive Sphere + Occluder</option>
         </select>
       </div>
     </div>
