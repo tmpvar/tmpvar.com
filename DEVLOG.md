@@ -26,6 +26,7 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
+- radiance-cascades/3d:
 - radiance-cascades/3d: add raymarching approach: Brute Force Screen Space
 - radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
 - radiance-cascades/3d: add raymarching approach: Cascades World Space RayMarch

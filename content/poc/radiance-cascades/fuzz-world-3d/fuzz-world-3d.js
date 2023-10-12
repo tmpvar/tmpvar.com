@@ -1433,6 +1433,7 @@ async function FuzzWorld3dBegin() {
       `
 
       const shaderModule = gpu.device.createShaderModule({
+        label: `${labelPrefix}ShaderModule`,
         code: source
       })
 
