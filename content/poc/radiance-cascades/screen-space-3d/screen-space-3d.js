@@ -271,11 +271,16 @@ async function ScreenSpace3DBegin(rootEl) {
       const device = gpu.device
       const presentationFormat = gpu.presentationFormat
 
-      let textureFormat = 'f32';
-      if (outputTexture.format.indexOf('uint') > -1) {
+      let textureFormat = 'f32'
+      let sampleType = 'float'
+      if (outputTexture.format.indexOf('32float') > 1) {
+        sampleType = 'unfilterable-float'
+      } else if (outputTexture.format.indexOf('uint') > -1) {
         textureFormat = 'u32'
+        sampleType = 'uint'
       } else if (outputTexture.format.indexOf('int') > -1) {
         textureFormat = 'i32'
+        sampleType = 'int'
       }
 
       const source = /* wgsl */`
@@ -320,7 +325,7 @@ async function ScreenSpace3DBegin(rootEl) {
             binding: 0,
             visibility: GPUShaderStage.FRAGMENT,
             texture: {
-              sampleType: outputTexture.format.indexOf('uint') > -1 ? 'uint' : 'float',
+              sampleType: sampleType,
             },
           },
           {
@@ -435,6 +440,17 @@ async function ScreenSpace3DBegin(rootEl) {
         }
       `
       return this.DebugBlitBase(gpu, outputTexture, objectsBuffer, fragCode)
+    },
+
+    DebugBlitFluence(gpu, fluenceTexture, objectsBuffer) {
+      const fragCode = /* wgsl */`
+        @fragment
+        fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
+          let pos = vec2<i32>(fragData.uv * vec2f(textureDimensions(outputTexture)));
+          return textureLoad(outputTexture, pos, 0);
+        }
+      `
+      return this.DebugBlitBase(gpu, fluenceTexture, objectsBuffer, fragCode)
     },
 
     RenderTriangleSoup(
@@ -630,7 +646,9 @@ async function ScreenSpace3DBegin(rootEl) {
       }
     },
 
-    ScreenSpaceBruteForce(gpu, fluenceTexture, depthTexture, objectIDTexture,) {
+    ScreenSpaceBruteForce(gpu, fluenceTexture, depthTexture, objectIDTexture) {
+
+
 
 
       return function ScreenSpaceBruteForce() {
@@ -739,6 +757,11 @@ async function ScreenSpace3DBegin(rootEl) {
       state.gpu,
       textures.objectID,
       state.gpu.buffers.objects
+    ),
+    debugFluence: shaders.DebugBlitFluence(
+      state.gpu,
+      textures.fluence,
+      state.gpu.buffers.objects
     )
   }
 
@@ -746,13 +769,11 @@ async function ScreenSpace3DBegin(rootEl) {
 
   const quatIdentity = [0.0, 0.0, 0.0, 1.0]
   function SceneAddInstances(scene, mesh, instanceCount) {
-    console.log('offset:', scene.objectCount * ObjectBufferEntrySize, scene.objectCount, instanceCount)
     let dataView = new DataView(
       state.objectsArrayBuffer,
       scene.objectCount * ObjectBufferEntrySize,
       instanceCount * ObjectBufferEntrySize
     )
-    console.log(dataView)
     let instances = CreateMeshInstances(mesh.typeID, mesh.mesh, dataView, instanceCount)
 
 
@@ -776,7 +797,6 @@ async function ScreenSpace3DBegin(rootEl) {
   // scene: single emissive sphere
   {
     let sceneName = 'simple/emissive-sphere'
-    console.group(sceneName)
     const scene = {
       objectCount: 0,
       renderSteps: []
@@ -815,13 +835,11 @@ async function ScreenSpace3DBegin(rootEl) {
     }
 
     scenes[sceneName] = scene
-    console.groupEnd()
   }
 
   // scene: single emissive sphere with occluder
   {
     let sceneName = 'simple/emissive-sphere-with-occluder'
-    console.group(sceneName)
     const scene = {
       objectCount: 0,
       renderSteps: []
@@ -875,7 +893,6 @@ async function ScreenSpace3DBegin(rootEl) {
     }
 
     scenes[sceneName] = scene
-    console.groupEnd()
   }
 
   function RenderFrame() {
@@ -950,6 +967,9 @@ async function ScreenSpace3DBegin(rootEl) {
     }
     if (state.params.debugRenderObjectTypeIDBuffer) {
       programs.debugObjectTypesBuffer(commandEncoder, frameTextureView)
+    }
+    if (state.params.debugRenderRawFluence) {
+      programs.debugFluence(commandEncoder, frameTextureView)
     }
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
