@@ -256,14 +256,14 @@ async function ScreenSpace3DBegin(rootEl) {
   }
 
   const WGSLObjectDataStruct = /* wgsl */`
-    struct ObjectData {
-      // props: mat4x4<f32>,
-      // rgb, a=objectType
-      albedo: vec4f,
-      // rgb, a=unused
-      emission: vec4f,
-      transform: mat4x4<f32>,
-    };
+        struct ObjectData {
+          // props: mat4x4<f32>,
+          // rgb, a=objectType
+          albedo: vec4f,
+          // rgb, a=unused
+          emission: vec4f,
+          transform: mat4x4<f32>,
+        };
   `
 
   const shaders = {
@@ -459,7 +459,12 @@ async function ScreenSpace3DBegin(rootEl) {
         @fragment
         fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
           let pos = vec2<i32>(fragData.uv * vec2f(textureDimensions(outputTexture)));
-          return vec4(textureLoad(outputTexture, pos, 0).rgb * 0.5 + 0.5, 1.0);
+          let value = textureLoad(outputTexture, pos, 0).rgb;
+          if (value.x == 0 && value.y == 0 && value.z == 0) {
+            return vec4(0.0);
+          }
+
+          return vec4(value * 0.5 + 0.5, 1.0);
         }
       `
       return this.DebugBlitBase(gpu, normalTexture, objectsBuffer, fragCode)
@@ -478,6 +483,7 @@ async function ScreenSpace3DBegin(rootEl) {
       const labelPrefix = gpu.labelPrefix + 'RenderMesh/'
       const device = gpu.device
       const uboFields = [
+        ['eye', 'vec4f', 16],
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
       ]
 
@@ -502,7 +508,7 @@ async function ScreenSpace3DBegin(rootEl) {
         }
 
         struct UBOParams {
-          worldToScreen: mat4x4<f32>,
+          ${uboFields.map(v => `${v[0]}: ${v[1]},`).join('\n          ')}
         };
 
         ${WGSLObjectDataStruct}
@@ -519,7 +525,7 @@ async function ScreenSpace3DBegin(rootEl) {
           var out: VertexOut;
           let objectID = ${objectIDStart} + instanceIndex;
           let worldPosition = objectData[objectID].transform * vec4(inPosition, 1.0);
-          out.worldPosition = worldPosition.xyz;
+          out.worldPosition = worldPosition.xyz - ubo.eye.xyz;
           out.position = ubo.worldToScreen * worldPosition;
           out.color = objectData[objectID].albedo.rgb;
           out.objectID = objectID;
@@ -539,13 +545,17 @@ async function ScreenSpace3DBegin(rootEl) {
           out.objectID = fragData.objectID;
 
           let dFdxPos = dpdx(fragData.worldPosition);
-          let dFdyPos = dpdy(fragData.worldPosition);
-          out.normal = vec4f(normalize(cross(dFdxPos,dFdyPos )), 1.0);
+          let dFdyPos = -dpdy(fragData.worldPosition);
+          out.normal = vec4f(
+            normalize(cross(dFdxPos, dFdyPos)),
+            1.0
+          );
 
           // TODO: compute screen space normal
           return out;
         }
       `
+      console.log(source)
 
       const shaderModule = gpu.device.createShaderModule({
         label: `${labelPrefix}ShaderModule`,
@@ -648,10 +658,16 @@ async function ScreenSpace3DBegin(rootEl) {
         ]
       })
 
-      return function RenderMesh(pass, worldToScreen) {
+      return function RenderMesh(pass, worldToScreen, eye) {
         // update the uniform buffer
         {
           let byteOffset = 0
+
+          eye.forEach(v => {
+            uboData.setFloat32(byteOffset, v, true)
+            byteOffset += 4;
+          })
+          byteOffset += 4
 
           worldToScreen.forEach(v => {
             uboData.setFloat32(byteOffset, v, true)
@@ -1300,7 +1316,7 @@ async function ScreenSpace3DBegin(rootEl) {
 
       let pass = commandEncoder.beginRenderPass(renderPassDesc);
       scenes[state.params.scene].renderSteps.forEach(fn => {
-        fn(pass, state.camera.state.worldToScreen)
+        fn(pass, state.camera.state.worldToScreen, state.camera.state.eye)
       })
 
       pass.end();
