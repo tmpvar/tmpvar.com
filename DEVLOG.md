@@ -32,13 +32,13 @@
 - radiance-cascades/3d: add raymarching approach: Cascades World Space RayMarch
 - radiance-cascades/3d: add raymarching approach: Brute Force World Space
 
-- radiance-cascades/3d: compute the per-pixel normals and output into a separate texture
 - radiance-cascades/3d: collect depth buffer and mipmap it into a
                         red/green (min/max) f32 texture
 - radiance-cascades/3d: add a toggle for screenspace vs worldspace ray casting
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-12
+- radiance-cascades/3d: compute the per-pixel normals and output into a separate texture
 - radiance-cascades/3d: add fluence debug output
 ## 2023-10-11
 - radiance-cascades/3d: add raymarching approach selector
