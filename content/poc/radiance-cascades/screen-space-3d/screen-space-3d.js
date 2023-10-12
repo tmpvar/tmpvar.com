@@ -95,9 +95,11 @@ async function ScreenSpace3DBegin(rootEl) {
 
   const probeBufferByteSize = state.maxLevel0Rays * raySize * 2
   const ObjectBufferEntrySize = (
-    4 * 4 +     // albedo (rgb, a=objectType)
-    4 * 4 +     // emission (rgb, a=unused)
-    4 * 4 * 4   // transform
+    16 +      //   albedo (rgb, a=objectType)
+    16 +      //   emission (rgb, a=unused)
+    16 +      //   padding
+    16 +      //   padding
+    16 * 4    // transform
   )
   const maxSceneObjects = 1 << 4;
   try {
@@ -257,10 +259,13 @@ async function ScreenSpace3DBegin(rootEl) {
 
   const WGSLObjectDataStruct = /* wgsl */`
     struct ObjectData {
-      // rgb, a=objectType
+      // props: mat4x4<f32>,
+      // // rgb, a=objectType
       albedo: vec4f,
-      // rgb, a=unused
+      // // rgb, a=unused
       emission: vec4f,
+      pad0: vec4f,
+      pad1: vec4f,
       transform: mat4x4<f32>,
     };
   `
@@ -428,7 +433,7 @@ async function ScreenSpace3DBegin(rootEl) {
             return vec4(0.0);
           }
 
-          let typeID = objectData[objectID].albedo.a;
+          let typeID = objectData[objectID].albedo.r;
           var col = i32(typeID + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
           col = col % vec3<i32>(255, 253, 127);
           return vec4(vec3f(col) / 255.0, 1.0);
@@ -669,7 +674,7 @@ async function ScreenSpace3DBegin(rootEl) {
     }),
   }
 
-  function CreateMeshInstances(gpu, mesh, dataView, count) {
+  function CreateMeshInstances(typeID, mesh, dataView, count) {
 
     // store the mesh typeID in the albedo.a channel
     {
@@ -685,14 +690,14 @@ async function ScreenSpace3DBegin(rootEl) {
       mesh: mesh,
 
       getTransform(index, out) {
-        let start = index * ObjectBufferEntrySize + 4 * 4 * 2;
+        let start = index * ObjectBufferEntrySize + 64;
         for (let i = 0; i < 16; i++) {
-          out[i] = dataView.setFloat32(start + i * 4, true)
+          out[i] = dataView.getFloat32(start + i * 4, true)
         }
       },
 
       setTransform(index, transform) {
-        let start = index * ObjectBufferEntrySize + 4 * 4 * 2;
+        let start = index * ObjectBufferEntrySize + 64;
 
         for (let i = 0; i < 16; i++) {
           dataView.setFloat32(start + i * 4, transform[i], true)
@@ -710,6 +715,7 @@ async function ScreenSpace3DBegin(rootEl) {
         dataView.setFloat32(start + 0, value[0], true)
         dataView.setFloat32(start + 4, value[1], true)
         dataView.setFloat32(start + 8, value[2], true)
+        dataView.setFloat32(start + 12, typeID, true)
       },
 
       getEmissions(index, out) {
@@ -746,12 +752,14 @@ async function ScreenSpace3DBegin(rootEl) {
 
   const quatIdentity = [0.0, 0.0, 0.0, 1.0]
   function SceneAddInstances(scene, mesh, instanceCount) {
+    console.log('offset:', scene.objectCount * ObjectBufferEntrySize, scene.objectCount, instanceCount)
     let dataView = new DataView(
       state.objectsArrayBuffer,
       scene.objectCount * ObjectBufferEntrySize,
       instanceCount * ObjectBufferEntrySize
     )
-    let instances = CreateMeshInstances(state.gpu, mesh.mesh, dataView, instanceCount)
+    console.log(dataView)
+    let instances = CreateMeshInstances(mesh.typeID, mesh.mesh, dataView, instanceCount)
 
 
     scene.renderSteps.push(
@@ -770,10 +778,11 @@ async function ScreenSpace3DBegin(rootEl) {
 
     return instances;
   }
+
   // scene: single emissive sphere
   {
     let sceneName = 'simple/emissive-sphere'
-
+    console.group(sceneName)
     const scene = {
       objectCount: 0,
       renderSteps: []
@@ -812,12 +821,13 @@ async function ScreenSpace3DBegin(rootEl) {
     }
 
     scenes[sceneName] = scene
+    console.groupEnd()
   }
 
   // scene: single emissive sphere with occluder
   {
     let sceneName = 'simple/emissive-sphere-with-occluder'
-    let objectIDStart = 0
+    console.group(sceneName)
     const scene = {
       objectCount: 0,
       renderSteps: []
@@ -838,7 +848,7 @@ async function ScreenSpace3DBegin(rootEl) {
           [10, 1, 10]
         )
         boxes.setTransform(0, scratch)
-        boxes.setAlbedo(0, [.5, .5, .5])
+        boxes.setAlbedo(0, [3.0, 0.0, 0.0])
         boxes.setEmissions(0, [0, 0, 0])
       }
 
@@ -852,7 +862,7 @@ async function ScreenSpace3DBegin(rootEl) {
           [2, yradius, 2]
         )
         boxes.setTransform(1, scratch)
-        boxes.setAlbedo(1, [.5, .5, .5])
+        boxes.setAlbedo(1, [3.0, 0.0, 0.0])
         boxes.setEmissions(1, [0, 0, 0])
       }
 
@@ -865,12 +875,13 @@ async function ScreenSpace3DBegin(rootEl) {
           [1, 1, 1]
         )
         spheres.setTransform(0, scratch)
-        spheres.setAlbedo(0, [1, 1, 1])
+        spheres.setAlbedo(0, [3.0, 0.0, 0.0])
         spheres.setEmissions(0, [1, 1, 1])
       }
     }
 
     scenes[sceneName] = scene
+    console.groupEnd()
   }
 
   function RenderFrame() {
@@ -895,10 +906,25 @@ async function ScreenSpace3DBegin(rootEl) {
     {
       scenes[state.params.scene].update()
 
+      {
+        console.group('object buffer contents')
+        let a = new Float32Array(state.objectsArrayBuffer)
+        for (
+          let i = 0;
+          i < a.length - ObjectBufferEntrySize * scenes[state.params.scene].objectCount;
+          i += ObjectBufferEntrySize / 4
+        ) {
+          console.log(a[i + 0], a[i + 1], a[i + 2], a[i + 3])
+        }
+        console.groupEnd()
+      }
+
       state.gpu.device.queue.writeBuffer(
         state.gpu.buffers.objects,
         0,
-        state.objectsArrayBuffer
+        state.objectsArrayBuffer,
+        0,
+        ObjectBufferEntrySize * scenes[state.params.scene].objectCount
       )
 
       let colorAttachment = {
