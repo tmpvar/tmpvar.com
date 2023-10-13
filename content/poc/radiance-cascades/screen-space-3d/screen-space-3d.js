@@ -253,6 +253,9 @@ async function ScreenSpace3DBegin(rootEl) {
       })
 
       Param('scene', 'string')
+
+      Param('sceneOccluderScale', 'f32')
+
     }
   }
 
@@ -856,18 +859,14 @@ async function ScreenSpace3DBegin(rootEl) {
           if (objectID == 0xFFFF) {
             textureStore(fluenceWriteTexture, id.xy, vec4(0.0));
             return;
-          } else {
-            fluence = objectData[objectID].emission.rgb;
           }
-          // textureStore(fluenceWriteTexture, id.xy, vec4(startingDepth));
-          // return;
 
           let rayCount = 64.0;
           let angleStep = TAU / (rayCount+1);
           let thickness = 0.5;
           var hits = 0.0;
           for (var angle=0.0; angle<TAU; angle+=angleStep) {
-            var steps = 64;
+            var steps = 32;
             var sampleUV = uv + halfInvDims;
 
             var direction = vec2f(cos(angle), sin(angle));
@@ -875,47 +874,24 @@ async function ScreenSpace3DBegin(rootEl) {
             // scale the direction so it steps through uv coords
             direction *= invDims;
 
-            let uvOffset = direction;
-            let ta = textureSampleLevel(depthTexture, linearSampler, uv - uvOffset, 0);
-            let tb = textureSampleLevel(depthTexture, linearSampler, uv + uvOffset, 0);
-
-
-            var tangentSlope = 0.0;
-            if (ta >= 1.0) {
-              tangentSlope = (tb - startingDepth) / (length(uvOffset));
-            } else if (tb >= 1.0) {
-              tangentSlope = (startingDepth - ta) / (length(uvOffset));
-            } else {
-              tangentSlope = (tb - ta) / (length(uvOffset) * 2.0);
-            }
-
-            // fluence = vec3(abs(tangentSlope), 0.0, 0.0);
-            // break;
             var horizonSlope = 1.0;
-            let thickness = 0.001;
             var t = 0.0;
             while(steps > 0) {
               steps--;
-              t = max(1.0, t * 1.25);
+              t = max(1.0, t * 1.5);
 
               sampleUV = uv + direction * t;
               let depth = GetDepth(sampleUV);
 
               let horizonAtT = startingDepth + horizonSlope * t;
               let depthDelta = depth - horizonAtT;
-              if (depthDelta <= 0.0) {
+              if (depthDelta < 0.0) {
                 horizonSlope = min(horizonSlope, (depth - startingDepth) / t);
                 let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * sampleUV), 0).r;
                 if (objectID < 0xFFFF) {
                   let radiance = objectData[objectID].emission.rgb;
-                  // let tangentAtT = startingDepth + tangentSlope * t;
-                  var ratio = 1.0;
-                  if (depthDelta < 0.0) {
-                    ratio = LinearizeDepth(-depthDelta);
-                  }
-
+                  let ratio = LinearizeDepth(-depthDelta);
                   fluence += radiance * ratio;
-
                   if (radiance.x > 0.0 || radiance.y > 0.0 || radiance.z >= 0.0) {
                     hits = hits + 1.0;
                   }
@@ -923,17 +899,6 @@ async function ScreenSpace3DBegin(rootEl) {
               }
             }
           }
-
-          // if (hits == hits && hits > 0.0) {
-          //   fluence /= hits;
-          // } else {
-          //   fluence = normal;
-          // }
-
-          // if (fluence.x <= 0.0 && fluence.y <= 0.0 && fluence.z <= 0.0) {
-          //   fluence = normal * 0.5 + 0.5;
-          // }
-
 
           textureStore(fluenceWriteTexture, id.xy, vec4(fluence, 1.0));
         }
@@ -1374,7 +1339,7 @@ async function ScreenSpace3DBegin(rootEl) {
           scratch,
           quatIdentity,
           [0, yradius + floory, 0],
-          [2, yradius, 2]
+          [2 * state.params.sceneOccluderScale, yradius, 2 * state.params.sceneOccluderScale]
         )
         boxes.setTransform(1, scratch)
         boxes.setAlbedo(1, [0.45, 0.45, 0.45])
@@ -1386,7 +1351,7 @@ async function ScreenSpace3DBegin(rootEl) {
         mat4.fromRotationTranslationScale(
           scratch,
           quatIdentity,
-          [0, 0, -4],
+          [0, 0, -4 - 2.0 * state.params.sceneOccluderScale],
           [1, 1, 1]
         )
         spheres.setTransform(0, scratch)
