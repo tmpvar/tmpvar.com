@@ -6,6 +6,15 @@ import * as vec3 from './gl-matrix/vec3.js'
 
 async function ScreenSpace3DBegin(rootEl) {
 
+  function ColorHexToF32Array(hex) {
+    let v = parseInt(hex.replace("#", ""), 16)
+    return [
+      ((v >> 16) & 0xFF) / 255.0,
+      ((v >> 8) & 0xFF) / 255.0,
+      ((v >> 0) & 0xFF) / 255.0
+    ]
+  }
+
   function Now() {
     if (window.performance && window.performance.now) {
       return window.performance.now()
@@ -900,6 +909,12 @@ async function ScreenSpace3DBegin(rootEl) {
             }
           }
 
+          // Albedo colored output
+          if (false) {
+            textureStore(fluenceWriteTexture, id.xy, vec4(max(vec3(0.05), fluence) * objectData[objectID].albedo.rgb, 1.0));
+            return;
+          }
+
           textureStore(fluenceWriteTexture, id.xy, vec4(fluence, 1.0));
         }
       `
@@ -1328,7 +1343,7 @@ async function ScreenSpace3DBegin(rootEl) {
           [10, 1, 10]
         )
         boxes.setTransform(0, scratch)
-        boxes.setAlbedo(0, [0.5, 0.5, 0.5])
+        boxes.setAlbedo(0, ColorHexToF32Array('#a26d3f'))
         boxes.setEmissions(0, [0, 0, 0])
       }
 
@@ -1342,7 +1357,7 @@ async function ScreenSpace3DBegin(rootEl) {
           [2 * state.params.sceneOccluderScale, yradius, 2 * state.params.sceneOccluderScale]
         )
         boxes.setTransform(1, scratch)
-        boxes.setAlbedo(1, [0.45, 0.45, 0.45])
+        boxes.setAlbedo(1, ColorHexToF32Array('#6b2643'))
         boxes.setEmissions(1, [0, 0, 0])
       }
 
