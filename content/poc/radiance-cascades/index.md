@@ -1125,6 +1125,12 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
           <option value="simple/emissive-sphere-with-occluder" selected >Single Emissive Sphere + Occluder</option>
         </select>
       </div>
+      <div class="shownBy-scene indent" showValue="simple/emissive-sphere-with-occluder">
+        <div class="sceneOccluderScale-control control">
+          scale (x,z): <input type="range" min="0.001" max="10.0" value="1.0" step="0.01">
+          <output></output>
+        </div>
+      </div>
     </div>
     <h4>Radiance Cascade Parameters</h4>
     <div class="indent">
