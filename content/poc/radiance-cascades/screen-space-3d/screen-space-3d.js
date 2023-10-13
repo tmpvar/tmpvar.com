@@ -430,7 +430,7 @@ async function ScreenSpace3DBegin(rootEl) {
           return vec4(vec3f(col) / 255.0, 1.0);
         }
       `
-      return this.DebugBlitBase(gpu, {texture : outputTexture}, objectsBuffer, fragCode)
+      return this.DebugBlitBase(gpu, { texture: outputTexture }, objectsBuffer, fragCode)
     },
 
     DebugBlitObjectTypeID(gpu, outputTexture, objectsBuffer) {
@@ -451,8 +451,8 @@ async function ScreenSpace3DBegin(rootEl) {
       `
       return this.DebugBlitBase(
         gpu, {
-          texture: outputTexture
-        }, objectsBuffer, fragCode)
+        texture: outputTexture
+      }, objectsBuffer, fragCode)
     },
 
     DebugBlitFluence(gpu, fluenceTexture, objectsBuffer) {
@@ -467,7 +467,7 @@ async function ScreenSpace3DBegin(rootEl) {
           return value;
         }
       `
-      return this.DebugBlitBase(gpu, {texture: fluenceTexture}, objectsBuffer, fragCode)
+      return this.DebugBlitBase(gpu, { texture: fluenceTexture }, objectsBuffer, fragCode)
     },
 
     DebugBlitNormals(gpu, normalTexture, objectsBuffer) {
@@ -483,7 +483,7 @@ async function ScreenSpace3DBegin(rootEl) {
           return vec4(value * 0.5 + 0.5, 1.0);
         }
       `
-      return this.DebugBlitBase(gpu, {texture: normalTexture}, objectsBuffer, fragCode)
+      return this.DebugBlitBase(gpu, { texture: normalTexture }, objectsBuffer, fragCode)
     },
 
     DebugBlitDepth(gpu, depthTexture, objectsBuffer) {
@@ -833,104 +833,107 @@ async function ScreenSpace3DBegin(rootEl) {
           return worldPos.xyz / worldPos.w;
         }
 
+        fn GetDepth(uv: vec2f) -> f32 {
+          let depth = textureSampleLevel(depthTexture, linearSampler, uv, 0);
+          if (false) {
+            return LinearizeDepth(depth);
+          }
+          return depth;
+        }
+
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           let dims = vec2f(textureDimensions(depthTexture));
           let invDims = 1.0 / dims;
           let halfInvDims = invDims * 0.5;
           let uv = vec2f(id.xy) * invDims;
-          let startingDepth = textureSampleLevel(depthTexture, linearSampler, uv + halfInvDims, 0);
 
-
-          // let txa = GetWorldPos(uv + vec2(-halfInvDims, -halfInvDims));
-          // let txb = GetWorldPos(uv + vec2(-halfInvDims,  halfInvDims));
-          // let txb = GetWorldPos(uv + vec2(halfInvDims, 0.0));
-
-          // let normal = normalize(vec2f(
-          //   startingDepth - textureSampleLevel(depthTexture, linearSampler, uv + vec2(-halfInvDims.x, -halfInvDims.x), 0),
-          //   startingDepth - textureSampleLevel(depthTexture, linearSampler, uv + vec2(-halfInvDims.x, halfInvDims.x), 0),
-          // ));
-
+          let startingDepth = GetDepth(uv);
           let normal = textureSampleLevel(normalTexture, linearSampler, uv, 0).xyz;
-          // let tangentAngle = atan(normal)
-          // textureStore(fluenceWriteTexture, id.xy, vec4(normal * 0.5 + 0.5, 1.0));
+          var fluence = vec3f(0.0);
+
+          let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * uv), 0).r;
+          if (objectID == 0xFFFF) {
+            textureStore(fluenceWriteTexture, id.xy, vec4(0.0));
+            return;
+          } else {
+            fluence = objectData[objectID].emission.rgb;
+          }
+          // textureStore(fluenceWriteTexture, id.xy, vec4(startingDepth));
           // return;
 
-          if (startingDepth >= 1.0) {
-            // textureStore(fluenceWriteTexture, id.xy, vec4(1.0, 0.0, 1.0, 1.0));
-            textureStore(fluenceWriteTexture, id.xy, vec4(0.0, 0.0, 0.0, 1.0));
-            return;
-          }
-          let startingLinearDepth = LinearizeDepth(startingDepth);
-
-
-          var fluence = vec3f(0.0);// = textureLoad(fluenceReadTexture, id.xy, 0);
-
-          // textureStore(fluenceWriteTexture, id.xy, vec4(uv, 0.0, 1.0));
-          // textureStore(fluenceWriteTexture, id.xy, vec4(startingDepth, 0.0, 0.0, 1.0));
-          let rayCount = 16.0;
+          let rayCount = 64.0;
           let angleStep = TAU / rayCount;
           let thickness = 0.5;
           var hits = 0.0;
-          let halfInvDimsLength = length(halfInvDims);
           for (var angle=0.0; angle<TAU; angle+=angleStep) {
-            var steps = 256;
+            var steps = 64;
             var sampleUV = uv + halfInvDims;
-            var occlusion = 0.0;
 
             var direction = vec2f(cos(angle), sin(angle));
-            let uvOffset = 0.5 * invDims * direction;
+
+            // scale the direction so it steps through uv coords
+            direction *= invDims;
+
+            let uvOffset = direction;
             let ta = textureSampleLevel(depthTexture, linearSampler, uv - uvOffset, 0);
             let tb = textureSampleLevel(depthTexture, linearSampler, uv + uvOffset, 0);
-            let slope = (ta - tb) / (length(uvOffset) * 2.0);
 
-            // textureStore(fluenceWriteTexture, id.xy, vec4(JetLinear(slope), 1.0));
-            // return;
-            var horizonHi = 0.0;
-            var horizonLo = startingLinearDepth;
 
-            direction *= invDims;
+            var tangentSlope = 0.0;
+            if (ta >= 1.0) {
+              tangentSlope = (tb - startingDepth) / (length(uvOffset));
+            } else if (tb >= 1.0) {
+              tangentSlope = (startingDepth - ta) / (length(uvOffset));
+            } else {
+              tangentSlope = (tb - ta) / (length(uvOffset) * 2.0);
+            }
+
+            // fluence = vec3(abs(tangentSlope), 0.0, 0.0);
+            // break;
+            var horizonSlope = 1.0;
+            let thickness = 0.001;
             var t = 0.0;
             while(steps > 0) {
               steps--;
-              t += 2.0;
-              let tangent = slope * t;
+              t = max(1.0, t * 1.25);
 
               sampleUV = uv + direction * t;
-              let depth = LinearizeDepth(
-                textureSampleLevel(depthTexture, linearSampler, sampleUV, 0)
-              );
+              let depth = GetDepth(sampleUV);
 
-
-              if (depth < horizonLo) {
-                let depthDelta = depth - (startingLinearDepth - tangent);
+              let horizonAtT = startingDepth + horizonSlope * t;
+              let depthDelta = depth - horizonAtT;
+              if (depthDelta <= 0.0) {
+                horizonSlope = min(horizonSlope, (depth - startingDepth) / t);
                 let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * sampleUV), 0).r;
                 if (objectID < 0xFFFF) {
-                  if (length(objectData[objectID].emission.rgb) > 0.0) {
-                    if (depthDelta < 0.0) {
-                      hits = hits + 1.0;
-                      fluence += objectData[objectID].emission.rgb;
+                  let radiance = objectData[objectID].emission.rgb;
+                  // let tangentAtT = startingDepth + tangentSlope * t;
+                  var ratio = 1.0;
+                  if (depthDelta < 0.0) {
+                    ratio = LinearizeDepth(-depthDelta);
+                  }
 
-                      break;
-                    }
+                  fluence += radiance * ratio;
+
+                  if (radiance.x > 0.0 || radiance.y > 0.0 || radiance.z >= 0.0) {
+                    hits = hits + 1.0;
                   }
                 }
               }
-              horizonHi = max(horizonHi, depth);
-              horizonLo = min(horizonLo, depth);
             }
-
           }
 
-          if (hits > 0.0) {
-            fluence /= hits;
-          } else {
-            fluence = normal;
-          }
+          // if (hits == hits && hits > 0.0) {
+          //   fluence /= hits;
+          // } else {
+          //   fluence = normal;
+          // }
 
+          // if (fluence.x <= 0.0 && fluence.y <= 0.0 && fluence.z <= 0.0) {
+          //   fluence = normal * 0.5 + 0.5;
+          // }
 
-          // let linearDepth = LinearizeDepth(startingDepth);
-          // textureStore(fluenceWriteTexture, id.xy, vec4(JetLinear(linearDepth), 1.0));
 
           textureStore(fluenceWriteTexture, id.xy, vec4(fluence, 1.0));
         }

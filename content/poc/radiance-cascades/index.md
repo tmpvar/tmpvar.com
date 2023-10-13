@@ -1103,7 +1103,7 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
         render normals <input type="checkbox" value="1" />
       </div>
       <div class="debugRenderDepth-control control">
-        render depth <input type="checkbox" value="1" checked/>
+        render depth <input type="checkbox" value="1" />
       </div>
       <div class="debugRenderRawFluence-control control">
         render fluence <input type="checkbox" value="1" checked/>
