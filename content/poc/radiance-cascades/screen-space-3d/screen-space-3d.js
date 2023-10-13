@@ -216,6 +216,7 @@ async function ScreenSpace3DBegin(rootEl) {
 
       Param('debugRenderRawFluence', 'bool')
       Param('debugRenderNormals', 'bool')
+      Param('debugRenderDepth', 'bool')
     }
 
     // probe params
@@ -267,14 +268,17 @@ async function ScreenSpace3DBegin(rootEl) {
   `
 
   const shaders = {
-    DebugBlitBase(gpu, outputTexture, objectsBuffer, fragCode) {
+    DebugBlitBase(gpu, textureDesc, objectsBuffer, fragCode) {
+      const outputTexture = textureDesc.texture;
       const labelPrefix = `${outputTexture.label}DebugBlit/`
       const device = gpu.device
       const presentationFormat = gpu.presentationFormat
 
       let textureFormat = 'f32'
       let sampleType = 'float'
-      if (outputTexture.format.indexOf('32float') > 1) {
+      if (textureDesc.aspect === 'depth-only') {
+        sampleType = 'unfilterable-float'
+      } else if (outputTexture.format.indexOf('32float') > 1) {
         sampleType = 'unfilterable-float'
       } else if (outputTexture.format.indexOf('uint') > -1) {
         textureFormat = 'u32'
@@ -368,7 +372,12 @@ async function ScreenSpace3DBegin(rootEl) {
         entries: [
           {
             binding: 0,
-            resource: outputTexture.createView()
+            resource: outputTexture.createView({
+              dimenion: '2d',
+              baseMipLevel: 0,
+              mipLevelCount: outputTexture.baseMipLevel,
+              aspect: textureDesc.aspect,
+            })
           },
           {
             binding: 1,
@@ -421,7 +430,7 @@ async function ScreenSpace3DBegin(rootEl) {
           return vec4(vec3f(col) / 255.0, 1.0);
         }
       `
-      return this.DebugBlitBase(gpu, outputTexture, objectsBuffer, fragCode)
+      return this.DebugBlitBase(gpu, {texture : outputTexture}, objectsBuffer, fragCode)
     },
 
     DebugBlitObjectTypeID(gpu, outputTexture, objectsBuffer) {
@@ -440,7 +449,10 @@ async function ScreenSpace3DBegin(rootEl) {
           return vec4(vec3f(col) / 255.0, 1.0);
         }
       `
-      return this.DebugBlitBase(gpu, outputTexture, objectsBuffer, fragCode)
+      return this.DebugBlitBase(
+        gpu, {
+          texture: outputTexture
+        }, objectsBuffer, fragCode)
     },
 
     DebugBlitFluence(gpu, fluenceTexture, objectsBuffer) {
@@ -455,7 +467,7 @@ async function ScreenSpace3DBegin(rootEl) {
           return value;
         }
       `
-      return this.DebugBlitBase(gpu, fluenceTexture, objectsBuffer, fragCode)
+      return this.DebugBlitBase(gpu, {texture: fluenceTexture}, objectsBuffer, fragCode)
     },
 
     DebugBlitNormals(gpu, normalTexture, objectsBuffer) {
@@ -471,7 +483,35 @@ async function ScreenSpace3DBegin(rootEl) {
           return vec4(value * 0.5 + 0.5, 1.0);
         }
       `
-      return this.DebugBlitBase(gpu, normalTexture, objectsBuffer, fragCode)
+      return this.DebugBlitBase(gpu, {texture: normalTexture}, objectsBuffer, fragCode)
+    },
+
+    DebugBlitDepth(gpu, depthTexture, objectsBuffer) {
+      const fragCode = /* wgsl */`
+        fn LinearizeDepth(depth: f32) -> f32{
+          let zNear = 0.2; // TODO: Replace by the zNear of your perspective projection
+          let zFar = 20.0; // TODO: Replace by the zFar  of your perspective projection
+
+          return (2.0 * zNear) / (zFar + zNear - depth * (zFar - zNear));
+        }
+
+        @fragment
+        fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
+          let pos = vec2<i32>(fragData.uv * vec2f(textureDimensions(outputTexture)));
+          let depth = textureLoad(outputTexture, pos, 0).r;
+          let linearDepth = LinearizeDepth(depth);
+          return vec4f(linearDepth);
+        }
+      `
+      return this.DebugBlitBase(
+        gpu,
+        {
+          texture: depthTexture,
+          aspect: 'depth-only'
+        },
+        objectsBuffer,
+        fragCode
+      )
     },
 
     RenderTriangleSoup(
@@ -806,14 +846,14 @@ async function ScreenSpace3DBegin(rootEl) {
           // let txb = GetWorldPos(uv + vec2(-halfInvDims,  halfInvDims));
           // let txb = GetWorldPos(uv + vec2(halfInvDims, 0.0));
 
-          let normal = normalize(vec2f(
-            startingDepth - textureSampleLevel(depthTexture, linearSampler, uv + vec2(-halfInvDims.x, -halfInvDims.x), 0),
-            startingDepth - textureSampleLevel(depthTexture, linearSampler, uv + vec2(-halfInvDims.x, halfInvDims.x), 0),
-          ));
+          // let normal = normalize(vec2f(
+          //   startingDepth - textureSampleLevel(depthTexture, linearSampler, uv + vec2(-halfInvDims.x, -halfInvDims.x), 0),
+          //   startingDepth - textureSampleLevel(depthTexture, linearSampler, uv + vec2(-halfInvDims.x, halfInvDims.x), 0),
+          // ));
 
-          // let normal = textureSampleLevel(normalTexture, linearSampler, uv, 0).xyz;
+          let normal = textureSampleLevel(normalTexture, linearSampler, uv, 0).xyz;
           // let tangentAngle = atan(normal)
-          // textureStore(fluenceWriteTexture, id.xy, vec4(normal * 0.5 + 0.5, 0.0, 1.0));
+          // textureStore(fluenceWriteTexture, id.xy, vec4(normal * 0.5 + 0.5, 1.0));
           // return;
 
           if (startingDepth >= 1.0) {
@@ -830,7 +870,7 @@ async function ScreenSpace3DBegin(rootEl) {
           // textureStore(fluenceWriteTexture, id.xy, vec4(startingDepth, 0.0, 0.0, 1.0));
           let rayCount = 16.0;
           let angleStep = TAU / rayCount;
-          let thickness = 10.5;
+          let thickness = 0.5;
           var hits = 0.0;
           let halfInvDimsLength = length(halfInvDims);
           for (var angle=0.0; angle<TAU; angle+=angleStep) {
@@ -839,44 +879,53 @@ async function ScreenSpace3DBegin(rootEl) {
             var occlusion = 0.0;
 
             var direction = vec2f(cos(angle), sin(angle));
-            let uvOffset = 0.1 * invDims * direction;
-            let ta = startingDepth;
+            let uvOffset = 0.5 * invDims * direction;
+            let ta = textureSampleLevel(depthTexture, linearSampler, uv - uvOffset, 0);
             let tb = textureSampleLevel(depthTexture, linearSampler, uv + uvOffset, 0);
-            let tangent = (tb - ta) / max(0.000001, (length(uvOffset) * 2.0));
+            let slope = (ta - tb) / (length(uvOffset) * 2.0);
 
-            textureStore(fluenceWriteTexture, id.xy, vec4(JetLinear(abs(tangent)), 1.0));
-            return;
+            // textureStore(fluenceWriteTexture, id.xy, vec4(JetLinear(slope), 1.0));
+            // return;
+            var horizonHi = 0.0;
+            var horizonLo = startingLinearDepth;
 
             direction *= invDims;
-
+            var t = 0.0;
             while(steps > 0) {
               steps--;
+              t += 2.0;
+              let tangent = slope * t;
 
-              sampleUV += direction;
+              sampleUV = uv + direction * t;
               let depth = LinearizeDepth(
                 textureSampleLevel(depthTexture, linearSampler, sampleUV, 0)
               );
 
-              let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * sampleUV), 0).r;
-              if (objectID < 0xFFFF) {
-                let depthDelta = depth - startingLinearDepth;
-                if (depthDelta > 0.0 && depthDelta < thickness) {
-                  fluence += objectData[objectID].emission.rgb;
-                  break;
-                }
 
+              if (depth < horizonLo) {
+                let depthDelta = depth - (startingLinearDepth - tangent);
+                let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * sampleUV), 0).r;
                 if (objectID < 0xFFFF) {
-                  hits += 1.0;
-                  fluence += objectData[objectID].emission.rgb;
+                  if (length(objectData[objectID].emission.rgb) > 0.0) {
+                    if (depthDelta < 0.0) {
+                      hits = hits + 1.0;
+                      fluence += objectData[objectID].emission.rgb;
 
+                      break;
+                    }
+                  }
                 }
-
               }
+              horizonHi = max(horizonHi, depth);
+              horizonLo = min(horizonLo, depth);
             }
+
           }
 
           if (hits > 0.0) {
             fluence /= hits;
+          } else {
+            fluence = normal;
           }
 
 
@@ -1197,6 +1246,11 @@ async function ScreenSpace3DBegin(rootEl) {
       textures.normals,
       state.gpu.buffers.objects
     ),
+    debugDepth: shaders.DebugBlitDepth(
+      state.gpu,
+      textures.depth,
+      state.gpu.buffers.objects
+    ),
     screenSpaceBruteForce: shaders.ScreenSpaceBruteForce(
       state.gpu,
       textures.fluencePrevious,
@@ -1359,6 +1413,7 @@ async function ScreenSpace3DBegin(rootEl) {
 
     let commandEncoder = state.gpu.device.createCommandEncoder()
     let frameTextureView = ctx.getCurrentTexture().createView()
+
     // Render the current scene
     {
       scenes[state.params.scene].update()
@@ -1434,6 +1489,9 @@ async function ScreenSpace3DBegin(rootEl) {
     }
     if (state.params.debugRenderNormals) {
       programs.debugNormals(commandEncoder, frameTextureView)
+    }
+    if (state.params.debugRenderDepth) {
+      programs.debugDepth(commandEncoder, frameTextureView)
     }
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
