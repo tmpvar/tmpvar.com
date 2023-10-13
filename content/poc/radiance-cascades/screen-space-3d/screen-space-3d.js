@@ -863,7 +863,7 @@ async function ScreenSpace3DBegin(rootEl) {
           // return;
 
           let rayCount = 64.0;
-          let angleStep = TAU / rayCount;
+          let angleStep = TAU / (rayCount+1);
           let thickness = 0.5;
           var hits = 0.0;
           for (var angle=0.0; angle<TAU; angle+=angleStep) {
