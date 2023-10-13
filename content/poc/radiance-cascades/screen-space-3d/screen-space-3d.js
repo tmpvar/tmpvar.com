@@ -448,7 +448,11 @@ async function ScreenSpace3DBegin(rootEl) {
         @fragment
         fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
           let pos = vec2<i32>(fragData.uv * vec2f(textureDimensions(outputTexture)));
-          return textureLoad(outputTexture, pos, 0);
+          let value = textureLoad(outputTexture, pos, 0);
+          if (value.x == 0 && value.y == 0 && value.z == 0) {
+            return vec4(0.0);
+          }
+          return value;
         }
       `
       return this.DebugBlitBase(gpu, fluenceTexture, objectsBuffer, fragCode)
@@ -546,16 +550,12 @@ async function ScreenSpace3DBegin(rootEl) {
 
           let dFdxPos = dpdx(fragData.worldPosition);
           let dFdyPos = -dpdy(fragData.worldPosition);
-          out.normal = vec4f(
-            normalize(cross(dFdxPos, dFdyPos)),
-            1.0
-          );
+          let normal = normalize(cross(dFdxPos, dFdyPos));
 
-          // TODO: compute screen space normal
+          out.normal = vec4(normal, 1.0);
           return out;
         }
       `
-      console.log(source)
 
       const shaderModule = gpu.device.createShaderModule({
         label: `${labelPrefix}ShaderModule`,
@@ -693,6 +693,7 @@ async function ScreenSpace3DBegin(rootEl) {
       fluenceCurrentTexture,
       depthTexture,
       objectIDTexture,
+      normalTexture,
       objectBuffer,
       workgroupSize,
       raysPerPixel,
@@ -707,9 +708,31 @@ async function ScreenSpace3DBegin(rootEl) {
         mipmapFilter: 'linear',
       })
 
+      const uboFields = [
+        ['eye', 'vec4f', 16],
+        ['worldToScreen', 'mat4x4<f32>', 16 * 4],
+        ['screenToWorld', 'mat4x4<f32>', 16 * 4],
+      ]
+
+      let uboBufferSize = uboFields.reduce((p, c) => {
+        return p + c[2]
+      }, 0)
+      uboBufferSize = Math.floor(uboBufferSize / 16 + 1) * 16
+      const uboBuffer = new ArrayBuffer(uboBufferSize)
+      const uboData = new DataView(uboBuffer)
+      const ubo = gpu.device.createBuffer({
+        label: `${labelPrefix}UBO`,
+        size: uboBuffer.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+
       const source =  /* wgsl */`
         const PI: f32 = ${Math.PI};
         const TAU: f32 = ${Math.PI * 2.0};
+
+        struct UBOParams {
+          ${uboFields.map(v => `${v[0]}: ${v[1]},`).join('\n          ')}
+        };
 
         fn LinearizeDepth(depth: f32) -> f32{
           let zNear = 0.2; // TODO: Replace by the zNear of your perspective projection
@@ -758,21 +781,44 @@ async function ScreenSpace3DBegin(rootEl) {
         @group(0) @binding(0) var fluenceWriteTexture: texture_storage_2d<rgba32float, write>;
         @group(0) @binding(1) var fluenceReadTexture: texture_2d<f32>;
         @group(0) @binding(2) var depthTexture: texture_depth_2d;
-        @group(0) @binding(3) var depthSampler: sampler;
+        @group(0) @binding(3) var linearSampler: sampler;
         @group(0) @binding(4) var objectIDTexture: texture_2d<u32>;
-        @group(0) @binding(5) var<storage, read_write> objectData: array<ObjectData>;
+        @group(0) @binding(5) var normalTexture: texture_2d<f32>;
+        @group(0) @binding(6) var<storage, read_write> objectData: array<ObjectData>;
+        @group(0) @binding(7) var<uniform> ubo: UBOParams;
+
+        fn GetWorldPos(uv: vec2f) -> vec3f {
+          let depth = textureSampleLevel(depthTexture, linearSampler, uv, 0);
+          let worldPos = ubo.screenToWorld * vec4f(uv, depth, 1.0);
+          return worldPos.xyz / worldPos.w;
+        }
+
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
           let dims = vec2f(textureDimensions(depthTexture));
           let invDims = 1.0 / dims;
+          let halfInvDims = invDims * 0.5;
           let uv = vec2f(id.xy) * invDims;
-          let startingDepth = textureSampleLevel(depthTexture, depthSampler, uv, 0);
+          let startingDepth = textureSampleLevel(depthTexture, linearSampler, uv + halfInvDims, 0);
 
-          // textureStore(fluenceWriteTexture, id.xy, vec4(startingDepth, 0.0, 0.0, 1.0));
+
+          // let txa = GetWorldPos(uv + vec2(-halfInvDims, -halfInvDims));
+          // let txb = GetWorldPos(uv + vec2(-halfInvDims,  halfInvDims));
+          // let txb = GetWorldPos(uv + vec2(halfInvDims, 0.0));
+
+          let normal = normalize(vec2f(
+            startingDepth - textureSampleLevel(depthTexture, linearSampler, uv + vec2(-halfInvDims.x, -halfInvDims.x), 0),
+            startingDepth - textureSampleLevel(depthTexture, linearSampler, uv + vec2(-halfInvDims.x, halfInvDims.x), 0),
+          ));
+
+          // let normal = textureSampleLevel(normalTexture, linearSampler, uv, 0).xyz;
+          // let tangentAngle = atan(normal)
+          // textureStore(fluenceWriteTexture, id.xy, vec4(normal * 0.5 + 0.5, 0.0, 1.0));
           // return;
 
           if (startingDepth >= 1.0) {
-            textureStore(fluenceWriteTexture, id.xy, vec4(1.0, 0.0, 1.0, 1.0));
+            // textureStore(fluenceWriteTexture, id.xy, vec4(1.0, 0.0, 1.0, 1.0));
+            textureStore(fluenceWriteTexture, id.xy, vec4(0.0, 0.0, 0.0, 1.0));
             return;
           }
           let startingLinearDepth = LinearizeDepth(startingDepth);
@@ -786,17 +832,29 @@ async function ScreenSpace3DBegin(rootEl) {
           let angleStep = TAU / rayCount;
           let thickness = 10.5;
           var hits = 0.0;
+          let halfInvDimsLength = length(halfInvDims);
           for (var angle=0.0; angle<TAU; angle+=angleStep) {
-            var direction = vec2f(cos(angle), sin(angle)) * invDims;
             var steps = 256;
-            var sampleUV = uv;
+            var sampleUV = uv + halfInvDims;
             var occlusion = 0.0;
+
+            var direction = vec2f(cos(angle), sin(angle));
+            let uvOffset = 0.1 * invDims * direction;
+            let ta = startingDepth;
+            let tb = textureSampleLevel(depthTexture, linearSampler, uv + uvOffset, 0);
+            let tangent = (tb - ta) / max(0.000001, (length(uvOffset) * 2.0));
+
+            textureStore(fluenceWriteTexture, id.xy, vec4(JetLinear(abs(tangent)), 1.0));
+            return;
+
+            direction *= invDims;
+
             while(steps > 0) {
               steps--;
 
               sampleUV += direction;
               let depth = LinearizeDepth(
-                textureSampleLevel(depthTexture, depthSampler, sampleUV, 0)
+                textureSampleLevel(depthTexture, linearSampler, sampleUV, 0)
               );
 
               let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * sampleUV), 0).r;
@@ -876,9 +934,24 @@ async function ScreenSpace3DBegin(rootEl) {
           {
             binding: 5,
             visibility: GPUShaderStage.COMPUTE,
+            texture: {
+              format: "float"
+            },
+          },
+          {
+            binding: 6,
+            visibility: GPUShaderStage.COMPUTE,
             buffer: {
               type: 'storage'
             },
+          },
+          {
+            binding: 7,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+              type: 'uniform',
+              hasDynamicOffset: false,
+            }
           },
         ]
       })
@@ -927,15 +1000,38 @@ async function ScreenSpace3DBegin(rootEl) {
           },
           {
             binding: 5,
+            resource: normalTexture.createView()
+          },
+          {
+            binding: 6,
             resource: {
               buffer: objectBuffer
+            }
+          },
+          {
+            binding: 7,
+            resource: {
+              buffer: ubo,
+              size: uboBufferSize,
             }
           },
         ]
       })
 
 
-      return function ScreenSpaceBruteForce(commandEncoder) {
+      return function ScreenSpaceBruteForce(commandEncoder, screenToWorld) {
+        // update the uniform buffer
+        {
+          let byteOffset = 0
+          screenToWorld.forEach(v => {
+            uboData.setFloat32(byteOffset, v, true)
+            byteOffset += 4;
+          })
+          gpu.device.queue.writeBuffer(ubo, 0, uboBuffer)
+        }
+
+
+
         commandEncoder.copyTextureToTexture(
           { texture: fluenceCurrentTexture },
           { texture: fluencePreviousTexture },
@@ -1107,6 +1203,7 @@ async function ScreenSpace3DBegin(rootEl) {
       textures.fluenceCurrent,
       textures.depth,
       textures.objectID,
+      textures.normals,
       state.gpu.buffers.objects,
       [16, 16, 1],
       8// raysPerPixel
@@ -1323,7 +1420,7 @@ async function ScreenSpace3DBegin(rootEl) {
     }
 
     {
-      programs.screenSpaceBruteForce(commandEncoder);
+      programs.screenSpaceBruteForce(commandEncoder, state.camera.state.screenToWorld);
     }
 
     if (state.params.debugRenderObjectIDBuffer) {
