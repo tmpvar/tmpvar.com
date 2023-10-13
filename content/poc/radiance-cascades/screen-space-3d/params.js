@@ -51,7 +51,6 @@ export default function CreateParamReader(state, controlEl) {
     }
 
     if (state.params[paramName] != value) {
-      console.log(el.type)
       if (el.type == 'checkbox' || el.type == 'select-one') {
         controlEl.querySelectorAll(
           `.disabledBy-${paramName} input, .disabledBy-${paramName} select`
