@@ -1100,10 +1100,10 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
         render object type IDs <input type="checkbox" value="1" />
       </div>
       <div class="debugRenderNormals-control control">
-        render normals <input type="checkbox" value="1" checked/>
+        render normals <input type="checkbox" value="1" />
       </div>
       <div class="debugRenderRawFluence-control control">
-        render fluence <input type="checkbox" value="1" />
+        render fluence <input type="checkbox" value="1" checked/>
       </div>
       <div class="approach-control control">
         raycasting approach:
