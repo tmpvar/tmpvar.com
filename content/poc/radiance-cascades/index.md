@@ -1114,6 +1114,12 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
           <option value="screen-space/brute-force" selected>Screen Space Brute Force</option>
           <option value="screen-space/brute-force">World Space Brute Force</option>
         </select>
+        <div class="shownBy-approach indent" showValue="screen-space/brute-force">
+          <div class="bruteForceRaysPerPixelPerFrame-control control">
+            rays per pixel per frame: <input type="range" min="1" max="64" value="1" step="1">
+            <output></output>
+          </div>
+       </div>
       </div>
     </div>
     <h4>Scene Parameters</h4>

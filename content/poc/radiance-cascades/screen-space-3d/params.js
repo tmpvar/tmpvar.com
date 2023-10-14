@@ -90,7 +90,7 @@ export default function CreateParamReader(state, controlEl) {
       }
 
       state.params[paramName] = value
-      state.dirty = true
+      state.dirty++
       return true
     }
     return false
