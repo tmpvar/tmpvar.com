@@ -27,7 +27,8 @@ async function ScreenSpace3DBegin(rootEl) {
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('webgpu')
   const state = {
-    dirty: 1,
+    dirty: 0,
+    clearFluence: false,
     params: {},
     camera: CreateOrbitCamera(),
     lastFrameTime: Now(),
@@ -226,6 +227,18 @@ async function ScreenSpace3DBegin(rootEl) {
       Param('debugRenderDepth', 'bool')
     }
 
+    // Approach params
+    {
+      Param('bruteForceRaysPerPixelPerFrame', 'f32', (parentEl, value, oldValue) => {
+        if (value != oldValue) {
+          state.dirty = Math.floor(360 / value);
+          state.clearFluence = true
+        }
+        parentEl.querySelector('output').innerHTML = value
+        return value;
+      })
+    }
+
     // probe params
     {
       Param('probeRadius', 'i32', (parentEl, value) => {
@@ -261,7 +274,14 @@ async function ScreenSpace3DBegin(rootEl) {
 
       Param('scene', 'string')
 
-      Param('sceneOccluderScale', 'f32')
+      Param('sceneOccluderScale', 'f32', (parentEl, value, oldValue) => {
+        if (value != oldValue) {
+          state.clearFluence = true;
+        }
+
+        parentEl.querySelector('output').innerHTML = value
+        return value
+      })
 
     }
   }
@@ -737,6 +757,68 @@ async function ScreenSpace3DBegin(rootEl) {
       }
     },
 
+    TextureClear(gpu, texture, color, workgroupSize) {
+      const labelPrefix = `${texture.label}Clear/`
+      const source =  /* wgsl */`
+        @group(0) @binding(0) var texture: texture_storage_2d<${texture.format}, write>;
+        @compute @workgroup_size(${workgroupSize.join(',')})
+        fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
+          textureStore(texture, id.xy, vec4f(${color.join(',')}));
+        }
+      `
+
+      const shaderModule = gpu.device.createShaderModule({
+        label: `${labelPrefix}ShaderModule`,
+        code: source
+      })
+
+      const bindGroupLayout = gpu.device.createBindGroupLayout({
+        label: `${labelPrefix}BindGroupLayout`,
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+            storageTexture: {
+              format: texture.format,
+            },
+          }
+        ]
+      })
+
+      const pipeline = gpu.device.createComputePipeline({
+        label: `${labelPrefix}ComputePipeline`,
+        compute: {
+          module: shaderModule,
+          entryPoint: 'ComputeMain',
+        },
+        layout: gpu.device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout
+          ]
+        }),
+      })
+
+      const bindGroup = gpu.device.createBindGroup({
+        label: `${labelPrefix}BindGroup`,
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: texture.createView() }
+        ]
+      })
+
+      return function ClearWorld(commandEncoder) {
+        const pass = commandEncoder.beginComputePass()
+        pass.setPipeline(pipeline)
+        pass.setBindGroup(0, bindGroup)
+        pass.dispatchWorkgroups(
+          Math.floor(texture.width / workgroupSize[0] + 1),
+          Math.floor(texture.height / workgroupSize[1] + 1),
+          1
+        )
+        pass.end()
+      }
+    },
+
     ScreenSpaceBruteForce(
       gpu,
       fluencePreviousTexture,
@@ -746,7 +828,6 @@ async function ScreenSpace3DBegin(rootEl) {
       normalTexture,
       objectBuffer,
       workgroupSize,
-      raysPerPixel,
     ) {
       const labelPrefix = `${gpu.labelPrefix}ScreenSpaceBruteForce/`
       const sampler = gpu.device.createSampler({
@@ -759,6 +840,8 @@ async function ScreenSpace3DBegin(rootEl) {
       })
 
       const uboFields = [
+        ['percent', 'f32', 4],
+        ['raysPerPixelPerFrame', 'f32', 4],
         ['eye', 'vec4f', 16],
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
         ['screenToWorld', 'mat4x4<f32>', 16 * 4],
@@ -860,7 +943,7 @@ async function ScreenSpace3DBegin(rootEl) {
 
           let startingDepth = GetDepth(uv);
           let normal = textureSampleLevel(normalTexture, linearSampler, uv, 0).xyz;
-          var fluence = vec3f(0.0);
+          var fluence = vec3(0.0);
 
           let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * uv), 0).r;
           if (objectID == 0xFFFF) {
@@ -868,47 +951,94 @@ async function ScreenSpace3DBegin(rootEl) {
             return;
           }
 
-          let rayCount = 8.0;
-          let angleStep = TAU / (rayCount+1);
-          let thickness = 0.5;
-          var hits = 0.0;
-          for (var angle=0.0; angle<TAU; angle+=angleStep) {
-            var steps = 32;
-            var sampleUV = uv + halfInvDims;
 
-            var direction = vec2f(cos(angle), sin(angle));
 
-            // scale the direction so it steps through uv coords
-            direction *= invDims;
+          // let rayCount = 8.0;
+          // let angleStep = TAU / (rayCount+1);
+          // let thickness = 0.5;
+          // var hits = 0.0;
+          // for (var angle=0.0; angle<TAU; angle+=angleStep) {
+          //   var steps = 32;
+          //   var sampleUV = uv + halfInvDims;
 
-            var horizonSlope = 1.0;
-            var t = 0.0;
-            while(steps > 0) {
-              steps--;
-              t += max(1.0, t * 1.5);
+          //   var direction = vec2f(cos(angle), sin(angle));
 
-              sampleUV = uv + direction * t;
-              let depth = GetDepth(sampleUV);
+          //   // scale the direction so it steps through uv coords
+          //   direction *= invDims;
 
-              let horizonAtT = startingDepth + horizonSlope * t;
-              let depthDelta = depth - horizonAtT;
-              if (depthDelta < 0.0) {
-                horizonSlope = min(horizonSlope, (depth - startingDepth) / t);
-                let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * sampleUV), 0).r;
-                if (objectID < 0xFFFF) {
-                  let radiance = objectData[objectID].emission.rgb;
-                  let ratio = LinearizeDepth(-depthDelta);
-                  fluence += radiance * ratio;
-                  if (radiance.x > 0.0 || radiance.y > 0.0 || radiance.z >= 0.0) {
-                    hits = hits + 1.0;
+          //   var horizonSlope = 1.0;
+          //   var t = 0.0;
+          //   while(steps > 0) {
+          //     steps--;
+          //     t += max(1.0, t * 1.5);
+
+          //     sampleUV = uv + direction * t;
+          //     let depth = GetDepth(sampleUV);
+
+          //     let horizonAtT = startingDepth + horizonSlope * t;
+          //     let depthDelta = depth - horizonAtT;
+          //     if (depthDelta < 0.0) {
+          //       horizonSlope = min(horizonSlope, (depth - startingDepth) / t);
+          //       let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * sampleUV), 0).r;
+          //       if (objectID < 0xFFFF) {
+          //         let radiance = objectData[objectID].emission.rgb;
+          //         let ratio = LinearizeDepth(-depthDelta);
+          //         fluence += radiance * ratio;
+          //         if (radiance.x > 0.0 || radiance.y > 0.0 || radiance.z >= 0.0) {
+          //           hits = hits + 1.0;
+          //         }
+          //       }
+          //     }
+          //   }
+          // }
+
+          {
+            let rayCount = ubo.raysPerPixelPerFrame;
+            let thickness = 0.5;
+            var hits = 0.0;
+            let maxSteps = 200;
+            let angleStart = ubo.percent * TAU / rayCount;
+            for (var rayIndex=0.0; rayIndex<rayCount; rayIndex+=1.0) {
+              let angle = rayIndex * TAU / rayCount + angleStart;
+              var step = 0;
+              var sampleUV = uv + halfInvDims;
+              // let angle = ubo.percent * TAU;
+              var direction = vec2f(cos(angle), sin(angle));
+
+              // scale the direction so it steps through uv coords
+              direction *= invDims;
+
+              var horizonSlope = 0.05;//(GetDepth(uv + direction) - startingDepth) / length(direction);
+              var t = 0.1;
+              while(step < maxSteps) {
+                t += 8.0;//max(1.0, t * 1.5);
+
+                sampleUV = uv + direction * t;
+                let depth = GetDepth(sampleUV);
+
+                let horizonAtT = startingDepth + horizonSlope * t;
+                let depthDelta = depth - horizonAtT;
+                if (depthDelta < 0.0 || step == 0) {
+                  horizonSlope = min(horizonSlope, (depth - startingDepth) / t);
+                  let objectID = textureLoad(objectIDTexture, vec2<u32>(dims * sampleUV), 0).r;
+                  if (objectID < 0xFFFF) {
+                    let radiance = objectData[objectID].emission.rgb;
+                    let ratio = LinearizeDepth(-depthDelta);
+                    let attenuation = 1.0 / (1.0 + t);
+                    fluence += radiance * ratio * attenuation;
                   }
                 }
+
+                step++;
               }
             }
           }
 
+          let previousFluence = textureLoad(fluenceReadTexture, vec2<i32>(id.xy), 0).xyz;
+          fluence = (previousFluence + fluence);
+
           // Albedo colored output
-          if (true) {
+          if (false) {
             textureStore(fluenceWriteTexture, id.xy, vec4(max(vec3(0.05), fluence) * objectData[objectID].albedo.rgb, 1.0));
             return;
           }
@@ -1049,10 +1179,19 @@ async function ScreenSpace3DBegin(rootEl) {
       })
 
 
-      return function ScreenSpaceBruteForce(commandEncoder, screenToWorld) {
+      return function ScreenSpaceBruteForce(commandEncoder, screenToWorld, percent, raysPerPixelPerFrame) {
         // update the uniform buffer
         {
           let byteOffset = 0
+
+          // percent
+          uboData.setFloat32(byteOffset, percent, true)
+          byteOffset += 4;
+
+          // raysPerPixelPerFrame
+          uboData.setFloat32(byteOffset, raysPerPixelPerFrame, true)
+          byteOffset += 4;
+
           screenToWorld.forEach(v => {
             uboData.setFloat32(byteOffset, v, true)
             byteOffset += 4;
@@ -1232,6 +1371,12 @@ async function ScreenSpace3DBegin(rootEl) {
       textures.depth,
       state.gpu.buffers.objects
     ),
+    clearFluence: shaders.TextureClear(
+      state.gpu,
+      textures.fluenceCurrent,
+      [0, 0, 0, 0],
+      [16, 16, 1]
+    ),
     screenSpaceBruteForce: shaders.ScreenSpaceBruteForce(
       state.gpu,
       textures.fluencePrevious,
@@ -1347,7 +1492,7 @@ async function ScreenSpace3DBegin(rootEl) {
 
       // occluder instance data
       {
-        let yradius = 4
+        let yradius = 2
         mat4.fromRotationTranslationScale(
           scratch,
           quatIdentity,
@@ -1382,20 +1527,40 @@ async function ScreenSpace3DBegin(rootEl) {
     const deltaTime = (now - state.lastFrameTime) / 1000.0
     state.lastFrameTime = now
 
+    let clearFluence = state.clearFluence;
+    const percentStepSize = Math.floor(
+      360 / state.params.bruteForceRaysPerPixelPerFrame
+    );
+
+    state.clearFluence = false;
     if (state.camera.tick(canvas.width, canvas.height, deltaTime)) {
-      console.log('camera dirty')
-      state.dirty = Math.min(360, state.dirty + 360);
+      clearFluence = true
+      state.dirty = 360
     }
 
+    if (clearFluence) {
+      state.dirty = 360
+    }
+
+    state.dirty = Math.min(
+      360,
+      state.dirty
+    );
     if (state.dirty <= 0) {
       state.dirty = 0
       requestAnimationFrame(RenderFrame)
       return
     }
-    console.log(state.dirty)
-    state.dirty--
+
+    let dirty = state.dirty;
+    state.dirty -= state.params.bruteForceRaysPerPixelPerFrame
 
     let commandEncoder = state.gpu.device.createCommandEncoder()
+
+    if (clearFluence) {
+      programs.clearFluence(commandEncoder)
+    }
+
     let frameTextureView = ctx.getCurrentTexture().createView()
 
     // Render the current scene
@@ -1459,7 +1624,14 @@ async function ScreenSpace3DBegin(rootEl) {
     }
 
     {
-      programs.screenSpaceBruteForce(commandEncoder, state.camera.state.screenToWorld);
+
+
+      programs.screenSpaceBruteForce(
+        commandEncoder,
+        state.camera.state.screenToWorld,
+        (dirty / 360),
+        state.params.bruteForceRaysPerPixelPerFrame,
+      );
     }
 
     if (state.params.debugRenderObjectIDBuffer) {
