@@ -315,6 +315,7 @@ export default function CreateOrbitCamera() {
     sensitivity: 0.01,
     scrollSensitivity: 0.01,
     fov: 90 * DegreesToRadians,
+    dirty: false,
   }
 
   return {
@@ -326,6 +327,7 @@ export default function CreateOrbitCamera() {
 
       state.yaw += dx
       state.pitch = Math.max(0.1, Math.min(state.pitch + dy, Math.PI - 0.1))
+      state.dirty = true;
     },
 
     zoom(delta) {
@@ -339,7 +341,8 @@ export default function CreateOrbitCamera() {
       let delta = (state.targetDistance - state.distance) * 9.9999999 * deltaTime
 
       // if the camera is moving, let the caller know
-      let ret = false
+      let ret = state.dirty
+      state.dirty = false;
       if (Math.abs(delta) > 0.01) {
         state.distance += delta
         ret = true
