@@ -27,7 +27,7 @@ async function ScreenSpace3DBegin(rootEl) {
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('webgpu')
   const state = {
-    dirty: true,
+    dirty: 1,
     params: {},
     camera: CreateOrbitCamera(),
     lastFrameTime: Now(),
@@ -47,7 +47,6 @@ async function ScreenSpace3DBegin(rootEl) {
     let ratioY = canvas.height / canvas.clientHeight
     state.mouse.pos[0] = x * ratioX
     state.mouse.pos[1] = y * ratioY
-    state.dirty = true;
   }
 
   window.addEventListener("mouseup", e => {
@@ -84,7 +83,6 @@ async function ScreenSpace3DBegin(rootEl) {
 
   canvas.addEventListener("wheel", e => {
     state.camera.zoom(e.deltaY)
-    state.dirty = true
     e.preventDefault()
   }, { passive: false })
 
@@ -870,7 +868,7 @@ async function ScreenSpace3DBegin(rootEl) {
             return;
           }
 
-          let rayCount = 64.0;
+          let rayCount = 8.0;
           let angleStep = TAU / (rayCount+1);
           let thickness = 0.5;
           var hits = 0.0;
@@ -887,7 +885,7 @@ async function ScreenSpace3DBegin(rootEl) {
             var t = 0.0;
             while(steps > 0) {
               steps--;
-              t = max(1.0, t * 1.5);
+              t += max(1.0, t * 1.5);
 
               sampleUV = uv + direction * t;
               let depth = GetDepth(sampleUV);
@@ -910,7 +908,7 @@ async function ScreenSpace3DBegin(rootEl) {
           }
 
           // Albedo colored output
-          if (false) {
+          if (true) {
             textureStore(fluenceWriteTexture, id.xy, vec4(max(vec3(0.05), fluence) * objectData[objectID].albedo.rgb, 1.0));
             return;
           }
@@ -1197,7 +1195,7 @@ async function ScreenSpace3DBegin(rootEl) {
         out[1] = dataView.getFloat32(start + 4, true)
         out[2] = dataView.getFloat32(start + 8, true)
       },
-      setEmissions(index, value) {
+      setEmission(index, value) {
         let start = index * ObjectBufferEntrySize + 16
         dataView.setFloat32(start + 0, value[0], true)
         dataView.setFloat32(start + 4, value[1], true)
@@ -1300,7 +1298,7 @@ async function ScreenSpace3DBegin(rootEl) {
         )
         floor.setTransform(0, scratch)
         floor.setAlbedo(0, [.5, .5, .5])
-        floor.setEmissions(0, [0, 0, 0])
+        floor.setEmission(0, [0, 0, 0])
       }
 
       // sphere instance data
@@ -1313,7 +1311,7 @@ async function ScreenSpace3DBegin(rootEl) {
         )
         sphere.setTransform(0, scratch)
         sphere.setAlbedo(0, [1, 1, 1])
-        sphere.setEmissions(0, [1, 1, 1])
+        sphere.setEmission(0, [1, 1, 1])
       }
     }
 
@@ -1340,11 +1338,11 @@ async function ScreenSpace3DBegin(rootEl) {
           scratch,
           quatIdentity,
           [0, floory, 0],
-          [10, 1, 10]
+          [15, 1, 15]
         )
         boxes.setTransform(0, scratch)
         boxes.setAlbedo(0, ColorHexToF32Array('#a26d3f'))
-        boxes.setEmissions(0, [0, 0, 0])
+        boxes.setEmission(0, [0, 0, 0])
       }
 
       // occluder instance data
@@ -1358,7 +1356,7 @@ async function ScreenSpace3DBegin(rootEl) {
         )
         boxes.setTransform(1, scratch)
         boxes.setAlbedo(1, ColorHexToF32Array('#6b2643'))
-        boxes.setEmissions(1, [0, 0, 0])
+        boxes.setEmission(1, [0, 0, 0])
       }
 
       // sphere instance data
@@ -1371,7 +1369,7 @@ async function ScreenSpace3DBegin(rootEl) {
         )
         spheres.setTransform(0, scratch)
         spheres.setAlbedo(0, [1.0, 1.0, 1.0])
-        spheres.setEmissions(0, [1, 1, 1])
+        spheres.setEmission(0, [10, 10, 10])
       }
     }
 
@@ -1385,14 +1383,17 @@ async function ScreenSpace3DBegin(rootEl) {
     state.lastFrameTime = now
 
     if (state.camera.tick(canvas.width, canvas.height, deltaTime)) {
-      state.dirty = true;
+      console.log('camera dirty')
+      state.dirty = Math.min(360, state.dirty + 360);
     }
 
-    if (!state.dirty) {
+    if (state.dirty <= 0) {
+      state.dirty = 0
       requestAnimationFrame(RenderFrame)
       return
     }
-    state.dirty = false
+    console.log(state.dirty)
+    state.dirty--
 
     let commandEncoder = state.gpu.device.createCommandEncoder()
     let frameTextureView = ctx.getCurrentTexture().createView()
