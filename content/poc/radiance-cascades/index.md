@@ -1106,7 +1106,7 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
         render depth <input type="checkbox" value="1" />
       </div>
       <div class="debugRenderRawFluence-control control">
-        render fluence <input type="checkbox" value="1" checked/>
+        render fluence <input type="checkbox" value="1" />
       </div>
       <div class="approach-control control">
         raycasting approach:

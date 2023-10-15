@@ -301,21 +301,27 @@ export default function CreateOrbitCamera() {
     EPS: 1e-5,
     yaw: 0.0,
     pitch: Math.PI * 0.5,
+    distance: 80.0,
+
+    yawVelocity: 0.0,
+    pitchVelocity: 0.0,
+    distanceVelocity: 0.0,
+
+    rotationFalloff: 0.75,
+    distanceFalloff: 0.75,
+
     eye: [0.0, 2.0, 0.0],
     target: [0.0, 0.0, 0.0],
     up: [0.0, 1.0, 0.0],
-    distance: 80.0,
-    targetDistance: 80.0,
     minDistance: 1,
     maxDistance: 500,
     projection: new Float32Array(16),
     view: new Float32Array(16),
     worldToScreen: new Float32Array(16),
     screenToWorld: new Float32Array(16),
-    sensitivity: 0.01,
-    scrollSensitivity: 0.01,
+    sensitivity: 0.1,
+    scrollSensitivity: 1.0,
     fov: 90 * DegreesToRadians,
-    dirty: false,
   }
 
   return {
@@ -325,29 +331,64 @@ export default function CreateOrbitCamera() {
       dx *= state.sensitivity
       dy *= state.sensitivity
 
-      state.yaw += dx
-      state.pitch = Math.max(0.1, Math.min(state.pitch + dy, Math.PI - 0.1))
-      state.dirty = true;
+      state.yawVelocity += dx
+      state.pitchVelocity += dy
     },
 
     zoom(delta) {
-      state.targetDistance = Math.max(
-        state.minDistance,
-        Math.min(state.targetDistance + delta * state.scrollSensitivity, state.maxDistance)
-      )
+      state.distanceVelocity += delta * state.scrollSensitivity
     },
 
     tick(width, height, deltaTime) {
-      let delta = (state.targetDistance - state.distance) * 9.9999999 * deltaTime
-
       // if the camera is moving, let the caller know
-      let ret = state.dirty
-      state.dirty = false;
-      if (Math.abs(delta) > 0.01) {
-        state.distance += delta
-        ret = true
-      } else {
-        state.distance = state.targetDistance
+      let ret = false
+
+      // distance
+      {
+        if (Math.abs(state.distanceVelocity) > 0.1) {
+          ret = true
+          state.distanceVelocity *= state.distanceFalloff
+          state.distance += state.distanceVelocity * deltaTime;
+          state.distance = Math.max(
+            state.minDistance,
+            Math.min(
+              state.maxDistance,
+              state.distance
+            )
+          )
+        } else {
+          state.distanceVelocity = 0.0
+        }
+      }
+
+
+      // pitch
+      {
+        if (Math.abs(state.pitchVelocity) > 0.1) {
+          ret = true
+          state.pitch += state.pitchVelocity * deltaTime
+          state.pitchVelocity *= state.rotationFalloff
+          state.pitch = Math.max(
+            0.1,
+            Math.min(
+              state.pitch,
+              Math.PI - 0.1
+            )
+          )
+        } else {
+          state.pitchVelocity = 0.0
+        }
+      }
+
+      // yaw
+      {
+        if (Math.abs(state.yawVelocity) > 0.1) {
+          ret = true
+          state.yaw += state.yawVelocity * deltaTime
+          state.yawVelocity *= state.rotationFalloff
+        } else {
+          state.yawVelocity = 0.0
+        }
       }
 
       state.eye[2] = Math.sin(state.pitch) * Math.sin(state.yaw) * state.distance
@@ -355,7 +396,7 @@ export default function CreateOrbitCamera() {
       state.eye[1] = Math.cos(state.pitch) * state.distance
 
       LookAt(state.view, state.eye, state.target, state.up)
-      PerspectiveZO(state.projection, state.fov, width / height, 0.1, 100.0)
+      PerspectiveZO(state.projection, state.fov, width / height, state.minDistance, state.maxDistance)
       Multiply(state.worldToScreen, state.projection, state.view)
       Invert(state.screenToWorld, state.worldToScreen)
       return ret
