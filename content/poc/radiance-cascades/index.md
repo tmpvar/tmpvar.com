@@ -1106,15 +1106,21 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
         render depth <input type="checkbox" value="1" />
       </div>
       <div class="debugRenderRawFluence-control control">
-        render fluence <input type="checkbox" value="1" />
+        render fluence <input type="checkbox" value="1" checked />
       </div>
       <div class="approach-control control">
         raycasting approach:
         <select>
-          <option value="screen-space/brute-force" selected>Screen Space Brute Force</option>
-          <option value="world-space/brute-force">World Space Brute Force</option>
+          <option value="screen-space/brute-force">Screen Space Brute Force</option>
+          <option value="world-space/brute-force" selected>World Space Brute Force</option>
         </select>
         <div class="shownBy-approach indent" showValue="screen-space/brute-force">
+          <div class="bruteForceRaysPerPixelPerFrame-control control">
+            rays per pixel per frame: <input type="range" min="1" max="64" value="1" step="1">
+            <output></output>
+          </div>
+       </div>
+        <div class="shownBy-approach indent" showValue="world-space/brute-force">
           <div class="bruteForceRaysPerPixelPerFrame-control control">
             rays per pixel per frame: <input type="range" min="1" max="64" value="1" step="1">
             <output></output>
