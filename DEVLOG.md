@@ -23,20 +23,27 @@
 - radiance-cascades/2d: how to fix the ringing artifacts?
 
 ## Next
+- let controls live next to the canvas so you dont have to scroll up and down
+- only show side controls when the window is wide enough to handle them.
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
 - radiance-cascades/3d:
-- radiance-cascades/3d: add raymarching approach: Brute Force Screen Space
+- radiance-cascades/3d: add raymarching approach: Brute Force World Space
 - radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
 - radiance-cascades/3d: add raymarching approach: Cascades World Space RayMarch
-- radiance-cascades/3d: add raymarching approach: Brute Force World Space
 
 - radiance-cascades/3d: collect depth buffer and mipmap it into a
                         red/green (min/max) f32 texture
 - radiance-cascades/3d: add a toggle for screenspace vs worldspace ray casting
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
+## 2023-10-15
+## 2023-10-14
+- radiance-cascades/3d: fixup BFSS so that performance can be adjusted and improve overall
+                        quality. In other words, make it actually brute force.
+## 2023-10-13
+- radiance-cascades/3d: add raymarching approach: Brute Force Screen Space
 ## 2023-10-12
 - radiance-cascades/3d: compute the per-pixel normals and output into a separate texture
 - radiance-cascades/3d: add fluence debug output
