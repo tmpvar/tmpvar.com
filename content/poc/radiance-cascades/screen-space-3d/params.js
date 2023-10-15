@@ -1,5 +1,15 @@
-export default function CreateParamReader(state, controlEl) {
-  return function Param(paramName, paramType, cb) {
+export default function CreateParamReader(state, controlEl, paramPrefix = null) {
+  let params = state.params
+  if (paramPrefix) {
+    paramPrefix.split('/').forEach(name => {
+      if (params[name] == undefined) {
+        params[name] = {}
+      }
+      params = params[name]
+    })
+  }
+
+  function Param(paramName, paramType, cb) {
     let selector = `.${paramName}-control`
     let parentEl = controlEl.querySelector(selector)
     if (!parentEl) {
@@ -47,10 +57,10 @@ export default function CreateParamReader(state, controlEl) {
     }
 
     if (cb) {
-      value = cb(parentEl, value, state.params[paramName])
+      value = cb(parentEl, value, params[paramName])
     }
 
-    if (state.params[paramName] != value) {
+    if (params[paramName] != value) {
       if (el.type == 'checkbox' || el.type == 'select-one') {
         controlEl.querySelectorAll(
           `.disabledBy-${paramName} input, .disabledBy-${paramName} select`
@@ -89,10 +99,13 @@ export default function CreateParamReader(state, controlEl) {
         }
       }
 
-      state.params[paramName] = value
+      params[paramName] = value
       state.dirty = true
       return true
     }
     return false
-  };
+  }
+
+  Param.data = params
+  return Param
 }
