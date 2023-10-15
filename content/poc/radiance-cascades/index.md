@@ -1112,7 +1112,7 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
         raycasting approach:
         <select>
           <option value="screen-space/brute-force" selected>Screen Space Brute Force</option>
-          <option value="screen-space/brute-force">World Space Brute Force</option>
+          <option value="world-space/brute-force">World Space Brute Force</option>
         </select>
         <div class="shownBy-approach indent" showValue="screen-space/brute-force">
           <div class="bruteForceRaysPerPixelPerFrame-control control">
@@ -1133,7 +1133,7 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
       </div>
       <div class="shownBy-scene indent" showValue="simple/emissive-sphere-with-occluder">
         <div class="sceneOccluderScale-control control">
-          scale (x,z): <input type="range" min="0.001" max="10.0" value="1.0" step="0.01">
+          scale (x,z): <input type="range" min="0.01" max="10.0" value="1.0" step="0.01">
           <output></output>
         </div>
       </div>

@@ -27,11 +27,15 @@ async function ScreenSpace3DBegin(rootEl) {
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('webgpu')
   const state = {
-    dirty: 0,
-    clearFluence: false,
+    dirty: true,
+    sceneDirty: true,
+    clearFluence: true,
     params: {},
     camera: CreateOrbitCamera(),
     lastFrameTime: Now(),
+
+    pendingFrames: 360,
+    maxPendingFrames: 360,
 
     mouse: {
       pos: [0, 0],
@@ -231,7 +235,7 @@ async function ScreenSpace3DBegin(rootEl) {
     {
       Param('bruteForceRaysPerPixelPerFrame', 'f32', (parentEl, value, oldValue) => {
         if (value != oldValue) {
-          state.dirty = Math.floor(360 / value);
+          state.pendingFrames = state.maxPendingFrames
           state.clearFluence = true
         }
         parentEl.querySelector('output').innerHTML = value
@@ -1527,39 +1531,41 @@ async function ScreenSpace3DBegin(rootEl) {
     const deltaTime = (now - state.lastFrameTime) / 1000.0
     state.lastFrameTime = now
 
-    let clearFluence = state.clearFluence;
     const percentStepSize = Math.floor(
       360 / state.params.bruteForceRaysPerPixelPerFrame
     );
 
-    state.clearFluence = false;
     if (state.camera.tick(canvas.width, canvas.height, deltaTime)) {
-      clearFluence = true
-      state.dirty = 360
+      state.clearFluence = true
+      state.pendingFrames = 360
     }
 
-    if (clearFluence) {
-      state.dirty = 360
+    if (state.clearFluence) {
+      let commandEncoder = state.gpu.device.createCommandEncoder()
+      programs.clearFluence(commandEncoder)
+      state.gpu.device.queue.submit([commandEncoder.finish()])
+      state.pendingFrames = 360
     }
 
-    state.dirty = Math.min(
-      360,
-      state.dirty
+    state.clearFluence = false;
+
+    state.pendingFrames = Math.min(
+      state.maxPendingFrames,
+      state.pendingFrames
     );
-    if (state.dirty <= 0) {
-      state.dirty = 0
+
+    state.dirty = state.dirty || state.pendingFrames >= 0
+
+    if (!state.dirty) {
       requestAnimationFrame(RenderFrame)
       return
     }
+    state.dirty = false
 
-    let dirty = state.dirty;
-    state.dirty -= state.params.bruteForceRaysPerPixelPerFrame
+    let pendingFrames = state.pendingFrames
+    state.pendingFrames -= state.params.bruteForceRaysPerPixelPerFrame
 
     let commandEncoder = state.gpu.device.createCommandEncoder()
-
-    if (clearFluence) {
-      programs.clearFluence(commandEncoder)
-    }
 
     let frameTextureView = ctx.getCurrentTexture().createView()
 
@@ -1624,12 +1630,10 @@ async function ScreenSpace3DBegin(rootEl) {
     }
 
     {
-
-
       programs.screenSpaceBruteForce(
         commandEncoder,
         state.camera.state.screenToWorld,
-        (dirty / 360),
+        (pendingFrames / 360),
         state.params.bruteForceRaysPerPixelPerFrame,
       );
     }
