@@ -28,7 +28,7 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
-- radiance-cascades/3d:
+- radiance-cascades/3d: add scene specific params and process them
 - radiance-cascades/3d: add raymarching approach: Brute Force World Space
 - radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
 - radiance-cascades/3d: add raymarching approach: Cascades World Space RayMarch
@@ -39,6 +39,9 @@
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-15
+- radiance-cascades/3d: move brute force screen space approach into its own little hidy hole
+- radiance-cascades/3d: add approach specific params and process them
+- radiance-cascades/3d: allow param reader to be scoped
 ## 2023-10-14
 - radiance-cascades/3d: fixup BFSS so that performance can be adjusted and improve overall
                         quality. In other words, make it actually brute force.
