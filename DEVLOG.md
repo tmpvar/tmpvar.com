@@ -35,13 +35,13 @@
 
 - radiance-cascades/3d: collect depth buffer and mipmap it into a
                         red/green (min/max) f32 texture
-- radiance-cascades/3d: add a toggle for screenspace vs worldspace ray casting
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-15
 - radiance-cascades/3d: move brute force screen space approach into its own little hidy hole
 - radiance-cascades/3d: add approach specific params and process them
 - radiance-cascades/3d: allow param reader to be scoped
+- radiance-cascades/3d: add a toggle for screenspace vs worldspace ray casting
 ## 2023-10-14
 - radiance-cascades/3d: fixup BFSS so that performance can be adjusted and improve overall
                         quality. In other words, make it actually brute force.
