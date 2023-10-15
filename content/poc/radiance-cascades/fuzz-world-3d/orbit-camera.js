@@ -352,9 +352,17 @@ export default function CreateOrbitCamera() {
       state.eye[1] = Math.cos(state.pitch) * state.distance
 
       LookAt(state.view, state.eye, state.target, state.up)
-      PerspectiveZO(state.projection, state.fov, width / height, 0.1, 100.0)
+      PerspectiveZO(state.projection, state.fov, width / height, state.minDistance, state.maxDistance)
       Multiply(state.worldToScreen, state.projection, state.view)
-      Invert(state.screenToWorld, state.worldToScreen)
+
+      let invView = new Float32Array(16)
+      let invProj = new Float32Array(16)
+      Invert(invProj, state.projection)
+      Invert(invView, state.view)
+
+      Multiply(state.screenToWorld, state.view, invProj);
+
+      // Invert(state.screenToWorld, state.worldToScreen)
       return ret
     }
   }

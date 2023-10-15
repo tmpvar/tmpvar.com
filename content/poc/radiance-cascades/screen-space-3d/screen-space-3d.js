@@ -5,6 +5,7 @@ import * as mat4 from './gl-matrix/mat4.js'
 import * as vec3 from './gl-matrix/vec3.js'
 
 import CreateScreenSpaceBruteForceApproach from './approach/screen-space-brute-force.js'
+import CreateWorldSpaceBruteForceApproach from './approach/world-space-brute-force.js'
 
 async function ScreenSpace3DBegin(rootEl) {
 
@@ -1118,6 +1119,19 @@ async function ScreenSpace3DBegin(rootEl) {
       'screen-space/brute-force',
       controlEl
     ),
+    'world-space/brute-force': CreateWorldSpaceBruteForceApproach(
+      state.gpu,
+      textures.fluencePrevious,
+      textures.fluenceCurrent,
+      textures.depth,
+      textures.objectID,
+      textures.normals,
+      state.gpu.buffers.objects,
+      WGSLObjectDataStruct,
+      state,
+      'world-space/brute-force',
+      controlEl
+    ),
   }
 
   function RenderFrame() {
@@ -1146,10 +1160,9 @@ async function ScreenSpace3DBegin(rootEl) {
       let commandEncoder = state.gpu.device.createCommandEncoder()
       programs.clearFluence(commandEncoder)
       state.gpu.device.queue.submit([commandEncoder.finish()])
+      state.dirty = true
     }
 
-    const clearFluence = state.clearFluence
-    state.clearFluence = false;
     if (!state.dirty) {
       requestAnimationFrame(RenderFrame)
       return
@@ -1229,7 +1242,7 @@ async function ScreenSpace3DBegin(rootEl) {
     if (state.params.debugRenderObjectTypeIDBuffer) {
       programs.debugObjectTypesBuffer(commandEncoder, frameTextureView)
     }
-    if (!clearFluence && state.params.debugRenderRawFluence) {
+    if (state.params.debugRenderRawFluence) {
       programs.debugFluence(commandEncoder, frameTextureView)
     }
     if (state.params.debugRenderNormals) {
@@ -1241,6 +1254,7 @@ async function ScreenSpace3DBegin(rootEl) {
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
 
+    state.clearFluence = false;
     requestAnimationFrame(RenderFrame)
   }
 
