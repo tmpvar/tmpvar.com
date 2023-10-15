@@ -42,9 +42,8 @@ async function ScreenSpace3DBegin(rootEl) {
       down: false
     },
   }
-  state.camera.state.targetDistance = 10
-  state.camera.state.distance = state.camera.state.targetDistance
-  state.camera.state.scrollSensitivity = 0.01;
+
+  state.camera.state.distance = 10
 
   const MoveMouse = (x, y) => {
     let ratioX = canvas.width / canvas.clientWidth
@@ -1149,6 +1148,7 @@ async function ScreenSpace3DBegin(rootEl) {
       state.gpu.device.queue.submit([commandEncoder.finish()])
     }
 
+    const clearFluence = state.clearFluence
     state.clearFluence = false;
     if (!state.dirty) {
       requestAnimationFrame(RenderFrame)
@@ -1229,7 +1229,7 @@ async function ScreenSpace3DBegin(rootEl) {
     if (state.params.debugRenderObjectTypeIDBuffer) {
       programs.debugObjectTypesBuffer(commandEncoder, frameTextureView)
     }
-    if (state.params.debugRenderRawFluence) {
+    if (!clearFluence && state.params.debugRenderRawFluence) {
       programs.debugFluence(commandEncoder, frameTextureView)
     }
     if (state.params.debugRenderNormals) {
