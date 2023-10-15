@@ -116,11 +116,11 @@ export default function CreateWorldSpaceBruteForceApproach(
             return;
           }
           let dims = vec2f(textureDimensions(depthTexture));
-          let uv = vec2f(id.xy) / dims * 2.0 - 1.0;
+          var uv = vec2f(f32(id.x), dims.y - f32(id.y)) / dims * 2.0 - 1.0;
           let projectedPos = ubo.screenToWorld * vec4f(uv, depth, 1.0);
           let worldPos = projectedPos.xyz / projectedPos.w;
 
-          textureStore(fluenceWriteTexture, id.xy, vec4(worldPos / 10.0 * 0.5 + 0.5, 1.0));
+          textureStore(fluenceWriteTexture, id.xy, vec4(worldPos / 20 * 0.5 + 0.5, 1.0));
         }
       `
 
