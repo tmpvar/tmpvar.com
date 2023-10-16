@@ -1,7 +1,7 @@
 import CreateParamReader from "./params.js"
 
 const DemoImage = document.createElement('img');
-DemoImage.src = window.location.pathname + "flatland-2d-demo.png"
+DemoImage.src = window.location.pathname + "flatland-2d/flatland-2d-demo.png"
 
 async function ProbeRayDDA2DBegin() {
   const rootEl = document.querySelector('#flatland-2d-content')
