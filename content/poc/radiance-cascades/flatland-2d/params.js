@@ -1,16 +1,24 @@
-function ParseColor(value) {
-  let v = parseInt(value.replace("#", ""), 16)
+export default function CreateParamReader(state, controlEl, paramPrefix = null) {
+  let params = state.params
+  if (paramPrefix) {
+    paramPrefix.split('/').forEach(name => {
+      if (params[name] == undefined) {
+        params[name] = {}
+      }
+      params = params[name]
+    })
+  }
 
-  let r = (v >> 16) & 0xFF
-  let g = (v >> 8) & 0xFF
-  let b = (v >> 0) & 0xFF
-  return r | (g << 8) | (b << 16) | 0xFF000000
-}
+  const ParseColor = (value) => {
+    let v = parseInt(value.replace("#", ""), 16)
 
-export default function CreateParamReader(state, controlEl) {
+    let r = (v >> 16) & 0xFF
+    let g = (v >> 8) & 0xFF
+    let b = (v >> 0) & 0xFF
+    return r | (g << 8) | (b << 16) | 0xFF000000
+  }
 
-
-  return function Param(paramName, paramType, cb) {
+  function Param(paramName, paramType, cb) {
     let selector = `.${paramName}-control`
     let parentEl = controlEl.querySelector(selector)
     if (!parentEl) {
@@ -58,14 +66,55 @@ export default function CreateParamReader(state, controlEl) {
     }
 
     if (cb) {
-      value = cb(parentEl, value)
+      value = cb(parentEl, value, params[paramName])
     }
 
-    if (state.params[paramName] != value) {
-      state.params[paramName] = value
+    if (params[paramName] != value) {
+      if (el.type == 'checkbox' || el.type == 'select-one') {
+        controlEl.querySelectorAll(
+          `.disabledBy-${paramName} input, .disabledBy-${paramName} select`
+        ).forEach(el => {
+          el.disabled = !!value
+        });
+        controlEl.querySelectorAll(
+          `.enabledBy-${paramName} input, .enabledBy-${paramName} select`
+        ).forEach(el => {
+          el.disabled = !value
+        });
+
+        controlEl.querySelectorAll(`.hiddenBy-${paramName} `).forEach(el => {
+
+          el.style.display = value ? 'none' : 'block'
+        });
+
+        controlEl.querySelectorAll(`.shownBy-${paramName}`).forEach(el => {
+          let requiredValue = el.getAttribute('showValue')
+          if (!value) {
+            el.style.display = 'none'
+          } else {
+            if (!requiredValue) {
+              el.style.display = !value ? 'none' : 'block'
+            } else {
+              el.style.display = requiredValue == value ? 'block' : 'none'
+            }
+          }
+        });
+      }
+
+      if (!cb) {
+        let outputEl = parentEl.querySelector('output')
+        if (outputEl) {
+          outputEl.innerHTML = `${value}`
+        }
+      }
+
+      params[paramName] = value
       state.dirty = true
       return true
     }
     return false
-  };
+  }
+
+  Param.data = params
+  return Param
 }
