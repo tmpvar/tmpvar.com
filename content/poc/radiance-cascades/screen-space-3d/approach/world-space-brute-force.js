@@ -14,6 +14,8 @@ export default function CreateWorldSpaceBruteForceApproach(
   controlEl
 ) {
 
+  const QuadDiameter = 8;
+
   function CreateProgram(
     gpu,
     fluencePreviousTexture,
@@ -35,7 +37,7 @@ export default function CreateWorldSpaceBruteForceApproach(
     })
 
     const uboFields = [
-      // percent, raysPerPixelPerFrame, and the rest is padding
+      // percent, raysPerPixelPerFrame, totalObjects, and the rest is padding
       ['params', 'mat4x4<f32>', 16 * 4],
       ['screenToWorld', 'mat4x4<f32>', 16 * 4],
     ]
@@ -74,24 +76,36 @@ export default function CreateWorldSpaceBruteForceApproach(
           return (-b - sqrt(discriminant)) / (2.0f * a);
         }
 
-        // axis aligned box centered at the origin, with size boxSize
-        fn RayAABB(ro: vec3f, rd: vec3f, boxSize: vec3f) -> f32 {
-          let m = 1.0f / rd; // can precompute if traversing a set of aligned boxes
-          let n = m * ro;    // can precompute if traversing a set of aligned boxes
-          let k = abs(m) * boxSize;
-          let t1 = -n - k;
-          let t2 = -n + k;
-          let tN = max(max(t1.x, t1.y), t1.z);
-          let tF = min(min(t2.x, t2.y), t2.z);
-          if (tN > tF || tF < 0.0f) {
-            return -1.0f; // no intersection
+        const MaxDistance = 1000.0;
+
+        fn MaxComponent(v: vec3f) -> f32 {
+          return max(v.x, max(v.y, v.z));
+        }
+
+        fn MinComponent(v: vec3f) -> f32 {
+          return min(v.x, min(v.y, v.z));
+        }
+
+        fn RayAABB(p0: vec3f, p1: vec3f, rayOrigin: vec3f, invRaydir: vec3f) -> f32 {
+          let t0 = (p0 - rayOrigin) * invRaydir;
+          let t1 = (p1 - rayOrigin) * invRaydir;
+          let tmin = min(t0, t1);
+          let tmax = max(t0, t1);
+          let a = MaxComponent(tmin);
+          let b = MinComponent(tmax);
+          if (b <= a) {
+            return MaxDistance;
           }
 
-          if (tN >= 0.0) {
-            return tN;
-          } else {
-            return tF;
+          if (a > 0.0) {
+            return a;
           }
+
+          if (b > 0.0) {
+            return b;
+          }
+
+          return MaxDistance;
         }
 
         ${WGSLObjectDataStruct}
@@ -104,6 +118,62 @@ export default function CreateWorldSpaceBruteForceApproach(
         @group(0) @binding(5) var normalTexture: texture_2d<f32>;
         @group(0) @binding(6) var<storage, read_write> objectData: array<ObjectData>;
         @group(0) @binding(7) var<uniform> ubo: UBOParams;
+
+        fn CastRay(rayOrigin: vec3f, rayDir: vec3f, originalObjectID: i32) -> vec3f {
+          var d = MaxDistance;
+          var fluence = vec3f(0.1);
+          let totalObjects = i32(ubo.params[0].z);
+          let surfaceOffset = rayDir * 0.5;
+          for (var objectIndex: i32 = 0; objectIndex < totalObjects; objectIndex++) {
+            if (objectIndex == originalObjectID) {
+              continue;
+            }
+
+            let objectType = u32(objectData[objectIndex].albedo.w);
+            switch(objectType) {
+              // Box
+              case 0: {
+                let pos = objectData[objectIndex].position.xyz;
+                let radius = objectData[objectIndex].scale.xyz;
+
+                let invRayDir = 1.0 / rayDir;
+
+                let ld = RayAABB(
+                  pos - radius,
+                  pos + radius,
+                  rayOrigin,
+                  invRayDir
+                );
+
+                if (ld >= 0.0 && ld < d) {
+                  d = ld;
+                  fluence = vec3(1.0, 0.0, 1.0);
+                }
+                break;
+              }
+
+              // Sphere
+              case 1: {
+
+                let spherePos = objectData[objectIndex].position.xyz;
+                let sphereRadius = objectData[objectIndex].scale.x;
+                let ld = RaySphere((rayOrigin - spherePos), rayDir, sphereRadius);
+
+                if (ld >= 0.0 && ld < d) {
+                  d = ld;
+                  fluence = vec3(1.0, 0.0, 1.0);
+                }
+                break;
+              }
+
+              default: {
+                break;
+              }
+            }
+          }
+
+          return fluence;
+        }
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -121,6 +191,15 @@ export default function CreateWorldSpaceBruteForceApproach(
           let worldPos = projectedPos.xyz / projectedPos.w;
 
           textureStore(fluenceWriteTexture, id.xy, vec4(worldPos / 20 * 0.5 + 0.5, 1.0));
+
+
+          let normal = textureLoad(normalTexture, id.xy, 0).xyz;
+          textureStore(fluenceWriteTexture, id.xy, vec4(normal * 0.5 + 0.5, 1.0));
+
+          let objectID = textureLoad(objectIDTexture, id.xy, 0).x;
+          let fluence = CastRay(worldPos, normal, i32(objectID));
+          textureStore(fluenceWriteTexture, id.xy, vec4(fluence, 1.0));
+
         }
       `
 
@@ -255,7 +334,13 @@ export default function CreateWorldSpaceBruteForceApproach(
       ]
     })
 
-    return function WorldSpaceBruteForce(commandEncoder, screenToWorld, percent, raysPerPixelPerFrame) {
+    return function WorldSpaceBruteForce(
+      commandEncoder,
+      screenToWorld,
+      percent,
+      objectCount,
+      raysPerPixelPerFrame
+    ) {
       // update the uniform buffer
       {
         let byteOffset = 0
@@ -265,6 +350,10 @@ export default function CreateWorldSpaceBruteForceApproach(
 
         // raysPerPixelPerFrame
         uboData.setFloat32(byteOffset, raysPerPixelPerFrame, true)
+        byteOffset += 4;
+
+        // objectCount
+        uboData.setFloat32(byteOffset, objectCount, true)
         byteOffset += 4;
 
         byteOffset = Math.floor(byteOffset / uboBufferAlignment + 1) * uboBufferAlignment
@@ -316,7 +405,7 @@ export default function CreateWorldSpaceBruteForceApproach(
 
   const Params = CreateParamReader(state, approachControlEl, 'approaches/' + approachName)
 
-  const MaxPendingFrames = 360
+  const MaxPendingFrames = QuadDiameter * QuadDiameter
   let pendingFrames = 0
 
   return {
@@ -339,12 +428,12 @@ export default function CreateWorldSpaceBruteForceApproach(
       }
 
     },
-    run(commandEncoder) {
-      console.log(Params.data.bruteForceRaysPerPixelPerFrame);
+    run(commandEncoder, scene) {
       program(
         commandEncoder,
         state.camera.state.screenToWorld,
         pendingFrames / 360,
+        scene.objectCount,
         Params.data.bruteForceRaysPerPixelPerFrame,
       )
     },
