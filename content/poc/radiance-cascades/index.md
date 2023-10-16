@@ -148,28 +148,43 @@ In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where rel
 
 ### Ray Distributions (2D)
 <section id="ray-distributions-2d-content">
-  <section id="ray-distributions-2d-controls">
-    <p>
-    level: <input type="range" min="0" max="6" value="0" name="level-slider">
-    </p>
-    <p>
-      2<sup>level</sup> spacing (level 0): <input type="range" min="0" max="6" value="4" name="i-slider">
-    </p>
-    <p>
-      branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="level-branching-factor">
-    </p>
-    <p>
-      color lower levels: <input type="checkbox" value="1" checked name="color-lower-levels">
-    </p>
-    <p>
-      show cascade ray counts: <input type="checkbox" value="1" name="show-cascade-ray-counts">
-    </p>
+  <p>
+    <b>Note:</b> this demo is limited to spatial doubling for cascade levels irregardless of the branching factor, which is the common case for flatland.
+  </p>
+
+  <section class="controls">
+    <section id="ray-distributions-2d-controls">
+      <div class="maxLevel-control control">
+        max level <input type="range" min="0" max="6" value="2">
+        <output></output>
+      </div>
+      <div class="probeRayCount-control control">
+        2<sup>r</sup> raycount (level 0): <input type="range" min="2" max="5" value="2">
+        <output></output>
+      </div>
+      <div class="probeDiameter-control control">
+        probe diameter (level 0): <input type="range" min="2" max="6" value="5">
+        <output></output>
+      </div>
+      <div class="branchingFactor-control control">
+        branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="level-branching-factor">
+        <output></output>
+      </div>
+      <div class="colorLowerLevels-control control">
+        color lower levels: <input type="checkbox" value="1" checked name="color-lower-levels">
+      </div>
+      <div class="showCascadeRayCounts-control control">
+        show cascade ray counts: <input type="checkbox" value="1">
+      </div>
+    </section>
   </section>
+
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
-  <script src="probe-ray-distributions-2d.js" defer type="module"></script>
+  <script src="flatland-2d/probe-ray-distributions-2d.js" defer type="module"></script>
 </section>
+
 ### Probe Ray Interpolation (2D)
 
 <section id="probe-interpolation-2d-controls">
