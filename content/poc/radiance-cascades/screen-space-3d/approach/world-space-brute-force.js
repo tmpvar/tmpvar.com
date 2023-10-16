@@ -14,7 +14,11 @@ export default function CreateWorldSpaceBruteForceApproach(
   controlEl
 ) {
 
-  const QuadDiameter = 8;
+
+
+  const RaysPerFace = 512
+  const QuadDiameter = Math.sqrt(RaysPerFace)
+  const MaxRays = RaysPerFace * 6
 
   function CreateProgram(
     gpu,
@@ -37,7 +41,7 @@ export default function CreateWorldSpaceBruteForceApproach(
     })
 
     const uboFields = [
-      // percent, raysPerPixelPerFrame, totalObjects, and the rest is padding
+      // rayIndex, raysPerPixelPerFrame, totalObjects, and the rest is padding
       ['params', 'mat4x4<f32>', 16 * 4],
       ['screenToWorld', 'mat4x4<f32>', 16 * 4],
     ]
@@ -55,6 +59,8 @@ export default function CreateWorldSpaceBruteForceApproach(
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     })
 
+
+    const GoldenRatio = (1 + Math.sqrt(5)) * 0.5
     const source =  /* wgsl */`
         const PI: f32 = ${Math.PI};
         const TAU: f32 = ${Math.PI * 2.0};
@@ -62,6 +68,74 @@ export default function CreateWorldSpaceBruteForceApproach(
         struct UBOParams {
           ${uboFields.map(v => `${v[0]}: ${v[1]},`).join('\n          ')}
         };
+
+         fn Compact1By1(v : u32) -> u32 {
+          var x = v & 0x55555555;             // x = -f-e -d-c -b-a -9-8 -7-6 -5-4 -3-2 -1-0
+          x = (x ^ (x >> 1)) & 0x33333333; // x = --fe --dc --ba --98 --76 --54 --32 --10
+          x = (x ^ (x >> 2)) & 0x0f0f0f0f; // x = ---- fedc ---- ba98 ---- 7654 ---- 3210
+          x = (x ^ (x >> 4)) & 0x00ff00ff; // x = ---- ---- fedc ba98 ---- ---- 7654 3210
+          x = (x ^ (x >> 8)) & 0x0000ffff; // x = ---- ---- ---- ---- fedc ba98 7654 3210
+          return x;
+        }
+
+        fn MortonDecodeX(code: u32) -> u32 {
+          return Compact1By1(code >> 0);
+        }
+
+        fn MortonDecodeY(code: u32) -> u32 {
+          return Compact1By1(code >> 1);
+        }
+
+        fn RayDirCubeFaceSubdivision(rayIndex: u32) -> vec3f {
+          let face = rayIndex / ${RaysPerFace};
+          let sign = select(1.0, -1.0, face % 2 == 0);
+          // -x, x, -y, y, -z, z
+          let axis = face / 2;
+          let faceRayIndex = rayIndex % ${RaysPerFace};
+
+          let u = (f32(MortonDecodeX(faceRayIndex)) + 0.5) / ${QuadDiameter} * 2.0 - 1.0;
+          let v = (f32(MortonDecodeY(faceRayIndex)) + 0.5) / ${QuadDiameter} * 2.0 - 1.0;
+          var pos: vec3f;
+          pos[axis] = sign;
+          pos[(axis + 1) % 3] = u;
+          pos[(axis + 2) % 3] = v;
+          return normalize(pos);
+        }
+
+        fn RayDirGoldenSpiral(rayIndex: f32) -> vec3f {
+          let a0 = TAU * rayIndex / ${GoldenRatio};
+          let a1 = acos(1.0 - 2 * (rayIndex + 0.5) / f32(${MaxRays}));
+          return normalize(
+            vec3f(
+              cos(a0) * sin(a1),
+              sin(a0) * sin(a1),
+              cos(a1)
+            )
+          );
+        }
+
+        fn RayDirHemisphereUniformNonRandom(rayIndex: f32) -> vec3f{
+          let r1 = (rayIndex % ${QuadDiameter} + 0.5) / ${QuadDiameter};
+          let r2 = rayIndex / ${QuadDiameter} * TAU;
+
+          let sinTheta = sqrt(1.0 - r1 * r1);
+          let phi = TAU * r2;
+          let x = sinTheta * cos(phi);
+          let z = sinTheta * sin(phi);
+
+          return normalize(vec3f(x, r1, z));
+        }
+
+        fn CreateCoordinateSystem(normal: vec3f) -> mat2x3f {
+          var ret: mat2x3<f32>;
+          if (abs(normal.x) > abs(normal.y)) {
+            ret[0] = vec3f(normal.z, 0.0, -normal.x) / sqrt(normal.x * normal.x + normal.z * normal.z);
+          } else {
+            ret[0] = vec3f(0.0, -normal.z, normal.y) / sqrt(normal.y * normal.y + normal.z * normal.z);
+          }
+          ret[1] = cross(normal, ret[0]);
+          return ret;
+        }
 
         // sphere centered at origin
         fn RaySphere(rayOrigin: vec3f, rayDir: vec3f, sphereRadius: f32) -> f32 {
@@ -125,10 +199,6 @@ export default function CreateWorldSpaceBruteForceApproach(
           let totalObjects = i32(ubo.params[0].z);
           let surfaceOffset = rayDir * 0.5;
           for (var objectIndex: i32 = 0; objectIndex < totalObjects; objectIndex++) {
-            if (objectIndex == originalObjectID) {
-              continue;
-            }
-
             let objectType = u32(objectData[objectIndex].albedo.w);
             switch(objectType) {
               // Box
@@ -147,7 +217,7 @@ export default function CreateWorldSpaceBruteForceApproach(
 
                 if (ld >= 0.0 && ld < d) {
                   d = ld;
-                  fluence = vec3(1.0, 0.0, 1.0);
+                  fluence = objectData[objectIndex].emission.rgb;
                 }
                 break;
               }
@@ -161,7 +231,7 @@ export default function CreateWorldSpaceBruteForceApproach(
 
                 if (ld >= 0.0 && ld < d) {
                   d = ld;
-                  fluence = vec3(1.0, 0.0, 1.0);
+                  fluence = objectData[objectIndex].emission.rgb;
                 }
                 break;
               }
@@ -172,13 +242,13 @@ export default function CreateWorldSpaceBruteForceApproach(
             }
           }
 
-          return fluence;
+          return fluence / (1.0 + d * d);
         }
 
         @compute @workgroup_size(${workgroupSize.join(',')})
         fn ComputeMain(@builtin(global_invocation_id) id: vec3<u32>) {
-          let percent = ubo.params[0].x;
-          let raysPerPixelPerFrame = ubo.params[0].y;
+          let RayIndex = i32(ubo.params[0].x);
+          let RaysPerFrame = i32(ubo.params[0].y);
 
           let depth = textureLoad(depthTexture, id.xy, 0);
           if (depth >= 1.0) {
@@ -196,8 +266,27 @@ export default function CreateWorldSpaceBruteForceApproach(
           let normal = textureLoad(normalTexture, id.xy, 0).xyz;
           textureStore(fluenceWriteTexture, id.xy, vec4(normal * 0.5 + 0.5, 1.0));
 
+          let surfaceTransform = CreateCoordinateSystem(normal);
+
           let objectID = textureLoad(objectIDTexture, id.xy, 0).x;
-          let fluence = CastRay(worldPos, normal, i32(objectID));
+
+          var fluence = objectData[objectID].emission.rgb;
+          for (var rayIndex=0; rayIndex<RaysPerFrame; rayIndex++) {
+            // let rayDir = RayDirCubeFaceSubdivision(u32(RayIndex + rayIndex));
+            // let rayDir = RayDirGoldenSpiral(f32(RayIndex + rayIndex));
+
+            let localRayDir = RayDirHemisphereUniformNonRandom(f32(RayIndex + rayIndex));
+            let rayDir = vec3f(
+              localRayDir.x * surfaceTransform[0].x + localRayDir.y * normal.x + localRayDir.z * surfaceTransform[1].x,
+              localRayDir.x * surfaceTransform[0].y + localRayDir.y * normal.y + localRayDir.z * surfaceTransform[1].y,
+              localRayDir.x * surfaceTransform[0].z + localRayDir.y * normal.z + localRayDir.z * surfaceTransform[1].z
+            );
+
+            let dir = normalize(rayDir + normal * 0.1);
+            fluence += CastRay(worldPos + rayDir * 0.1, rayDir, i32(objectID));
+          }
+
+          fluence = (fluence + textureLoad(fluenceReadTexture, vec2<i32>(id.xy), 0).xyz);
           textureStore(fluenceWriteTexture, id.xy, vec4(fluence, 1.0));
 
         }
@@ -337,15 +426,15 @@ export default function CreateWorldSpaceBruteForceApproach(
     return function WorldSpaceBruteForce(
       commandEncoder,
       screenToWorld,
-      percent,
+      rayIndex,
       objectCount,
       raysPerPixelPerFrame
     ) {
       // update the uniform buffer
       {
         let byteOffset = 0
-        // percent
-        uboData.setFloat32(byteOffset, percent, true)
+        // rayIndex
+        uboData.setFloat32(byteOffset, rayIndex, true)
         byteOffset += 4;
 
         // raysPerPixelPerFrame
@@ -405,14 +494,12 @@ export default function CreateWorldSpaceBruteForceApproach(
 
   const Params = CreateParamReader(state, approachControlEl, 'approaches/' + approachName)
 
-  const MaxPendingFrames = QuadDiameter * QuadDiameter
-  let pendingFrames = 0
-
+  let rayIndex = 0
   return {
     update() {
       Params('bruteForceRaysPerPixelPerFrame', 'f32', (parentEl, value, oldValue) => {
         if (value != oldValue) {
-          pendingFrames = MaxPendingFrames
+          rayIndex = 0
           state.clearFluence = true
         }
         parentEl.querySelector('output').innerHTML = value
@@ -420,11 +507,12 @@ export default function CreateWorldSpaceBruteForceApproach(
       })
 
       if (state.clearFluence) {
-        pendingFrames = MaxPendingFrames
+        rayIndex = 0
       }
 
-      if (pendingFrames > 0) {
+      if (rayIndex < MaxRays) {
         state.dirty = true
+
       }
 
     },
@@ -432,10 +520,11 @@ export default function CreateWorldSpaceBruteForceApproach(
       program(
         commandEncoder,
         state.camera.state.screenToWorld,
-        pendingFrames / 360,
+        rayIndex,
         scene.objectCount,
         Params.data.bruteForceRaysPerPixelPerFrame,
       )
+      rayIndex += Params.data.bruteForceRaysPerPixelPerFrame
     },
   }
 }

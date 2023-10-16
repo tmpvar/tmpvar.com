@@ -320,6 +320,7 @@ async function ProbeRayDistribution3dBegin() {
           return Compact1By1(code >> 1);
         }
 
+        let totalRays = 0
         const branchingFactor = 4
 
         for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
@@ -336,14 +337,15 @@ async function ProbeRayDistribution3dBegin() {
 
             let u = (MortonDecodeX(faceRayIndex) + 0.5) / diameter * 2.0 - 1.0
             let v = (MortonDecodeY(faceRayIndex) + 0.5) / diameter * 2.0 - 1.0
-            let l = Math.sqrt(1 + u*u + v*v)
+            let l = Math.sqrt(1 + u * u + v * v)
             pos[axis] = sign / l
             pos[(axis + 1) % 3] = u / l
             pos[(axis + 2) % 3] = v / l
-
+            totalRays++
             Add(pos, level)
           }
         }
+        console.log(totalRays)
 
         break;
       }
@@ -395,7 +397,7 @@ async function ProbeRayDistribution3dBegin() {
           const rayCount = 8 << level
           for (let rayIndex = 0; rayIndex < rayCount; rayIndex++) {
             let a0 = TAU * rayIndex / goldenRatio
-            let a1 = Math.acos(1.0 - 2 * (rayIndex + 0.5) / rayCount)
+            let a1 = Math.acos(1.0 - 1 * (rayIndex + 0.5) / rayCount)
             pos[0] = Math.cos(a0) * Math.sin(a1)
             pos[1] = Math.sin(a0) * Math.sin(a1)
             pos[2] = Math.cos(a1)
@@ -430,6 +432,98 @@ async function ProbeRayDistribution3dBegin() {
         break;
       }
 
+      case 'golden-hemisphere': {
+        // go from index -> uv -> spherical -> cartesian
+        let goldenRatio = (1 + Math.sqrt(5)) * 0.5
+        function Clamp(v, lo, hi) {
+          return Math.max(lo, Math.min(v, hi));
+        }
+
+        for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+          const rayCount = 128 << level
+          const diameter = Math.sqrt(rayCount)
+          for (let rayIndex = 0; rayIndex < rayCount; rayIndex++) {
+            let u = Clamp((rayIndex % diameter + 0.5) / diameter, 0.0, 1.0);
+            let v = Clamp((rayIndex / diameter + 0.5) / diameter, 0.0, 1.0);
+
+            let a0 = Math.PI * u
+            let a1 = Math.PI * v
+
+            pos[0] = Math.cos(a0) * Math.cos(a1)
+            pos[1] = Math.sin(a0) * Math.cos(a1)
+            pos[2] = Math.sin(a1)
+
+            Add(pos, level)
+          }
+        }
+
+        break;
+      }
+
+      case 'random-hemisphere': {
+        for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+          const rayCount = 128 << level
+          for (let rayIndex = 0; rayIndex < rayCount; rayIndex++) {
+            let a0 = Math.random() * Math.PI
+            let a1 = Math.random() * Math.PI
+
+            pos[0] = Math.cos(a0) * Math.cos(a1)
+            pos[2] = Math.sin(a0) * Math.cos(a1)
+            pos[1] = Math.sin(a1)
+
+            Add(pos, level)
+          }
+        }
+
+        break;
+      }
+
+      case 'random-uniform-hemisphere': {
+        for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+          const rayCount = 512 << level
+          for (let rayIndex = 0; rayIndex < rayCount; rayIndex++) {
+            let r1 = Math.random() * Math.PI
+            let r2 = Math.random() * Math.PI
+
+            let sinTheta = Math.sqrt(1 - r1 * r1);
+            let phi = TAU * r2;
+            let x = sinTheta * Math.cos(phi);
+            let z = sinTheta * Math.sin(phi);
+            let l = x*x + r1*r1 + z*z
+            pos[0] = x / l
+            pos[1] = r1 / l
+            pos[2] = z / l
+
+            Add(pos, level)
+          }
+        }
+
+        break;
+      }
+
+      case 'uniform-hemisphere': {
+        for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
+          const rayCount = 512 << level
+          const diameter = Math.sqrt(rayCount)
+          for (let rayIndex = 0; rayIndex < rayCount; rayIndex++) {
+            let r1 = (rayIndex % diameter + 0.5) / diameter
+            let r2 = rayIndex / diameter * TAU
+
+            let sinTheta = Math.sqrt(1 - r1 * r1);
+            let phi = TAU * r2;
+            let x = sinTheta * Math.cos(phi);
+            let z = sinTheta * Math.sin(phi);
+            let l = x * x + r1 * r1 + z * z
+            pos[0] = x / l
+            pos[1] = r1 / l
+            pos[2] = z / l
+
+            Add(pos, level)
+          }
+        }
+
+        break;
+      }
 
     }
 
