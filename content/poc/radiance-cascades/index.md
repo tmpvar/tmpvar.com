@@ -874,10 +874,14 @@ click/drag to move the light
     <div class="rayPackingApproach-control control">
       approach:
       <select>
-        <option value="cube-face-subdivision" selected>Cube Face Subdivision</option>
+        <option value="cube-face-subdivision">Cube Face Subdivision</option>
         <option value="lat-lon-subdivision">Lat/Lon Subdivision</option>
         <option value="golden-spiral">Golden Spiral</option>
         <option value="kogan-spiral">Kogan Spiral</option>
+        <option value="golden-hemisphere">Golden Hemisphere</option>
+        <option value="random-hemisphere">Random Hemisphere</option>
+        <option value="random-uniform-hemisphere" selected>Uniform Random Hemisphere</option>
+        <option value="uniform-hemisphere" selected>Uniform Hemisphere</option>
       </select>
     </div>
     <div class="minLevel-control control">

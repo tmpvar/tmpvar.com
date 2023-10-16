@@ -28,6 +28,7 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
+- radiance-cascades/3d: cast rays over an entire sphere
 - radiance-cascades/3d: add scene specific params and process them
 - radiance-cascades/3d: add raymarching approach: Brute Force World Space
 - radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
@@ -37,6 +38,7 @@
                         red/green (min/max) f32 texture
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
+## 2023-10-16
 ## 2023-10-15
 - radiance-cascades/3d: smooth out distance and rotation in orbit camera
 - radiance-cascades/3d: move brute force screen space approach into its own little hidy hole
