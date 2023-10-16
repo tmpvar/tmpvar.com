@@ -106,9 +106,10 @@ async function ScreenSpace3DBegin(rootEl) {
 
   const probeBufferByteSize = state.maxLevel0Rays * raySize * 2
   const ObjectBufferEntrySize = (
-    16 +      //   albedo (rgb, a=objectType)
-    16 +      //   emission (rgb, a=unused)
-    16 * 4    // transform
+    16 +  // albedo (rgb, a=objectType)
+    16 +  // emission (rgb, a=unused)
+    16 +  // position
+    16    // scale
   )
   const maxSceneObjects = 1 << 4;
   try {
@@ -285,12 +286,12 @@ async function ScreenSpace3DBegin(rootEl) {
 
   const WGSLObjectDataStruct = /* wgsl */`
         struct ObjectData {
-          // props: mat4x4<f32>,
           // rgb, a=objectType
           albedo: vec4f,
           // rgb, a=unused
           emission: vec4f,
-          transform: mat4x4<f32>,
+          position: vec4f,
+          scale: vec4f,
         };
   `
 
@@ -594,11 +595,22 @@ async function ScreenSpace3DBegin(rootEl) {
           @builtin(instance_index) instanceIndex: u32
         ) -> VertexOut {
           var out: VertexOut;
+
           let objectID = ${objectIDStart} + instanceIndex;
-          let worldPosition = objectData[objectID].transform * vec4(inPosition, 1.0);
-          out.worldPosition = worldPosition.xyz - ubo.eye.xyz;
-          out.position = ubo.worldToScreen * worldPosition;
+          var scale = objectData[objectID].scale.xyz;
+          let position = objectData[objectID].position.xyz;
           out.color = objectData[objectID].albedo.rgb;
+
+          if (scale.x <= 0.0 || scale.y <= 0.0 || scale.z <= 0.0) {
+            out.color = vec3f(1.0, 0.0, 1.0);
+            scale = max(vec3f(1.0), scale);
+          }
+
+          let worldPosition = position + inPosition * scale;
+          out.worldPosition = worldPosition - ubo.eye.xyz;
+          out.position = ubo.worldToScreen * vec4(worldPosition, 1.0);
+
+
           out.objectID = objectID;
           return out;
         }
@@ -881,7 +893,7 @@ async function ScreenSpace3DBegin(rootEl) {
   }
 
   function CreateMeshInstances(typeID, mesh, dataView, count) {
-
+    let m4scratch = mat4.create()
     // store the mesh typeID in the albedo.a channel
     {
       for (let i = 0; i < count; i++) {
@@ -895,26 +907,20 @@ async function ScreenSpace3DBegin(rootEl) {
       dataView: dataView,
       mesh: mesh,
 
-      getTransform(index, out) {
+      setPosition(index, center) {
         let start = index * ObjectBufferEntrySize + 16 * 2;
-        for (let i = 0; i < 16; i++) {
-          out[i] = dataView.getFloat32(start + i * 4, true)
+        for (let i = 0; i < 3; i++) {
+          dataView.setFloat32(start + i * 4, center[i], true)
         }
       },
 
-      setTransform(index, transform) {
-        let start = index * ObjectBufferEntrySize + 16 * 2;
-        for (let i = 0; i < 16; i++) {
-          dataView.setFloat32(start + i * 4, transform[i], true)
+      setScale(index, scale) {
+        let start = index * ObjectBufferEntrySize + 16 * 3;
+        for (let i = 0; i < 3; i++) {
+          dataView.setFloat32(start + i * 4, scale[i], true)
         }
       },
 
-      getAlbedo(index, out) {
-        let start = index * ObjectBufferEntrySize
-        out[0] = dataView.getFloat32(start + 0, true)
-        out[1] = dataView.getFloat32(start + 4, true)
-        out[2] = dataView.getFloat32(start + 8, true)
-      },
       setAlbedo(index, value) {
         let start = index * ObjectBufferEntrySize
         dataView.setFloat32(start + 0, value[0], true)
@@ -923,12 +929,6 @@ async function ScreenSpace3DBegin(rootEl) {
         dataView.setFloat32(start + 12, typeID, true)
       },
 
-      getEmissions(index, out) {
-        let start = index * ObjectBufferEntrySize + 16
-        out[0] = dataView.getFloat32(start + 0, true)
-        out[1] = dataView.getFloat32(start + 4, true)
-        out[2] = dataView.getFloat32(start + 8, true)
-      },
       setEmission(index, value) {
         let start = index * ObjectBufferEntrySize + 16
         dataView.setFloat32(start + 0, value[0], true)
@@ -1012,33 +1012,22 @@ async function ScreenSpace3DBegin(rootEl) {
       renderSteps: []
     }
 
-    let scratch = mat4.create()
     let floor = SceneAddInstances(scene, state.meshes.box, 1)
     let sphere = SceneAddInstances(scene, state.meshes.sphere, 1)
 
     scene.update = function () {
       // floor instance data
       {
-        mat4.fromRotationTranslationScale(
-          scratch,
-          quatIdentity,
-          [-2, 0, 0],
-          [0.1, 20, 20]
-        )
-        floor.setTransform(0, scratch)
+        floor.setPosition(0, [-10.0, 0.0, 0.0])
+        floor.setScale(0, [0.1, 20.0, 20.0])
         floor.setAlbedo(0, [.5, .5, .5])
         floor.setEmission(0, [0, 0, 0])
       }
 
       // sphere instance data
       {
-        mat4.fromRotationTranslationScale(
-          scratch,
-          quatIdentity,
-          [0, 0, 0],
-          [1, 1, 1]
-        )
-        sphere.setTransform(0, scratch)
+        sphere.setPosition(0, [0, 0, 0])
+        sphere.setScale(0, [1, 1, 1])
         sphere.setAlbedo(0, [1, 1, 1])
         sphere.setEmission(0, [1, 1, 1])
       }
@@ -1057,19 +1046,13 @@ async function ScreenSpace3DBegin(rootEl) {
 
     let boxes = SceneAddInstances(scene, state.meshes.box, 2)
     let spheres = SceneAddInstances(scene, state.meshes.sphere, 1)
-    let scratch = mat4.create()
 
     scene.update = function () {
       let floory = -2
       // floor instance data
       {
-        mat4.fromRotationTranslationScale(
-          scratch,
-          quatIdentity,
-          [0, floory, 0],
-          [15, 1, 15]
-        )
-        boxes.setTransform(0, scratch)
+        boxes.setPosition(0, [0, floory, 0]),
+        boxes.setScale(0, [15, 1, 15])
         boxes.setAlbedo(0, ColorHexToF32Array('#a26d3f'))
         boxes.setEmission(0, [0, 0, 0])
       }
@@ -1077,26 +1060,29 @@ async function ScreenSpace3DBegin(rootEl) {
       // occluder instance data
       {
         let yradius = 2
-        mat4.fromRotationTranslationScale(
-          scratch,
-          quatIdentity,
-          [0, yradius + floory, 0],
-          [2 * state.params.sceneOccluderScale, yradius, 2 * state.params.sceneOccluderScale]
+
+        boxes.setPosition(1, [
+          0,
+          yradius + floory + 0.999,
+          0
+        ])
+
+        boxes.setScale(
+          1,
+          [
+            2 * state.params.sceneOccluderScale,
+            yradius,
+            2 * state.params.sceneOccluderScale
+          ]
         )
-        boxes.setTransform(1, scratch)
         boxes.setAlbedo(1, ColorHexToF32Array('#6b2643'))
         boxes.setEmission(1, [0, 0, 0])
       }
 
       // sphere instance data
       {
-        mat4.fromRotationTranslationScale(
-          scratch,
-          quatIdentity,
-          [0, 0, -4 - 2.0 * state.params.sceneOccluderScale],
-          [1, 1, 1]
-        )
-        spheres.setTransform(0, scratch)
+        spheres.setPosition(0, [0, 0, -4 - 2.0 * state.params.sceneOccluderScale])
+        spheres.setScale(0, [1.0, 1.0, 1.0])
         spheres.setAlbedo(0, [1.0, 1.0, 1.0])
         spheres.setEmission(0, [10, 10, 10])
       }
@@ -1175,8 +1161,14 @@ async function ScreenSpace3DBegin(rootEl) {
     let frameTextureView = ctx.getCurrentTexture().createView()
 
     // Render the current scene
+    const scene = scenes[state.params.scene]
+    if (scene == undefined) {
+      console.error(`'${scene}' not implemented`)
+      return;
+    }
+
     {
-      scenes[state.params.scene].update()
+      scene.update()
 
       state.gpu.device.queue.writeBuffer(
         state.gpu.buffers.objects,
@@ -1227,14 +1219,14 @@ async function ScreenSpace3DBegin(rootEl) {
       };
 
       let pass = commandEncoder.beginRenderPass(renderPassDesc);
-      scenes[state.params.scene].renderSteps.forEach(fn => {
+      scene.renderSteps.forEach(fn => {
         fn(pass, state.camera.state.worldToScreen, state.camera.state.eye)
       })
 
       pass.end();
     }
 
-    approach.run(commandEncoder)
+    approach.run(commandEncoder, scene)
 
     if (state.params.debugRenderObjectIDBuffer) {
       programs.debugObjectsBuffer(commandEncoder, frameTextureView)
