@@ -1,4 +1,4 @@
-import CreateParamReader from "../params.js"
+import CreateParamReader from "./params.js"
 import CreateCamera from "./camera.js"
 import { orient2d } from "./orient2d.js"
 import RobustPointInPolygon from "./robust-point-in-polygon.js"

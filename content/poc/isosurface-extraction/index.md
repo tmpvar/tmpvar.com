@@ -57,8 +57,8 @@ description = "Playground for various isosurface extraction techniques"
       <div class="contourExtractionApproach-control control">
         <select>
             <option value="marching-squares">Marching Squares</option>
-            <option value="dual-contouring">Dual Contouring (WIP)</option>
-            <!-- <option value="surface-nets">Surface Nets (WIP)</option> -->
+            <option value="dual-contouring">🚧 Dual Contouring 🚧</option>
+            <option value="surface-nets">🚧 Surface Nets 🚧</option>
         </select>
         contour extraction approach
       </div>
@@ -88,10 +88,6 @@ description = "Playground for various isosurface extraction techniques"
   <section class="controls webgpu-required">
     <h4>Debug/Development</h4>
     <div class="indent">
-      <div class="debugRenderMaxFixedSteps-control control">
-        max fixed steps: <input type="range" min="10.0" max="1000.0" value="200.0" step="1.0">
-        <output></output>
-      </div>
       <div class="debugRenderStepCount-control control">
         render step count <input type="checkbox" value="1" />
       </div>
@@ -99,10 +95,9 @@ description = "Playground for various isosurface extraction techniques"
         render solid <input type="checkbox" value="1" />
       </div>
     </div>
-    <h4>Scene Params</h4>
+    <h4>Scene</h4>
     <div class="indent">
       <div class="scene-control control">
-        scene:
         <select>
           <option value="time-varying" selected>Time Varying</option>
           <option value="manual">Manual</option>
@@ -140,6 +135,22 @@ description = "Playground for various isosurface extraction techniques"
         <div class="c111-control control">
           (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="-0.28" step="0.01">
           <output></output>
+        </div>
+      </div>
+    </div>
+    <h4>Approach</h4>
+    <div class="indent">
+      <div class="approach-control control">
+        <select>
+          <option value="fixed-step-ray-march" selected>Fixed Step Raymarch</option>
+          <option value="segment-marching">🚧 Segment Marching 🚧</option>
+          <option value="ray-tracing-signed-distance-grids">🚧 Ray Tracing Signed Distance Grids 🚧</option>
+        </select>
+        <div class="shownBy-approach indent" showValue="fixed-step-ray-march">
+          <div class="maxFixedSteps-control control">
+            max fixed steps: <input type="range" min="10.0" max="1000.0" value="200.0" step="1.0">
+            <output></output>
+          </div>
         </div>
       </div>
     </div>

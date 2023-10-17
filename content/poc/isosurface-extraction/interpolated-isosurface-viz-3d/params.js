@@ -1,7 +1,8 @@
 export default function CreateParamReader(state, controlEl, paramPrefix = null) {
   let params = state.params
   if (paramPrefix) {
-    paramPrefix.split('/').forEach(name => {
+    let parts = paramPrefix.split('/');
+    parts.forEach(name => {
       if (params[name] == undefined) {
         params[name] = {}
       }
