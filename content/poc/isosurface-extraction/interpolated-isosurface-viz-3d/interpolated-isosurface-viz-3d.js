@@ -503,6 +503,80 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           return out;
         }
       `
+    ),
+
+    raytraceSignedDistanceFunctionGrids: shaders.RenderTriangleSoup(
+      state.gpu,
+      state.mesh,
+      textures.objectID,
+      textures.depth,
+      textures.normals,
+      state.gpu.presentationFormat,
+      /* wgsl */`
+        @fragment
+        fn FragmentMain(
+          fragData: VertexOut
+        ) -> FragmentOut {
+          var out: FragmentOut;
+          out.color = vec4(fragData.color, 1.0);
+          out.objectID = fragData.objectID;
+
+          let dFdxPos = dpdx(fragData.worldPosition);
+          let dFdyPos = -dpdy(fragData.worldPosition);
+          let normal = normalize(cross(dFdxPos, dFdyPos));
+
+          out.normal = vec4(normal, 1.0);
+          out.color = vec4(normal.xyz * 0.5 + 0.5, 1.0);
+          return out;
+          let eye = ubo.eye.xyz;
+          let dir = normalize(fragData.worldPosition - eye);
+
+          var aabbHit = RayAABB(vec3(-1.0), vec3(1.0), eye, 1.0 / dir);
+          let startT = aabbHit.x + 0.0001;
+          let maxT = aabbHit.y - startT;
+          var hit = false;
+          var steps = 0.0;
+
+          let rayOrigin = eye + dir * startT;
+
+          var t = 0.0;
+          let maxSteps = ubo.approachParams[0].x;
+          let invMaxSteps = 1.0 / maxSteps;
+          let eps = invMaxSteps * 2.0;
+          let debugRenderSolid = ubo.debugParams[0].y;
+          while(t < maxT) {
+            let pos = rayOrigin + dir * t;
+            let currentDistance = TrilinearInterpolation(pos);
+
+            if (
+              (debugRenderSolid > 0.0 && currentDistance <= 0.0) ||
+              abs(currentDistance) <= eps
+            ) {
+              out.color = vec4(1.0);
+              out.color = vec4(ComputeNormal(pos) * 0.5 + 0.5, 1.0);
+              hit = true;
+              break;
+            }
+            t += invMaxSteps;
+            steps += 1.0;
+          }
+
+          if (t >= maxT) {
+            out.color = vec4(1.0 - steps/(maxSteps * 8));
+            hit = true;
+          }
+
+          if (!hit) {
+            discard;
+          }
+
+          let debugRenderStepCount = ubo.debugParams[0].x;
+          if (debugRenderStepCount > 0.0) {
+            out.color = vec4(JetLinear(steps/maxSteps), 1.0);
+          }
+          return out;
+        }
+      `
     )
   }
 
@@ -738,22 +812,36 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       depthStencilAttachment: depthAttachment,
     };
 
-    let pass = commandEncoder.beginRenderPass(renderPassDesc);
-    const objectID = 0
-    const d = 1
-    state.gpu.programs.raymarchFixedStep(
-      pass,
-      state.camera.state.worldToScreen,
-      state.camera.state.screenToWorld,
-      [0, 0, 0],
-      state.camera.state.eye,
-      [canvas.width, canvas.height],
-      objectID,
-      state.sceneParams,
-      state.approachParams,
-      state.debugParams
-    )
-    pass.end();
+    let renderFunction = null
+    switch (state.params.approach) {
+      case 'fixed-step-ray-march': {
+        renderFunction = state.gpu.programs.raymarchFixedStep;
+        break;
+      }
+      case 'ray-tracing-signed-distance-grids': {
+        renderFunction = state.gpu.programs.raytraceSignedDistanceFunctionGrids;
+        break;
+      }
+    }
+
+    if (renderFunction) {
+      let pass = commandEncoder.beginRenderPass(renderPassDesc);
+      const objectID = 0
+
+      renderFunction(
+        pass,
+        state.camera.state.worldToScreen,
+        state.camera.state.screenToWorld,
+        [0, 0, 0],
+        state.camera.state.eye,
+        [canvas.width, canvas.height],
+        objectID,
+        state.sceneParams,
+        state.approachParams,
+        state.debugParams
+      )
+      pass.end();
+      }
     state.gpu.device.queue.submit([commandEncoder.finish()])
 
     requestAnimationFrame(RenderFrame)
