@@ -883,7 +883,6 @@ function IsosurfaceExtractionBegin(rootEl) {
     ctx.lineWidth = 1.0 / state.camera.state.zoom
 
     if (state.dirty) {
-      console.clear()
       FindBoundaryCells()
       if (state.boundaryCells.length) {
         ComputeEdgeNeighbors()

@@ -81,3 +81,20 @@ description = "Playground for various isosurface extraction techniques"
   </section>
   <script type="module" src="2d/isosurface-extraction-2d.js"></script>
 </section>
+
+
+## Interpolated Isosurface Viz (3D)
+<section id="interpolated-isosurface-viz-3d-content" class="has-webgpu">
+  <section class="controls webgpu-required">
+  </section>
+  <section class="center-align webgpu-required">
+    <canvas width="1024" height="1024"></canvas>
+  </section>
+  <script type="module" src="interpolated-isosurface-viz-3d/interpolated-isosurface-viz-3d.js"></script>
+  <section class="center-align webgpu-missing error-border">
+    <img src="/img/webgpu-responsive.svg" width="768" height="768" />
+    <p class="error">
+      This demo requires <a href="https://en.wikipedia.org/wiki/WebGPU">WebGPU</a> - in other words, you should open this page in Chrome or Edge.
+    <p>
+  </section>
+</section>
