@@ -32,13 +32,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       down: false
     },
 
-    cornerValues: [
-      -0.5, 1, Math.sin(Now() * 0.0001) * 4.0, 1, 1,
-      -2.0 + Math.cos(Now() * 0.001) + Math.sin(Now() * 0.001) * 3.0, 1, -4 - Math.sin(Now() * 0.0005) * 4.0, 1,
-      // the rest are unused for now
-      0, 0, 0, 0,
-      0, 0, 0, 0,
-    ]
+    cornerValues: new Float32Array(16),
+    sceneParams: new Float32Array(16),
   }
 
   state.camera.state.distance = 3.0;
@@ -72,6 +67,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
         ['screenToWorld', 'mat4x4<f32>', 16 * 4],
         ['objectParams', 'mat4x4<f32>', 16 * 4],
+        ['sceneParams', 'mat4x4<f32>', 16 * 4],
       ]
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -217,7 +213,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ]
       })
 
-      return function RenderMesh(pass, worldToScreen, screenToWorld, modelPosition, eye, objectID, objectParams) {
+      return function RenderMesh(pass, worldToScreen, screenToWorld, modelPosition, eye, objectID, objectParams, sceneParams) {
         // update the uniform buffer
         {
           let byteOffset = 0
@@ -246,7 +242,15 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             byteOffset += 4;
           })
 
+          // TODO: for these params, maybe loop from 0..15 and if there is a param
+          //       then write, otherwise just update the byte offset
+
           objectParams.forEach(v => {
+            uboData.setFloat32(byteOffset, v, true)
+            byteOffset += 4;
+          })
+
+          sceneParams.forEach((v, i) => {
             uboData.setFloat32(byteOffset, v, true)
             byteOffset += 4;
           })
@@ -389,7 +393,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
 
         @fragment
-        fn FragmentMain(fragData: VertexOut) -> FragmentOut {
+        fn FragmentMain(
+          fragData: VertexOut
+        ) -> FragmentOut {
           var out: FragmentOut;
           out.color = vec4(fragData.color, 1.0);
           out.objectID = fragData.objectID;
@@ -411,6 +417,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let dir = normalize(fragData.worldPosition - ubo.eye.xyz);
           let rayOrigin = uvw;
           var wasInside = false;
+
+          let maxSteps = ubo.sceneParams[0].y;
+          let invMaxSteps = 1.0 / maxSteps;
+          let eps = invMaxSteps * 4.0;
           while(t < 2.0) {
             let pos = rayOrigin + dir * t;
             let boxD = SDFBox(pos - 0.5, vec3f(0.5));
@@ -421,20 +431,28 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             }
             let currentDistance = TrilinearInterpolation(pos);
 
-            if (abs(currentDistance) < 0.01) {
+            let debugRenderSolid = ubo.sceneParams[0].z;
+
+            if (
+              (debugRenderSolid > 0.0 && currentDistance <= 0.0) ||
+              abs(currentDistance) < eps
+            ) {
               out.color = vec4(1.0);
               out.color = vec4(ComputeNormal(pos) * 0.5 + 0.5, 1.0);
               hit = true;
               break;
             }
-            t += 0.001;
+            t += invMaxSteps;
             steps += 1.0;
           }
           if (!hit) {
             discard;
           }
 
-          // out.color = vec4(JetLinear(steps/2000.0), 1.0);
+          let debugRenderStepCount = ubo.sceneParams[0].x;
+          if (debugRenderStepCount > 0.0) {
+            out.color = vec4(JetLinear(steps/maxSteps), 1.0);
+          }
           return out;
         }
       `
@@ -518,7 +536,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       controlHarness.el = controlEl.querySelector(`.shownBy-${controlName}[showValue="${option.value}"]`)
       if (controlHarness.el) {
         controlHarness.Param = CreateParamReader(state, controlHarness.el, option.value)
-        console.log(Array.from(controlHarness.el.querySelectorAll('.control')))
         let subcontrols = Array
           .from(controlHarness.el.querySelectorAll('.control'))
           .map(control => {
@@ -558,6 +575,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
   const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
+
+    Param('debugRenderMaxFixedSteps', 'f32')
+    Param('debugRenderStepCount', 'bool')
+    Param('debugRenderSolid', 'f32')
+
     Param('scene', 'string')
   }
 
@@ -607,6 +629,14 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         state.dirty = true;
         break;
       }
+    }
+
+    // Scene Params
+    {
+      state.sceneParams[0] = state.params.debugRenderStepCount ? 1.0 : 0.0
+      state.sceneParams[1] = state.params.debugRenderMaxFixedSteps
+      state.sceneParams[2] = state.params.debugRenderSolid ? 1.0 : 0.0
+
     }
 
     const commandEncoder = state.gpu.device.createCommandEncoder()
@@ -662,7 +692,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       [0, 0, 0],
       state.camera.state.eye,
       objectID,
-      state.cornerValues
+      state.cornerValues,
+      state.sceneParams
     )
     pass.end();
     state.gpu.device.queue.submit([commandEncoder.finish()])

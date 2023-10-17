@@ -30,10 +30,8 @@
 ## Pending
 - isosurface-extraction/sphere-march-cube: handle when the camera is inside of the cube
 - isosurface-extraction/sphere-march-cube: add an approach selector
-- isosurface-extraction/sphere-march-cube: add a scene selector
 - isosurface-extraction/sphere-march-cube: implement the approach from
                                            'Ray Tracing of Signed Distance Function Grids'
-
 
 - radiance-cascades/3d: add scene specific params and process them
 - radiance-cascades/3d: add raymarching approach: Brute Force World Space
@@ -45,6 +43,10 @@
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-17
+- isosurface-extraction/sphere-march-cube: add solid rendering toggle
+- isosurface-extraction/sphere-march-cube: add max fixed steps slider
+- isosurface-extraction/sphere-march-cube: add step count heat render
+- isosurface-extraction/sphere-march-cube: add a scene selector
 ## 2023-10-16
 - isosurface-extraction/sphere-march-cube: sphere march from surface into the cube given the
                                            corner values
