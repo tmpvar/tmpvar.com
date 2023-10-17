@@ -33,6 +33,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     },
   }
 
+  state.camera.state.distance = 3.0;
+  state.camera.state.scrollSensitivity = 0.05;
+
   try {
     state.gpu = await InitGPU(ctx);
   } catch (e) {
@@ -44,14 +47,14 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
   state.gpu.labelPrefix = "InterpolatedIsosurfaceViz3D/"
 
   const shaders = {
-
     RenderTriangleSoup(
       gpu,
       mesh,
       objectIDTexture,
       depthTexture,
       normalTexture,
-      presentationFormat
+      presentationFormat,
+      fragmentCode
     ) {
       const labelPrefix = gpu.labelPrefix + 'RenderMesh/'
       const device = gpu.device
@@ -59,6 +62,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ['modelPosition', 'vec4f', 16],
         ['eye', 'vec4f', 16],
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
+        ['objectParams', 'mat4x4<f32>', 16 * 4],
       ]
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -79,6 +83,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           @location(0) color: vec3f,
           @interpolate(flat) @location(1) objectID: u32,
           @location(2) worldPosition: vec3f,
+          @location(3) eyeRelativePosition: vec3f,
         }
 
         struct UBOParams {
@@ -99,7 +104,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let position = ubo.modelPosition.xyz;
 
           let worldPosition = position + inPosition;
-          out.worldPosition = worldPosition - ubo.eye.xyz;
+          out.worldPosition = worldPosition;
+          out.eyeRelativePosition = worldPosition - ubo.eye.xyz;
           out.position = ubo.worldToScreen * vec4(worldPosition, 1.0);
           out.objectID = objectID;
           return out;
@@ -111,20 +117,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           @location(2) normal: vec4f,
         };
 
-        @fragment
-        fn FragmentMain(fragData: VertexOut) -> FragmentOut {
-          var out: FragmentOut;
-          out.color = vec4(fragData.color, 1.0);
-          out.objectID = fragData.objectID;
-
-          let dFdxPos = dpdx(fragData.worldPosition);
-          let dFdyPos = -dpdy(fragData.worldPosition);
-          let normal = normalize(cross(dFdxPos, dFdyPos));
-
-          out.normal = vec4(normal, 1.0);
-          out.color = vec4(normal * 0.5 + 0.5, 1.0);
-          return out;
-        }
+        ${fragmentCode}
       `
 
       const shaderModule = gpu.device.createShaderModule({
@@ -137,7 +130,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         entries: [
           {
             binding: 0,
-            visibility: GPUShaderStage.VERTEX,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
             buffer: {
               type: 'uniform',
             }
@@ -215,7 +208,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ]
       })
 
-      return function RenderMesh(pass, worldToScreen, modelPosition, eye, objectID) {
+      return function RenderMesh(pass, worldToScreen, modelPosition, eye, objectID, objectParams) {
         // update the uniform buffer
         {
           let byteOffset = 0
@@ -235,6 +228,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           byteOffset += 4
 
           worldToScreen.forEach(v => {
+            uboData.setFloat32(byteOffset, v, true)
+            byteOffset += 4;
+          })
+
+          objectParams.forEach(v => {
             uboData.setFloat32(byteOffset, v, true)
             byteOffset += 4;
           })
@@ -293,13 +291,92 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
   state.mesh = CreateCubeMesh(state.gpu)
 
   state.gpu.programs = {
-    renderCube: shaders.RenderTriangleSoup(
+    renderInterpolatedSurface: shaders.RenderTriangleSoup(
       state.gpu,
       state.mesh,
       textures.objectID,
       textures.depth,
       textures.normals,
-      state.gpu.presentationFormat
+      state.gpu.presentationFormat,
+      /* wgsl */`
+        fn JetLinearRescale(u: f32, v: f32, x: f32) -> f32 {
+          return (x - u) / (v - u);
+        }
+
+        fn JetLinear(t: f32) -> vec3f {
+          const color0 = vec3f(0.0, 0.0, 0.5625); // blue
+          const u1 = 1.0 / 9.0;
+          const color1 = vec3f(0.0, 0.0, 1.0); // blue
+          const u2 = 23.0 / 63.0;
+          const color2 = vec3f(0.0, 1.0, 1.0); // cyan
+          const u3 = 13.0 / 21.0;
+          const color3 = vec3f(1.0, 1.0, 0.0); // yellow
+          const u4 = 47.0 / 63.0;
+          const color4 = vec3f(1.0, 0.5, 0.0); // orange
+          const u5 = 55.0 / 63.0;
+          const color5 = vec3f(1.0, 0.0, 0.0); // red
+          const color6 = vec3(0.5, 0.0, 0.0); // red
+          return mix(color0, color1, JetLinearRescale(0.0, u1, t)) +
+                (mix(color1, color2, JetLinearRescale(u1, u2, t)) -
+                  mix(color0, color1, JetLinearRescale(0.0, u1, t))) *
+                  step(u1, t) +
+                (mix(color2, color3, JetLinearRescale(u2, u3, t)) -
+                  mix(color1, color2, JetLinearRescale(u1, u2, t))) *
+                  step(u2, t) +
+                (mix(color3, color4, JetLinearRescale(u3, u4, t)) -
+                  mix(color2, color3, JetLinearRescale(u2, u3, t))) *
+                  step(u3, t) +
+                (mix(color4, color5, JetLinearRescale(u4, u5, t)) -
+                  mix(color3, color4, JetLinearRescale(u3, u4, t))) *
+                  step(u4, t) +
+                (mix(color5, color6, JetLinearRescale(u5, 1.0, t)) -
+                  mix(color4, color5, JetLinearRescale(u4, u5, t))) *
+                  step(u5, t);
+        }
+
+        fn TrilinearInterpolation(factor: vec3f) -> f32{
+          // rescale cube position to 0..1
+          let invFactor = 1.0 - factor;
+          // format: c{X}{Y}{Z}
+          let c000 = ubo.objectParams[0][0];
+          let c100 = ubo.objectParams[0][1];
+          let c010 = ubo.objectParams[0][2];
+          let c110 = ubo.objectParams[0][3];
+
+          let c001 = ubo.objectParams[1][0];
+          let c101 = ubo.objectParams[1][1];
+          let c011 = ubo.objectParams[1][2];
+          let c111 = ubo.objectParams[1][3];
+
+          let c00 = c000 * invFactor.x + c100 * factor.x;
+          let c01 = c010 * invFactor.x + c110 * factor.x;
+          let c10 = c001 * invFactor.x + c101 * factor.x;
+          let c11 = c011 * invFactor.x + c111 * factor.x;
+
+          let c0 = c00 * invFactor.y + c10 * factor.y;
+          let c1 = c01 * invFactor.y + c11 * factor.y;
+
+          return c0 * invFactor.z + c1 * factor.z;
+        }
+
+        @fragment
+        fn FragmentMain(fragData: VertexOut) -> FragmentOut {
+          var out: FragmentOut;
+          out.color = vec4(fragData.color, 1.0);
+          out.objectID = fragData.objectID;
+
+          let dFdxPos = dpdx(fragData.worldPosition);
+          let dFdyPos = -dpdy(fragData.worldPosition);
+          let normal = normalize(cross(dFdxPos, dFdyPos));
+
+          out.normal = vec4(normal, 1.0);
+          // out.color = vec4(normal * 0.5 + 0.5, 1.0);
+          let uvw = fragData.worldPosition * 0.5 + 0.5;
+          out.color = vec4(max(vec3(0.1), JetLinear(TrilinearInterpolation(uvw))), 1.0);
+          // out.color = vec4(uvw, 1.0);
+          return out;
+        }
+      `
     )
   }
 
@@ -386,7 +463,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       state.dirty = true;
     }
 
-    if (!state.dirty){
+    if (!state.dirty) {
       requestAnimationFrame(RenderFrame)
       return
     }
@@ -435,11 +512,20 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     };
 
     let pass = commandEncoder.beginRenderPass(renderPassDesc);
-    state.gpu.programs.renderCube(
+    const objectID = 0
+    state.gpu.programs.renderInterpolatedSurface(
       pass,
       state.camera.state.worldToScreen,
       [0, 0, 0],
-      state.camera.state.eye
+      state.camera.state.eye,
+      objectID,
+      [
+        -1 + Math.sin(Now() * 0.001) * 0.5, 1, 1, 1,
+         1, 1, 1, 1,
+         // the rest are unused for now
+         0, 0, 0, 0,
+         0, 0, 0, 0,
+      ]
     )
     pass.end();
     state.gpu.device.queue.submit([commandEncoder.finish()])

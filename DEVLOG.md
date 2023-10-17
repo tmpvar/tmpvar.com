@@ -41,6 +41,7 @@
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-16
+- isosurface-extraction/sphere-march-cube: draw interpolated distance on the surface
 - isosurface-extraction/sphere-march-cube: render a cube on the screen w/ orbit camera
 - radiance-cascades/3d: cast rays over a hemisphere
 - radiance-cascades/3d: cast rays over an entire sphere
