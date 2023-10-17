@@ -685,7 +685,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         break;
       }
     }
-    console.log(state.params.approach)
     switch (state.params.approach) {
       case 'fixed-step-ray-march': {
         state.approachParams[0] = state.params['approach-fixed-step-ray-march'].maxFixedSteps
