@@ -163,7 +163,11 @@ In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where rel
         <output></output>
       </div>
       <div class="probeDiameter-control control">
-        probe diameter (level 0): <input type="range" min="2" max="6" value="5">
+        probe diameter (level 0): <input type="range" min="2" max="7" value="6">
+        <output></output>
+      </div>
+      <div class="intervalRadius-control control">
+        interval radius (level 0): <input type="range" min="0" max="64" value="9">
         <output></output>
       </div>
       <div class="branchingFactor-control control">
