@@ -84,6 +84,7 @@ description = "Playground for various isosurface extraction techniques"
 
 
 ## Interpolated Isosurface Viz (3D)
+
 <section id="interpolated-isosurface-viz-3d-content" class="has-webgpu">
   <section class="controls webgpu-required">
     <h4>Debug/Development</h4>
