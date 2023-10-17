@@ -86,45 +86,61 @@ description = "Playground for various isosurface extraction techniques"
 ## Interpolated Isosurface Viz (3D)
 <section id="interpolated-isosurface-viz-3d-content" class="has-webgpu">
   <section class="controls webgpu-required">
-    <div class="scene-control control">
-      scene:
-      <select>
-        <option value="time-varying" selected>Time Varying</option>
-        <option value="manual">Manual</option>
-      </select>
+    <h4>Debug/Development</h4>
+    <div class="indent">
+      <div class="debugRenderMaxFixedSteps-control control">
+        max fixed steps: <input type="range" min="10.0" max="1000.0" value="200.0" step="1.0">
+        <output></output>
+      </div>
+      <div class="debugRenderStepCount-control control">
+        render step count <input type="checkbox" value="1" />
+      </div>
+      <div class="debugRenderSolid-control control">
+        render solid <input type="checkbox" value="1" />
+      </div>
     </div>
-    <div class="shownBy-scene indent" showValue="manual">
-      <div class="c000-control control">
-        (0, 0, 0): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
-        <output></output>
+    <h4>Scene Params</h4>
+    <div class="indent">
+      <div class="scene-control control">
+        scene:
+        <select>
+          <option value="time-varying" selected>Time Varying</option>
+          <option value="manual">Manual</option>
+        </select>
       </div>
-      <div class="c001-control control">
-        (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="-1.0" step="0.01">
-        <output></output>
-      </div>
-      <div class="c010-control control">
-        (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
-        <output></output>
-      </div>
-      <div class="c011-control control">
-        (1, 1, 0): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
-        <output></output>
-      </div>
-      <div class="c100-control control">
-        (0, 0, 1): <input type="range" min="-2.0" max="2.0" value="-1.0" step="0.01">
-        <output></output>
-      </div>
-      <div class="c101-control control">
-        (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
-        <output></output>
-      </div>
-      <div class="c110-control control">
-        (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
-        <output></output>
-      </div>
-      <div class="c111-control control">
-        (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="-1.0" step="0.01">
-        <output></output>
+      <div class="shownBy-scene indent" showValue="manual">
+        <div class="c000-control control">
+          (0, 0, 0): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          <output></output>
+        </div>
+        <div class="c001-control control">
+          (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="-1.0" step="0.01">
+          <output></output>
+        </div>
+        <div class="c010-control control">
+          (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          <output></output>
+        </div>
+        <div class="c011-control control">
+          (1, 1, 0): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          <output></output>
+        </div>
+        <div class="c100-control control">
+          (0, 0, 1): <input type="range" min="-2.0" max="2.0" value="-1.0" step="0.01">
+          <output></output>
+        </div>
+        <div class="c101-control control">
+          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          <output></output>
+        </div>
+        <div class="c110-control control">
+          (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          <output></output>
+        </div>
+        <div class="c111-control control">
+          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="-1.0" step="0.01">
+          <output></output>
+        </div>
       </div>
     </div>
   </section>
