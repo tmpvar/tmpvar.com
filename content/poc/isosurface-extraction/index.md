@@ -143,7 +143,7 @@ description = "Playground for various isosurface extraction techniques"
       <div class="approach-control control">
         <select>
           <option value="fixed-step-ray-march" selected>Fixed Step Raymarch</option>
-          <option value="segment-marching">🚧 Segment Marching 🚧</option>
+          <!-- <option value="segment-marching">🚧 Segment Marching 🚧</option> -->
           <option value="ray-tracing-signed-distance-grids">🚧 Ray Tracing Signed Distance Grids 🚧</option>
         </select>
         <div class="shownBy-approach indent" showValue="fixed-step-ray-march">
