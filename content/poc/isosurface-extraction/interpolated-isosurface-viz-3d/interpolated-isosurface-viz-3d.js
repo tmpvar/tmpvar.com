@@ -32,8 +32,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       down: false
     },
 
-    cornerValues: new Float32Array(16),
+    debugParams: new Float32Array(16),
     sceneParams: new Float32Array(16),
+    approachParams: new Float32Array(16),
   }
 
   state.camera.state.distance = 3.0;
@@ -67,8 +68,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ['screenDims', 'vec4f', 16],
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
         ['screenToWorld', 'mat4x4<f32>', 16 * 4],
-        ['objectParams', 'mat4x4<f32>', 16 * 4],
         ['sceneParams', 'mat4x4<f32>', 16 * 4],
+        ['approachParams', 'mat4x4<f32>', 16 * 4],
+        ['debugParams', 'mat4x4<f32>', 16 * 4],
       ]
 
       let uboBufferSize = uboFields.reduce((p, c) => {
@@ -222,8 +224,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         eye,
         screenDims,
         objectID,
-        objectParams,
-        sceneParams
+        sceneParams,
+        approachParams,
+        debugParams
       ) {
         // update the uniform buffer
         {
@@ -261,12 +264,17 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           // TODO: for these params, maybe loop from 0..15 and if there is a param
           //       then write, otherwise just update the byte offset
 
-          objectParams.forEach(v => {
+          sceneParams.forEach(v => {
             uboData.setFloat32(byteOffset, v, true)
             byteOffset += 4;
           })
 
-          sceneParams.forEach((v, i) => {
+          approachParams.forEach((v, i) => {
+            uboData.setFloat32(byteOffset, v, true)
+            byteOffset += 4;
+          })
+
+          debugParams.forEach((v, i) => {
             uboData.setFloat32(byteOffset, v, true)
             byteOffset += 4;
           })
@@ -376,15 +384,15 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           // rescale cube position to 0..1
           let invFactor = 1.0 - factor;
           // format: c{X}{Y}{Z}
-          let c000 = ubo.objectParams[0][0];
-          let c100 = ubo.objectParams[0][1];
-          let c010 = ubo.objectParams[0][2];
-          let c110 = ubo.objectParams[0][3];
+          let c000 = ubo.sceneParams[0][0];
+          let c100 = ubo.sceneParams[0][1];
+          let c010 = ubo.sceneParams[0][2];
+          let c110 = ubo.sceneParams[0][3];
 
-          let c001 = ubo.objectParams[1][0];
-          let c101 = ubo.objectParams[1][1];
-          let c011 = ubo.objectParams[1][2];
-          let c111 = ubo.objectParams[1][3];
+          let c001 = ubo.sceneParams[1][0];
+          let c101 = ubo.sceneParams[1][1];
+          let c011 = ubo.sceneParams[1][2];
+          let c111 = ubo.sceneParams[1][3];
 
           let c00 = c000 * invFactor.x + c100 * factor.x;
           let c01 = c010 * invFactor.x + c110 * factor.x;
@@ -461,10 +469,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let rayOrigin = eye + dir * startT;
 
           var t = 0.0;
-          let maxSteps = ubo.sceneParams[0].y;
+          let maxSteps = ubo.approachParams[0].x;
           let invMaxSteps = 1.0 / maxSteps;
           let eps = invMaxSteps * 2.0;
-          let debugRenderSolid = ubo.sceneParams[0].z;
+          let debugRenderSolid = ubo.debugParams[0].y;
           while(t < maxT) {
             let pos = rayOrigin + dir * t;
             let currentDistance = TrilinearInterpolation(pos);
@@ -491,7 +499,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             discard;
           }
 
-          let debugRenderStepCount = ubo.sceneParams[0].x;
+          let debugRenderStepCount = ubo.debugParams[0].x;
           if (debugRenderStepCount > 0.0) {
             out.color = vec4(JetLinear(steps/maxSteps), 1.0);
           }
@@ -566,18 +574,26 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     e.preventDefault()
   }, { passive: false })
 
+  const Param = CreateParamReader(state, controlEl)
+  function ReadParams() {
+    Param('debugRenderStepCount', 'bool')
+    Param('debugRenderSolid', 'f32')
 
-  const scenes = {}
+    Param('scene', 'string')
+    Param('approach', 'string')
+  }
+
   // Note: I'm toying with the idea of automatic control wiring
-  {
-    let controlName = 'scene'
+  function CreateSubParams(state, controlName) {
+    const cache = {}
+    // let controlName = 'scene'
     let selectorControl = controlEl.querySelector(`.${controlName}-control`)
     let options = selectorControl.querySelectorAll('select option')
     options.forEach(option => {
       let controlHarness = {}
       controlHarness.el = controlEl.querySelector(`.shownBy-${controlName}[showValue="${option.value}"]`)
       if (controlHarness.el) {
-        controlHarness.Param = CreateParamReader(state, controlHarness.el, option.value)
+        controlHarness.Param = CreateParamReader(state, controlHarness.el, controlName + '-' + option.value)
         let subcontrols = Array
           .from(controlHarness.el.querySelectorAll('.control'))
           .map(control => {
@@ -611,24 +627,19 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       }
 
 
-      scenes[option.value] = controlHarness
+      cache[option.value] = controlHarness
     })
+    return cache
   }
 
-  const Param = CreateParamReader(state, controlEl)
-  function ReadParams() {
-
-    Param('debugRenderMaxFixedSteps', 'f32')
-    Param('debugRenderStepCount', 'bool')
-    Param('debugRenderSolid', 'f32')
-
-    Param('scene', 'string')
-  }
+  const scenes = CreateSubParams(state, 'scene')
+  const approaches = CreateSubParams(state, 'approach')
 
   function RenderFrame() {
     ReadParams()
 
     scenes[state.params.scene].update()
+    approaches[state.params.approach].update()
 
     const now = Now()
     const deltaTime = (now - state.lastFrameTime) / 1000.0
@@ -646,39 +657,46 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
     switch (state.params.scene) {
       case 'manual': {
-        state.cornerValues[0] = state.params.manual.c000
-        state.cornerValues[1] = state.params.manual.c001
-        state.cornerValues[2] = state.params.manual.c010
-        state.cornerValues[3] = state.params.manual.c011
-        state.cornerValues[4] = state.params.manual.c100
-        state.cornerValues[5] = state.params.manual.c101
-        state.cornerValues[6] = state.params.manual.c110
-        state.cornerValues[7] = state.params.manual.c111
+        // corners 0..8
+        state.sceneParams[0] = state.params['scene-manual'].c000
+        state.sceneParams[1] = state.params['scene-manual'].c001
+        state.sceneParams[2] = state.params['scene-manual'].c010
+        state.sceneParams[3] = state.params['scene-manual'].c011
+        state.sceneParams[4] = state.params['scene-manual'].c100
+        state.sceneParams[5] = state.params['scene-manual'].c101
+        state.sceneParams[6] = state.params['scene-manual'].c110
+        state.sceneParams[7] = state.params['scene-manual'].c111
         break;
       }
 
       case 'time-varying': {
-        state.cornerValues[0] = -0.5
-        state.cornerValues[1] = 1
-        state.cornerValues[2] = Math.sin(Now() * 0.0001) * 4.0
-        state.cornerValues[3] = 1
-        state.cornerValues[4] = 1
-        state.cornerValues[5] = -2.0 + Math.cos(Now() * 0.001) + Math.sin(Now() * 0.001) * 3.0
-        state.cornerValues[6] = 1
-        state.cornerValues[7] = -4 - Math.sin(Now() * 0.0005) * 4.0
+        // corners 0..8
+        state.sceneParams[0] = -0.5
+        state.sceneParams[1] = 1
+        state.sceneParams[2] = Math.sin(Now() * 0.0001) * 4.0
+        state.sceneParams[3] = 1
+        state.sceneParams[4] = 1
+        state.sceneParams[5] = -2.0 + Math.cos(Now() * 0.001) + Math.sin(Now() * 0.001) * 3.0
+        state.sceneParams[6] = 1
+        state.sceneParams[7] = -4 - Math.sin(Now() * 0.0005) * 4.0
 
         // keep rendering frames
         state.dirty = true;
         break;
       }
     }
+    console.log(state.params.approach)
+    switch (state.params.approach) {
+      case 'fixed-step-ray-march': {
+        state.approachParams[0] = state.params['approach-fixed-step-ray-march'].maxFixedSteps
+        break;
+      }
+    }
 
-    // Scene Params
+    // Debug Params
     {
-      state.sceneParams[0] = state.params.debugRenderStepCount ? 1.0 : 0.0
-      state.sceneParams[1] = state.params.debugRenderMaxFixedSteps
-      state.sceneParams[2] = state.params.debugRenderSolid ? 1.0 : 0.0
-
+      state.debugParams[0] = state.params.debugRenderStepCount ? 1.0 : 0.0
+      state.debugParams[1] = state.params.debugRenderSolid ? 1.0 : 0.0
     }
 
     const commandEncoder = state.gpu.device.createCommandEncoder()
@@ -735,8 +753,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       state.camera.state.eye,
       [canvas.width, canvas.height],
       objectID,
-      state.cornerValues,
-      state.sceneParams
+      state.sceneParams,
+      state.approachParams,
+      state.debugParams
     )
     pass.end();
     state.gpu.device.queue.submit([commandEncoder.finish()])
