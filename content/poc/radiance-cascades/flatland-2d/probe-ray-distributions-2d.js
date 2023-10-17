@@ -37,6 +37,12 @@ function ProbeRayDistributions2DBegin(rootEl) {
       parentEl.querySelector('output').innerHTML = `2<sup>${exponent}</sup> = ${value}`
       return value;
     })
+
+    Param('intervalRadius', 'i32', (parentEl, value) => {
+      parentEl.querySelector('output').innerHTML = `${value}`
+      return value
+    })
+
     Param('branchingFactor', 'i32', (parentEl, value, prevValue) => {
       let probeRayCount = state.params.probeRayCount;
       let displayValue = Math.pow(2, value)
@@ -83,39 +89,54 @@ function ProbeRayDistributions2DBegin(rootEl) {
 
     const TAU = Math.PI * 2.0
     state.ctx.save()
-    let scale = 4.0;
+    let scale = 2.0;
     state.ctx.scale(scale, scale);
-    state.ctx.lineWidth = 1.0 / scale * 2.0;
+    state.ctx.lineWidth = 1.0 / scale;
 
     let cascadeRayCounts = [];
+    let index = 0
+    console.clear()
     for (let level = 0; level <= state.params.maxLevel; level++) {
-      let angularSteps = state.params.probeRayCount << (level * state.params.branchingFactor)
-      let diameter = state.params.probeDiameter << level
-      let radius = diameter * 0.5
-      let prevRadius = level > 0.0 ? (state.params.probeDiameter << (level - 1)) * 0.5 : 0.0
+      let currentProbeDiameter = state.params.probeDiameter << level;
+      let currentProbeRadius = currentProbeDiameter / 2
+      let currentProbeRayCount = state.params.probeRayCount << (level * state.params.branchingFactor);
 
+      let intervalStartRadius = level == 0
+        ? 0
+        : state.params.intervalRadius << ((level - 1) * state.params.branchingFactor)
+      let intervalEndRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
+
+
+      console.log(intervalStartRadius, intervalEndRadius, { currentProbeDiameter, r: intervalEndRadius - intervalStartRadius})
       state.ctx.strokeStyle = levelColors[level]
-      state.ctx.beginPath()
 
       let cascadeRayCount = 0;
-      for (let x = 0; x < state.canvas.width; x += diameter) {
-        for (let y = 0; y < state.canvas.height; y += diameter) {
-          let centerX = x + radius
-          let centerY = y + radius
 
-          for (let step = 0; step < angularSteps; step++) {
-            let angle = TAU * (step + 0.5) / angularSteps;
+      for (let x = 0; x < state.canvas.width; x += currentProbeDiameter) {
+        for (let y = 0; y < state.canvas.height; y += currentProbeDiameter) {
+          let centerX = x + currentProbeRadius
+          let centerY = y + currentProbeRadius
+
+          // let r = ((index + 1) * 190) % 255
+          // let g = ((index + 1) * 2 * 156) % 255
+          // let b = ((index + 1) * 3 * 159) % 127
+          // index++;
+          // state.ctx.strokeStyle = `rgb(${r},${g},${b})`
+
+          state.ctx.beginPath()
+          for (let step = 0; step < currentProbeRayCount; step++) {
+            let angle = TAU * (step + 0.5) / currentProbeRayCount;
             let dirX = Math.sin(angle)
             let dirY = Math.cos(angle)
-
-            state.ctx.moveTo(centerX + dirX * prevRadius, centerY + dirY * prevRadius);
-            state.ctx.lineTo(centerX + dirX * radius, centerY + dirY * radius)
+            // state.ctx.moveTo(centerX, centerY);
+            state.ctx.moveTo(centerX + dirX * intervalStartRadius, centerY + dirY * intervalStartRadius);
+            state.ctx.lineTo(centerX + dirX * intervalEndRadius, centerY + dirY * intervalEndRadius)
             cascadeRayCount++
           }
+          state.ctx.stroke();
         }
       }
       cascadeRayCounts.push(cascadeRayCount)
-      state.ctx.stroke();
     }
 
     state.ctx.restore()
