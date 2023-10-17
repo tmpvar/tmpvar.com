@@ -28,7 +28,9 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
-- radiance-cascades/3d: cast rays over an entire sphere
+- isosurface-extraction/sphere-march-cube: sphere march from surface into the cube given the
+                                           corner values
+
 - radiance-cascades/3d: add scene specific params and process them
 - radiance-cascades/3d: add raymarching approach: Brute Force World Space
 - radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
@@ -39,6 +41,9 @@
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-16
+- isosurface-extraction/sphere-march-cube: render a cube on the screen w/ orbit camera
+- radiance-cascades/3d: cast rays over a hemisphere
+- radiance-cascades/3d: cast rays over an entire sphere
 ## 2023-10-15
 - radiance-cascades/3d: smooth out distance and rotation in orbit camera
 - radiance-cascades/3d: move brute force screen space approach into its own little hidy hole

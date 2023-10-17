@@ -273,14 +273,14 @@ export default function CreateWorldSpaceBruteForceApproach(
           var fluence = objectData[objectID].emission.rgb;
           for (var rayIndex=0; rayIndex<RaysPerFrame; rayIndex++) {
             // let rayDir = RayDirCubeFaceSubdivision(u32(RayIndex + rayIndex));
-            // let rayDir = RayDirGoldenSpiral(f32(RayIndex + rayIndex));
+            let rayDir = RayDirGoldenSpiral(f32(RayIndex + rayIndex));
 
-            let localRayDir = RayDirHemisphereUniformNonRandom(f32(RayIndex + rayIndex));
-            let rayDir = vec3f(
-              localRayDir.x * surfaceTransform[0].x + localRayDir.y * normal.x + localRayDir.z * surfaceTransform[1].x,
-              localRayDir.x * surfaceTransform[0].y + localRayDir.y * normal.y + localRayDir.z * surfaceTransform[1].y,
-              localRayDir.x * surfaceTransform[0].z + localRayDir.y * normal.z + localRayDir.z * surfaceTransform[1].z
-            );
+            // let localRayDir = RayDirHemisphereUniformNonRandom(f32(RayIndex + rayIndex));
+            // let rayDir = vec3f(
+            //   localRayDir.x * surfaceTransform[0].x + localRayDir.y * normal.x + localRayDir.z * surfaceTransform[1].x,
+            //   localRayDir.x * surfaceTransform[0].y + localRayDir.y * normal.y + localRayDir.z * surfaceTransform[1].y,
+            //   localRayDir.x * surfaceTransform[0].z + localRayDir.y * normal.z + localRayDir.z * surfaceTransform[1].z
+            // );
 
             let dir = normalize(rayDir + normal * 0.1);
             fluence += CastRay(worldPos + rayDir * 0.1, rayDir, i32(objectID));
