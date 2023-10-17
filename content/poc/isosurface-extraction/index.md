@@ -110,35 +110,35 @@ description = "Playground for various isosurface extraction techniques"
       </div>
       <div class="shownBy-scene indent" showValue="manual">
         <div class="c000-control control">
-          (0, 0, 0): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          (0, 0, 0): <input type="range" min="-2.0" max="2.0" value="2.0" step="0.01">
           <output></output>
         </div>
         <div class="c001-control control">
-          (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="-1.0" step="0.01">
+          (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="-2.0" step="0.01">
           <output></output>
         </div>
         <div class="c010-control control">
-          (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="-1.76" step="0.01">
           <output></output>
         </div>
         <div class="c011-control control">
-          (1, 1, 0): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          (1, 1, 0): <input type="range" min="-2.0" max="2.0" value="0.51" step="0.01">
           <output></output>
         </div>
         <div class="c100-control control">
-          (0, 0, 1): <input type="range" min="-2.0" max="2.0" value="-1.0" step="0.01">
+          (0, 0, 1): <input type="range" min="-2.0" max="2.0" value="-0.97" step="0.01">
           <output></output>
         </div>
         <div class="c101-control control">
-          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="0.7" step="0.01">
           <output></output>
         </div>
         <div class="c110-control control">
-          (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="1.0" step="0.01">
+          (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="2.0" step="0.01">
           <output></output>
         </div>
         <div class="c111-control control">
-          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="-1.0" step="0.01">
+          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="-0.28" step="0.01">
           <output></output>
         </div>
       </div>

@@ -28,7 +28,6 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
-- isosurface-extraction/sphere-march-cube: handle when the camera is inside of the cube
 - isosurface-extraction/sphere-march-cube: add an approach selector
 - isosurface-extraction/sphere-march-cube: implement the approach from
                                            'Ray Tracing of Signed Distance Function Grids'
@@ -43,6 +42,7 @@
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## 2023-10-17
+- isosurface-extraction/sphere-march-cube: handle when the camera is inside of the cube
 - isosurface-extraction/sphere-march-cube: add solid rendering toggle
 - isosurface-extraction/sphere-march-cube: add max fixed steps slider
 - isosurface-extraction/sphere-march-cube: add step count heat render
