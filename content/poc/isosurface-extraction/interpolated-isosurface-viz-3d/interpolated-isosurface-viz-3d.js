@@ -64,6 +64,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       const uboFields = [
         ['modelPosition', 'vec4f', 16],
         ['eye', 'vec4f', 16],
+        ['screenDims', 'vec4f', 16],
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
         ['screenToWorld', 'mat4x4<f32>', 16 * 4],
         ['objectParams', 'mat4x4<f32>', 16 * 4],
@@ -185,7 +186,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         },
         primitive: {
           topology: 'triangle-list',
-          cullMode: 'none',
+          cullMode: 'front',
           frontFace: 'cw',
         },
         depthStencil: {
@@ -213,7 +214,17 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ]
       })
 
-      return function RenderMesh(pass, worldToScreen, screenToWorld, modelPosition, eye, objectID, objectParams, sceneParams) {
+      return function RenderMesh(
+        pass,
+        worldToScreen,
+        screenToWorld,
+        modelPosition,
+        eye,
+        screenDims,
+        objectID,
+        objectParams,
+        sceneParams
+      ) {
         // update the uniform buffer
         {
           let byteOffset = 0
@@ -230,6 +241,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           uboData.setFloat32(byteOffset + 4, eye[1], true)
           uboData.setFloat32(byteOffset + 8, eye[2], true)
           uboData.setFloat32(byteOffset + 12, 0, true)
+          byteOffset += 16
+
+          // screenDims
+          uboData.setFloat32(byteOffset + 0, screenDims[0], true)
+          uboData.setFloat32(byteOffset + 4, screenDims[1], true)
           byteOffset += 16
 
           worldToScreen.forEach(v => {
@@ -352,9 +368,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
                   step(u5, t);
         }
 
-        fn TrilinearInterpolation(uvw: vec3f) -> f32{
+        fn TrilinearInterpolation(pos: vec3f) -> f32{
+          // convert from -1..1 to 0..1
+          let uvw = pos * 0.5 + 0.5;
           let factor = clamp(uvw, vec3f(0.0), vec3f(1.0));
-          // let factor = uvw;
+          // let factor = fract(uvw);
           // rescale cube position to 0..1
           let invFactor = 1.0 - factor;
           // format: c{X}{Y}{Z}
@@ -392,6 +410,31 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
                                   TrilinearInterpolation(pos+h.yyx) - TrilinearInterpolation(pos-h.yyx) ) );
         }
 
+        fn MinComponent(a: vec3f) -> f32 {
+          return min(a.x, min(a.y, a.z));
+        }
+
+        fn MaxComponent(a: vec3f) -> f32 {
+          return max(a.x, max(a.y, a.z));
+        }
+
+        fn RayAABB(p0: vec3f, p1: vec3f, rayOrigin: vec3f, invRaydir: vec3f) -> vec2f {
+          let t0 = (p0 - rayOrigin) * invRaydir;
+          let t1 = (p1 - rayOrigin) * invRaydir;
+          let tmin = MaxComponent(min(t0, t1));
+          let tmax = MinComponent(max(t0, t1));
+          var hit = 0.0;
+          if (tmin <= tmax) {
+            if (tmin >= 0) {
+              return vec2f(tmin, tmax);
+            } else {
+              return vec2f(0.0, tmax);
+            }
+          } else {
+            return vec2f(-1.0);
+          }
+        }
+
         @fragment
         fn FragmentMain(
           fragData: VertexOut
@@ -406,36 +449,29 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
           out.normal = vec4(normal, 1.0);
 
-          let uvw = fragData.worldPosition * 0.5 + 0.5;
-          out.color = vec4(max(vec3(0.1), JetLinear(TrilinearInterpolation(uvw))), 1.0);
+          let eye = ubo.eye.xyz;
+          let dir = normalize(fragData.worldPosition - eye);
 
-          var t = 0.0;
-          var lastDistance = TrilinearInterpolation(uvw);
+          var aabbHit = RayAABB(vec3(-1.0), vec3(1.0), eye, 1.0 / dir);
+          let startT = aabbHit.x + 0.0001;
+          let maxT = aabbHit.y - startT;
           var hit = false;
           var steps = 0.0;
 
-          let dir = normalize(fragData.worldPosition - ubo.eye.xyz);
-          let rayOrigin = uvw;
-          var wasInside = false;
+          let rayOrigin = eye + dir * startT;
 
+          var t = 0.0;
           let maxSteps = ubo.sceneParams[0].y;
           let invMaxSteps = 1.0 / maxSteps;
-          let eps = invMaxSteps * 4.0;
-          while(t < 2.0) {
+          let eps = invMaxSteps * 2.0;
+          let debugRenderSolid = ubo.sceneParams[0].z;
+          while(t < maxT) {
             let pos = rayOrigin + dir * t;
-            let boxD = SDFBox(pos - 0.5, vec3f(0.5));
-            if (boxD > 0.0) {
-              out.color = vec4(1.0 - t/1.7);
-              hit = true;
-              break;
-            }
             let currentDistance = TrilinearInterpolation(pos);
-
-            let debugRenderSolid = ubo.sceneParams[0].z;
 
             if (
               (debugRenderSolid > 0.0 && currentDistance <= 0.0) ||
-              abs(currentDistance) < eps
+              abs(currentDistance) <= eps
             ) {
               out.color = vec4(1.0);
               out.color = vec4(ComputeNormal(pos) * 0.5 + 0.5, 1.0);
@@ -445,6 +481,12 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             t += invMaxSteps;
             steps += 1.0;
           }
+
+          if (t >= maxT) {
+            out.color = vec4(1.0 - steps/(maxSteps * 8));
+            hit = true;
+          }
+
           if (!hit) {
             discard;
           }
@@ -691,6 +733,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       state.camera.state.screenToWorld,
       [0, 0, 0],
       state.camera.state.eye,
+      [canvas.width, canvas.height],
       objectID,
       state.cornerValues,
       state.sceneParams
