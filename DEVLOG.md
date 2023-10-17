@@ -28,8 +28,12 @@
 - radiance-cascades/3d: render an analytic primitive
 
 ## Pending
-- isosurface-extraction/sphere-march-cube: sphere march from surface into the cube given the
-                                           corner values
+- isosurface-extraction/sphere-march-cube: handle when the camera is inside of the cube
+- isosurface-extraction/sphere-march-cube: add an approach selector
+- isosurface-extraction/sphere-march-cube: add a scene selector
+- isosurface-extraction/sphere-march-cube: implement the approach from
+                                           'Ray Tracing of Signed Distance Function Grids'
+
 
 - radiance-cascades/3d: add scene specific params and process them
 - radiance-cascades/3d: add raymarching approach: Brute Force World Space
@@ -40,7 +44,10 @@
                         red/green (min/max) f32 texture
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
+## 2023-10-17
 ## 2023-10-16
+- isosurface-extraction/sphere-march-cube: sphere march from surface into the cube given the
+                                           corner values
 - isosurface-extraction/sphere-march-cube: draw interpolated distance on the surface
 - isosurface-extraction/sphere-march-cube: render a cube on the screen w/ orbit camera
 - radiance-cascades/3d: cast rays over a hemisphere

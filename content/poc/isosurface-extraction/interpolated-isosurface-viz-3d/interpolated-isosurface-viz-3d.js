@@ -31,6 +31,14 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       lastPos: [0, 0],
       down: false
     },
+
+    cornerValues: [
+      -0.5, 1, Math.sin(Now() * 0.0001) * 4.0, 1, 1,
+      -2.0 + Math.cos(Now() * 0.001) + Math.sin(Now() * 0.001) * 3.0, 1, -4 - Math.sin(Now() * 0.0005) * 4.0, 1,
+      // the rest are unused for now
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+    ]
   }
 
   state.camera.state.distance = 3.0;
@@ -367,36 +375,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           return c0 * invFactor.z + c1 * factor.z;
         }
 
-        fn ComputeRayDir(uv: vec2f, inv: mat4x4<f32>) -> vec3f {
-          var far = inv * vec4f(-uv.x, uv.y, 0.1, 1.0);
-          far /= far.w;
-          var near = inv * vec4f(-uv.x, uv.y, 0.01, 1.0);
-          near /= near.w;
-
-          return normalize(far.xyz - near.xyz);
-        }
-
-        fn MaxComponent(v: vec3f) -> f32 {
-          return max(v.x, max(v.y, v.z));
-        }
-
-        fn MinComponent(v: vec3f) -> f32 {
-          return min(v.x, min(v.y, v.z));
-        }
-        fn RayAABBMaxTime(p0: vec3f, p1: vec3f, rayOrigin: vec3f, invRaydir: vec3f) -> f32 {
-          let t0 = (p0 - rayOrigin) * invRaydir;
-          let t1 = (p1 - rayOrigin) * invRaydir;
-          let tmin = min(t0, t1);
-          let tmax = max(t0, t1);
-          let a = MaxComponent(tmin);
-          let b = MinComponent(tmax);
-          if (b <= a) {
-            return 0.0;
-          }
-
-          return b;
-        }
-
         fn SDFBox( p: vec3f, b: vec3f ) -> f32 {
           let q = abs(p) - b;
           return length(max(q,vec3f(0.0))) + min(max(q.x,max(q.y,q.z)),0.0);
@@ -421,28 +399,19 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let normal = normalize(cross(dFdxPos, dFdyPos));
 
           out.normal = vec4(normal, 1.0);
-          // out.color = vec4(normal * 0.5 + 0.5, 1.0);
+
           let uvw = fragData.worldPosition * 0.5 + 0.5;
           out.color = vec4(max(vec3(0.1), JetLinear(TrilinearInterpolation(uvw))), 1.0);
-          // out.color = vec4(uvw, 1.0);
 
-          // out.color = vec4(dir * 0.5 + 0.5, 1.0);
-          // out.color = vec4((ubo.eye.xyz) * 0.5 + 0.5, 1.0);
-          // out.color = vec4(fragData.uv, 0.0, 1.0);
-          // out.color = vec4(ComputeRayDir(fragData.uv, ubo.worldToScreen) * 0.5 + 0.5, 1.0);
           var t = 0.0;
           var lastDistance = TrilinearInterpolation(uvw);
           var hit = false;
           var steps = 0.0;
 
-          // let dir = ComputeRayDir(fragData.uv, ubo.worldToScreen);
-          // let dir = normalize(fragData.eyeRelativePosition);
           let dir = normalize(fragData.worldPosition - ubo.eye.xyz);
-          // let rayOrigin = ubo.eye.xyz + 0.5;
           let rayOrigin = uvw;
           var wasInside = false;
-          let MaxT = RayAABBMaxTime(vec3f(0.0), vec3f(1.0), rayOrigin, dir);
-          while(t < 1.7) {
+          while(t < 2.0) {
             let pos = rayOrigin + dir * t;
             let boxD = SDFBox(pos - 0.5, vec3f(0.5));
             if (boxD > 0.0) {
@@ -450,8 +419,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
               hit = true;
               break;
             }
-            // let currentDistance = TrilinearInterpolation(pos);
-            // let sampleD = length(pos) - 0.5;
             let currentDistance = TrilinearInterpolation(pos);
 
             if (abs(currentDistance) < 0.01) {
@@ -463,11 +430,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             t += 0.001;
             steps += 1.0;
           }
-          if (!hit && t >= MaxT) {
-            // out.color = vec4(JetLinear(steps / 200.0), 1.0);
+          if (!hit) {
             discard;
-          } else {
           }
+
+          // out.color = vec4(JetLinear(steps/2000.0), 1.0);
           return out;
         }
       `
@@ -540,14 +507,64 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
   }, { passive: false })
 
 
+  const scenes = {}
+  // Note: I'm toying with the idea of automatic control wiring
+  {
+    let controlName = 'scene'
+    let selectorControl = controlEl.querySelector(`.${controlName}-control`)
+    let options = selectorControl.querySelectorAll('select option')
+    options.forEach(option => {
+      let controlHarness = {}
+      controlHarness.el = controlEl.querySelector(`.shownBy-${controlName}[showValue="${option.value}"]`)
+      if (controlHarness.el) {
+        controlHarness.Param = CreateParamReader(state, controlHarness.el, option.value)
+        console.log(Array.from(controlHarness.el.querySelectorAll('.control')))
+        let subcontrols = Array
+          .from(controlHarness.el.querySelectorAll('.control'))
+          .map(control => {
+            let paramName = Array
+              .from(control.classList)
+              .find(name => name.endsWith('-control')).replace('-control', '')
 
-  const Params = CreateParamReader(state, controlEl)
+            let el = control.querySelector(['input', 'select'])
+
+            let paramType = 'f32'
+            switch (el.type) {
+              case 'checkbox': {
+                paramType = 'bool'
+                break;
+              }
+            }
+
+            return {
+              paramName, paramType
+            }
+          })
+
+        controlHarness.update = () => {
+          subcontrols.forEach(subcontrol => {
+            controlHarness.Param(subcontrol.paramName, subcontrol.paramType)
+          })
+        }
+
+      } else {
+        controlHarness.update = function () { }
+      }
+
+
+      scenes[option.value] = controlHarness
+    })
+  }
+
+  const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
-
+    Param('scene', 'string')
   }
 
   function RenderFrame() {
     ReadParams()
+
+    scenes[state.params.scene].update()
 
     const now = Now()
     const deltaTime = (now - state.lastFrameTime) / 1000.0
@@ -560,6 +577,36 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     if (!state.dirty) {
       requestAnimationFrame(RenderFrame)
       return
+    }
+    state.dirty = false;
+
+    switch (state.params.scene) {
+      case 'manual': {
+        state.cornerValues[0] = state.params.manual.c000
+        state.cornerValues[1] = state.params.manual.c001
+        state.cornerValues[2] = state.params.manual.c010
+        state.cornerValues[3] = state.params.manual.c011
+        state.cornerValues[4] = state.params.manual.c100
+        state.cornerValues[5] = state.params.manual.c101
+        state.cornerValues[6] = state.params.manual.c110
+        state.cornerValues[7] = state.params.manual.c111
+        break;
+      }
+
+      case 'time-varying': {
+        state.cornerValues[0] = -0.5
+        state.cornerValues[1] = 1
+        state.cornerValues[2] = Math.sin(Now() * 0.0001) * 4.0
+        state.cornerValues[3] = 1
+        state.cornerValues[4] = 1
+        state.cornerValues[5] = -2.0 + Math.cos(Now() * 0.001) + Math.sin(Now() * 0.001) * 3.0
+        state.cornerValues[6] = 1
+        state.cornerValues[7] = -4 - Math.sin(Now() * 0.0005) * 4.0
+
+        // keep rendering frames
+        state.dirty = true;
+        break;
+      }
     }
 
     const commandEncoder = state.gpu.device.createCommandEncoder()
@@ -615,13 +662,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       [0, 0, 0],
       state.camera.state.eye,
       objectID,
-      [
-        -0.5, d, Math.sin(Now() * 0.0001) * 4.0, d, d,
-        -2.0 + Math.cos(Now() * 0.001) + Math.sin(Now() * 0.001) * 3.0, 1, -4 - Math.sin(Now() * 0.0005) * 4.0, 1,
-        // the rest are unused for now
-        0, 0, 0, 0,
-        0, 0, 0, 0,
-      ]
+      state.cornerValues
     )
     pass.end();
     state.gpu.device.queue.submit([commandEncoder.finish()])
