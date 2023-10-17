@@ -119,6 +119,105 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           return out;
         }
 
+
+
+        fn JetLinearRescale(u: f32, v: f32, x: f32) -> f32 {
+          return (x - u) / (v - u);
+        }
+
+        fn JetLinear(t: f32) -> vec3f {
+          const color0 = vec3f(0.0, 0.0, 0.5625); // blue
+          const u1 = 1.0 / 9.0;
+          const color1 = vec3f(0.0, 0.0, 1.0); // blue
+          const u2 = 23.0 / 63.0;
+          const color2 = vec3f(0.0, 1.0, 1.0); // cyan
+          const u3 = 13.0 / 21.0;
+          const color3 = vec3f(1.0, 1.0, 0.0); // yellow
+          const u4 = 47.0 / 63.0;
+          const color4 = vec3f(1.0, 0.5, 0.0); // orange
+          const u5 = 55.0 / 63.0;
+          const color5 = vec3f(1.0, 0.0, 0.0); // red
+          const color6 = vec3(0.5, 0.0, 0.0); // red
+          return mix(color0, color1, JetLinearRescale(0.0, u1, t)) +
+                (mix(color1, color2, JetLinearRescale(u1, u2, t)) -
+                  mix(color0, color1, JetLinearRescale(0.0, u1, t))) *
+                  step(u1, t) +
+                (mix(color2, color3, JetLinearRescale(u2, u3, t)) -
+                  mix(color1, color2, JetLinearRescale(u1, u2, t))) *
+                  step(u2, t) +
+                (mix(color3, color4, JetLinearRescale(u3, u4, t)) -
+                  mix(color2, color3, JetLinearRescale(u2, u3, t))) *
+                  step(u3, t) +
+                (mix(color4, color5, JetLinearRescale(u4, u5, t)) -
+                  mix(color3, color4, JetLinearRescale(u3, u4, t))) *
+                  step(u4, t) +
+                (mix(color5, color6, JetLinearRescale(u5, 1.0, t)) -
+                  mix(color4, color5, JetLinearRescale(u4, u5, t))) *
+                  step(u5, t);
+        }
+
+        fn TrilinearInterpolation(pos: vec3f) -> f32{
+          // convert from -1..1 to 0..1
+          let uvw = pos * 0.5 + 0.5;
+          let factor = clamp(uvw, vec3f(0.0), vec3f(1.0));
+          // let factor = fract(uvw);
+          // rescale cube position to 0..1
+          let invFactor = 1.0 - factor;
+          // format: c{X}{Y}{Z}
+          let c000 = ubo.sceneParams[0][0];
+          let c100 = ubo.sceneParams[0][1];
+          let c010 = ubo.sceneParams[0][2];
+          let c110 = ubo.sceneParams[0][3];
+
+          let c001 = ubo.sceneParams[1][0];
+          let c101 = ubo.sceneParams[1][1];
+          let c011 = ubo.sceneParams[1][2];
+          let c111 = ubo.sceneParams[1][3];
+
+          let c00 = c000 * invFactor.x + c100 * factor.x;
+          let c01 = c010 * invFactor.x + c110 * factor.x;
+          let c10 = c001 * invFactor.x + c101 * factor.x;
+          let c11 = c011 * invFactor.x + c111 * factor.x;
+
+          let c0 = c00 * invFactor.y + c10 * factor.y;
+          let c1 = c01 * invFactor.y + c11 * factor.y;
+
+          return c0 * invFactor.z + c1 * factor.z;
+        }
+
+        fn ComputeNormal(pos: vec3f) -> vec3f {
+          const eps = 0.0001; // or some other value
+          const h = vec2f(eps,0);
+          return normalize( vec3f(TrilinearInterpolation(pos+h.xyy) - TrilinearInterpolation(pos-h.xyy),
+                                  TrilinearInterpolation(pos+h.yxy) - TrilinearInterpolation(pos-h.yxy),
+                                  TrilinearInterpolation(pos+h.yyx) - TrilinearInterpolation(pos-h.yyx) ) );
+        }
+
+        fn MinComponent(a: vec3f) -> f32 {
+          return min(a.x, min(a.y, a.z));
+        }
+
+        fn MaxComponent(a: vec3f) -> f32 {
+          return max(a.x, max(a.y, a.z));
+        }
+
+        fn RayAABB(p0: vec3f, p1: vec3f, rayOrigin: vec3f, invRaydir: vec3f) -> vec2f {
+          let t0 = (p0 - rayOrigin) * invRaydir;
+          let t1 = (p1 - rayOrigin) * invRaydir;
+          let tmin = MaxComponent(min(t0, t1));
+          let tmax = MinComponent(max(t0, t1));
+          var hit = 0.0;
+          if (tmin <= tmax) {
+            if (tmin >= 0) {
+              return vec2f(tmin, tmax);
+            } else {
+              return vec2f(0.0, tmax);
+            }
+          } else {
+            return vec2f(-1.0);
+          }
+        }
+
         struct FragmentOut {
           @location(0) color: vec4f,
           @location(1) objectID: u32,
@@ -333,7 +432,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
   state.mesh = CreateCubeMesh(state.gpu)
 
   state.gpu.programs = {
-    renderInterpolatedSurface: shaders.RenderTriangleSoup(
+    raymarchFixedStep: shaders.RenderTriangleSoup(
       state.gpu,
       state.mesh,
       textures.objectID,
@@ -341,108 +440,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       textures.normals,
       state.gpu.presentationFormat,
       /* wgsl */`
-        fn JetLinearRescale(u: f32, v: f32, x: f32) -> f32 {
-          return (x - u) / (v - u);
-        }
-
-        fn JetLinear(t: f32) -> vec3f {
-          const color0 = vec3f(0.0, 0.0, 0.5625); // blue
-          const u1 = 1.0 / 9.0;
-          const color1 = vec3f(0.0, 0.0, 1.0); // blue
-          const u2 = 23.0 / 63.0;
-          const color2 = vec3f(0.0, 1.0, 1.0); // cyan
-          const u3 = 13.0 / 21.0;
-          const color3 = vec3f(1.0, 1.0, 0.0); // yellow
-          const u4 = 47.0 / 63.0;
-          const color4 = vec3f(1.0, 0.5, 0.0); // orange
-          const u5 = 55.0 / 63.0;
-          const color5 = vec3f(1.0, 0.0, 0.0); // red
-          const color6 = vec3(0.5, 0.0, 0.0); // red
-          return mix(color0, color1, JetLinearRescale(0.0, u1, t)) +
-                (mix(color1, color2, JetLinearRescale(u1, u2, t)) -
-                  mix(color0, color1, JetLinearRescale(0.0, u1, t))) *
-                  step(u1, t) +
-                (mix(color2, color3, JetLinearRescale(u2, u3, t)) -
-                  mix(color1, color2, JetLinearRescale(u1, u2, t))) *
-                  step(u2, t) +
-                (mix(color3, color4, JetLinearRescale(u3, u4, t)) -
-                  mix(color2, color3, JetLinearRescale(u2, u3, t))) *
-                  step(u3, t) +
-                (mix(color4, color5, JetLinearRescale(u4, u5, t)) -
-                  mix(color3, color4, JetLinearRescale(u3, u4, t))) *
-                  step(u4, t) +
-                (mix(color5, color6, JetLinearRescale(u5, 1.0, t)) -
-                  mix(color4, color5, JetLinearRescale(u4, u5, t))) *
-                  step(u5, t);
-        }
-
-        fn TrilinearInterpolation(pos: vec3f) -> f32{
-          // convert from -1..1 to 0..1
-          let uvw = pos * 0.5 + 0.5;
-          let factor = clamp(uvw, vec3f(0.0), vec3f(1.0));
-          // let factor = fract(uvw);
-          // rescale cube position to 0..1
-          let invFactor = 1.0 - factor;
-          // format: c{X}{Y}{Z}
-          let c000 = ubo.sceneParams[0][0];
-          let c100 = ubo.sceneParams[0][1];
-          let c010 = ubo.sceneParams[0][2];
-          let c110 = ubo.sceneParams[0][3];
-
-          let c001 = ubo.sceneParams[1][0];
-          let c101 = ubo.sceneParams[1][1];
-          let c011 = ubo.sceneParams[1][2];
-          let c111 = ubo.sceneParams[1][3];
-
-          let c00 = c000 * invFactor.x + c100 * factor.x;
-          let c01 = c010 * invFactor.x + c110 * factor.x;
-          let c10 = c001 * invFactor.x + c101 * factor.x;
-          let c11 = c011 * invFactor.x + c111 * factor.x;
-
-          let c0 = c00 * invFactor.y + c10 * factor.y;
-          let c1 = c01 * invFactor.y + c11 * factor.y;
-
-          return c0 * invFactor.z + c1 * factor.z;
-        }
-
-        fn SDFBox( p: vec3f, b: vec3f ) -> f32 {
-          let q = abs(p) - b;
-          return length(max(q,vec3f(0.0))) + min(max(q.x,max(q.y,q.z)),0.0);
-        }
-
-        fn ComputeNormal(pos: vec3f) -> vec3f {
-          const eps = 0.0001; // or some other value
-          const h = vec2f(eps,0);
-          return normalize( vec3f(TrilinearInterpolation(pos+h.xyy) - TrilinearInterpolation(pos-h.xyy),
-                                  TrilinearInterpolation(pos+h.yxy) - TrilinearInterpolation(pos-h.yxy),
-                                  TrilinearInterpolation(pos+h.yyx) - TrilinearInterpolation(pos-h.yyx) ) );
-        }
-
-        fn MinComponent(a: vec3f) -> f32 {
-          return min(a.x, min(a.y, a.z));
-        }
-
-        fn MaxComponent(a: vec3f) -> f32 {
-          return max(a.x, max(a.y, a.z));
-        }
-
-        fn RayAABB(p0: vec3f, p1: vec3f, rayOrigin: vec3f, invRaydir: vec3f) -> vec2f {
-          let t0 = (p0 - rayOrigin) * invRaydir;
-          let t1 = (p1 - rayOrigin) * invRaydir;
-          let tmin = MaxComponent(min(t0, t1));
-          let tmax = MinComponent(max(t0, t1));
-          var hit = 0.0;
-          if (tmin <= tmax) {
-            if (tmin >= 0) {
-              return vec2f(tmin, tmax);
-            } else {
-              return vec2f(0.0, tmax);
-            }
-          } else {
-            return vec2f(-1.0);
-          }
-        }
-
         @fragment
         fn FragmentMain(
           fragData: VertexOut
@@ -744,7 +741,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     let pass = commandEncoder.beginRenderPass(renderPassDesc);
     const objectID = 0
     const d = 1
-    state.gpu.programs.renderInterpolatedSurface(
+    state.gpu.programs.raymarchFixedStep(
       pass,
       state.camera.state.worldToScreen,
       state.camera.state.screenToWorld,
