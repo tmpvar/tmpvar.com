@@ -156,12 +156,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
                   step(u5, t);
         }
 
-        fn TrilinearInterpolation(pos: vec3f) -> f32{
-          // convert from -1..1 to 0..1
-          let uvw = pos * 0.5 + 0.5;
-          let factor = clamp(uvw, vec3f(0.0), vec3f(1.0));
+        fn TrilinearInterpolation(uvw: vec3f) -> f32{
+          // let factor = saturate(uvw);
           // let factor = fract(uvw);
-          // rescale cube position to 0..1
+          let factor = uvw;
           let invFactor = 1.0 - factor;
           // format: c{X}{Y}{Z}
           let c000 = ubo.sceneParams[0][0];
@@ -206,16 +204,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let t1 = (p1 - rayOrigin) * invRaydir;
           let tmin = MaxComponent(min(t0, t1));
           let tmax = MinComponent(max(t0, t1));
-          var hit = 0.0;
-          if (tmin <= tmax) {
-            if (tmin >= 0) {
-              return vec2f(tmin, tmax);
-            } else {
-              return vec2f(0.0, tmax);
-            }
-          } else {
-            return vec2f(-1.0);
-          }
+          return vec2f(tmin, tmax);
         }
 
         struct FragmentOut {
@@ -454,41 +443,53 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
           out.normal = vec4(normal, 1.0);
 
-          let eye = ubo.eye.xyz;
-          let dir = normalize(fragData.worldPosition - eye);
+          let uvw = (fragData.worldPosition * 0.5 + 0.5);
+          var eye = ubo.eye.xyz * 0.5 + 0.5;
+          let rayDir = normalize(uvw - eye);
+          var tInterval = RayAABB(vec3(0.0), vec3(1.0), eye, 1.0 / rayDir);
+          if (tInterval.y < tInterval.x) {
+            out.color = vec4(1.0, 0.0, 1.0, 1.0);
+            return out;
+          }
 
-          var aabbHit = RayAABB(vec3(-1.0), vec3(1.0), eye, 1.0 / dir);
-          let startT = aabbHit.x + 0.0001;
-          let maxT = aabbHit.y - startT;
+          var rayOrigin = eye;
+          if (tInterval.x > 0.0) {
+            rayOrigin = eye + rayDir * tInterval.x;
+            tInterval.y -= tInterval.x;
+            tInterval.x = 0.000001;
+          } else {
+            tInterval.x = 0.0;
+          }
+
+          var t = tInterval.x;
           var hit = false;
           var steps = 0.0;
 
-          let rayOrigin = eye + dir * startT;
-
-          var t = 0.0;
           let maxSteps = ubo.approachParams[0].x;
           let invMaxSteps = 1.0 / maxSteps;
-          let eps = invMaxSteps * 2.0;
+          let eps = invMaxSteps * 4.0;
           let debugRenderSolid = ubo.debugParams[0].y;
-          while(t < maxT) {
-            let pos = rayOrigin + dir * t;
-            let currentDistance = TrilinearInterpolation(pos);
-
-            if (
-              (debugRenderSolid > 0.0 && currentDistance <= 0.0) ||
-              abs(currentDistance) <= eps
-            ) {
-              out.color = vec4(1.0);
-              out.color = vec4(ComputeNormal(pos) * 0.5 + 0.5, 1.0);
-              hit = true;
-              break;
+          while(t < tInterval.y) {
+            let pos = rayOrigin + rayDir * t;
+            if (t >= tInterval.x) {
+              let d = TrilinearInterpolation(pos);
+              if (
+                (debugRenderSolid > 0.0 && d <= 0.0) ||
+                abs(d) <= eps
+              ) {
+                out.color = vec4(1.0);
+                out.color = vec4(ComputeNormal(pos) * 0.5 + 0.5, 1.0);
+                hit = true;
+                break;
+              }
             }
             t += invMaxSteps;
             steps += 1.0;
           }
 
-          if (t >= maxT) {
-            out.color = vec4(1.0 - steps/(maxSteps * 8));
+          if (t >= tInterval.y) {
+            out.color = vec4(((1.0 - steps/(maxSteps * 8)) + 1.0) / 6.0);
+            // out.color = vec4(normal * 0.5 + 0.5, 1.0);
             hit = true;
           }
 
@@ -841,7 +842,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         state.debugParams
       )
       pass.end();
-      }
+    }
     state.gpu.device.queue.submit([commandEncoder.finish()])
 
     requestAnimationFrame(RenderFrame)
