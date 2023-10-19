@@ -506,14 +506,113 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       `
     ),
 
-    raytraceSignedDistanceFunctionGrids: shaders.RenderTriangleSoup(
-      state.gpu,
-      state.mesh,
-      textures.objectID,
-      textures.depth,
-      textures.normals,
-      state.gpu.presentationFormat,
+    raytraceSignedDistanceFunctionGrids: (function () {
+      return shaders.RenderTriangleSoup(
+        state.gpu,
+        state.mesh,
+        textures.objectID,
+        textures.depth,
+        textures.normals,
+        state.gpu.presentationFormat,
       /* wgsl */`
+
+        fn ComputeConstants(rayOrigin: vec3f, rayDir: vec3f) -> vec4f {
+          /*
+                6       7
+                +------+
+               /.     /|
+            2 +------+3|
+              | + 4  | + 5
+              |.     |/
+              +------+
+            0         1
+
+            s000 = 0
+            s100 = 1
+            s010 = 2
+            s110 = 3
+
+            s001 = 4
+            s100 = 5
+            s010 = 6
+            s110 = 7
+
+            Note: these have been swapped to be z-up!
+          */
+
+          // compute the constants
+          let s000 = ubo.sceneParams[0][0];
+          let s100 = ubo.sceneParams[0][1];
+          let s010 = ubo.sceneParams[0][2];
+          let s110 = ubo.sceneParams[0][3];
+
+          let s001 = ubo.sceneParams[1][0];
+          let s101 = ubo.sceneParams[1][1];
+          let s011 = ubo.sceneParams[1][2];
+          let s111 = ubo.sceneParams[1][3];
+
+          let a = s101 - s001;
+          let k0 = s000;
+          let k1 = s100 - s000;
+          let k2 = s010 - s000;
+          let k3 = s110 - s010 - k1;
+          let k4 = k0 - s001;
+          let k5 = k1 - a;
+          let k6 = k2 - (s011 - s001);
+          let k7 = k3 - (s111 - s011 - a);
+
+          let ox = rayOrigin.x;
+          let oy = rayOrigin.y;
+          let oz = rayOrigin.z;
+
+          let dx = rayDir.x;
+          let dy = rayDir.y;
+          let dz = rayDir.z;
+
+          let m0 = ox * oy;
+          let m1 = dx * dy;
+          let m2 = ox * dy + oy * dx;
+          let m3 = k5 * oz - k1;
+          let m4 = k6 * oz - k2;
+          let m5 = k7 * oz - k3;
+
+          return vec4f(
+            (k4 * oz - k0) + ox * m3 + oy * m4 + m0 * m5,
+            dx * m3 + dy * m4 + m2 * m5 + dz * (k4 + k5 * ox + k6 * oy + k7 * m0),
+            m1 * m5 + dz * (k5 * dx + k6 * dy + k7 * m2),
+            k7 * m1 * dz
+          );
+        }
+
+        fn EvalG(constants: vec4f, t: f32) -> f32 {
+          return constants[3] * pow(t, 3.0) +
+                 constants[2] * pow(t, 2.0) +
+                 constants[1] * t +
+                 constants[0];
+        }
+
+        fn EvalGPrime(constants: vec4f, t: f32) -> f32 {
+          return 3.0 * constants[3] * pow(t, 2.0) +
+                 2.0 * constants[2] * t +
+                 constants[1];
+        }
+
+        fn SolveQuadratic(a: f32, b: f32, c: f32) -> vec2f {
+          let q = -0.5 * (b + sign(b) * sqrt(pow(b, 2.0) - 4.0 * a * c));
+          return vec2f(q/a, c/q);
+        }
+
+        fn QuadraticRootCount(a: f32, b: f32, c: f32) -> f32 {
+          let discriminant = pow(b, 2.0) - 4.0 * a * c;
+          if (discriminant > 0.0) {
+            return 2.0;
+          } else if (discriminant == 0.0) {
+            return 1.0;
+          } else {
+            return 0.0;
+          }
+        }
+
         @fragment
         fn FragmentMain(
           fragData: VertexOut
@@ -528,57 +627,55 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
           out.normal = vec4(normal, 1.0);
           out.color = vec4(normal.xyz * 0.5 + 0.5, 1.0);
-          return out;
-          let eye = ubo.eye.xyz;
-          let dir = normalize(fragData.worldPosition - eye);
 
-          var aabbHit = RayAABB(vec3(-1.0), vec3(1.0), eye, 1.0 / dir);
-          let startT = aabbHit.x + 0.0001;
-          let maxT = aabbHit.y - startT;
+          let uvw = (fragData.worldPosition * 0.5 + 0.5);
+          let eye = ubo.eye.xyz * 0.5 + 0.5;
+          let rayDir = normalize(uvw - eye);
+          var tInterval = RayAABB(vec3(0.0), vec3(1.0), eye, 1.0 / rayDir);
+          if (tInterval.y < 0.0) {
+            out.color = vec4(1.0, 0.0, 1.0, 1.0);
+            return out;
+          }
+
+          var rayOrigin = eye;
+          if (tInterval.x > 0.0) {
+            rayOrigin = eye + rayDir * tInterval.x;
+            tInterval.y -= tInterval.x;
+            tInterval.x = 0.000001;
+          } else {
+            tInterval.x = 0.0;
+          }
+
+          var t = tInterval.x;
+          let Constants = ComputeConstants(rayOrigin, rayDir);
+
+          let maxSteps = 10.0;
+          let kNumericEpsilon = 0.01;
           var hit = false;
           var steps = 0.0;
-
-          let rayOrigin = eye + dir * startT;
-
-          var t = 0.0;
-          let maxSteps = ubo.approachParams[0].x;
-          let invMaxSteps = 1.0 / maxSteps;
-          let eps = invMaxSteps * 2.0;
-          let debugRenderSolid = ubo.debugParams[0].y;
-          while(t < maxT) {
-            let pos = rayOrigin + dir * t;
-            let currentDistance = TrilinearInterpolation(pos);
-
-            if (
-              (debugRenderSolid > 0.0 && currentDistance <= 0.0) ||
-              abs(currentDistance) <= eps
-            ) {
-              out.color = vec4(1.0);
-              out.color = vec4(ComputeNormal(pos) * 0.5 + 0.5, 1.0);
+          while (steps < maxSteps) {
+            let g =  EvalG(Constants, t);
+            let gprime = EvalGPrime(Constants, t);
+            let deltaT = g / gprime;
+            t -= deltaT;
+            steps += 1.0;
+            if (abs(deltaT) <= kNumericEpsilon) {
+              out.color = vec4(ComputeNormal(eye + rayDir * t) * 0.5 + 0.5, 1.0);
               hit = true;
               break;
             }
-            t += invMaxSteps;
-            steps += 1.0;
-          }
-
-          if (t >= maxT) {
-            out.color = vec4(1.0 - steps/(maxSteps * 8));
-            hit = true;
           }
 
           if (!hit) {
-            discard;
+            out.color = vec4(1.0, 0.0, 1.0, 1.0);
+            // discard;
           }
 
-          let debugRenderStepCount = ubo.debugParams[0].x;
-          if (debugRenderStepCount > 0.0) {
-            out.color = vec4(JetLinear(steps/maxSteps), 1.0);
-          }
           return out;
         }
       `
-    )
+      )
+    })()
   }
 
   async function InitGPU(ctx) {
