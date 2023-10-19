@@ -1,13 +1,19 @@
 +++
 title = "Implementing Radiance Cascades"
 date = 2023-10-10
-description = "Notes and issues that I experienced while implementing Radiance Cascades"
-draft = true
+
 [extra]
+unlisted = true
 enableSampleImage = false
 +++
 
+Notes and issues that I experienced while implementing Radiance Cascades
+
+<!-- more -->
+
 ## Notes
+
+
 
 ### Flatland
 
