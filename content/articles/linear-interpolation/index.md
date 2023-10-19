@@ -25,9 +25,9 @@ where `start` and `end` are our starting and ending values and `t` is the ratio 
 
 
 ## Linear Interpolation (1D)
+<div class="interactive-demo" id="Lerp1D">
 
 Here's an example of how a 1D `lerp` function behaves - you can drag the slider around.
-<div id="Lerp1D">
 
 ```c++
 f32 Lerp1D(f32 start, f32 end, f32 t) {
@@ -38,7 +38,6 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
 <div class="center-align">
 <canvas width="1024" height="128"></canvas>
 </div>
-<p><br/><br/></p>
 </div>
 
 
