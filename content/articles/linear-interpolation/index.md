@@ -80,7 +80,7 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
     params = Object.assign({
       skipFirst: false,
       precision: 2
-    }, params)
+    }, params || {})
 
     let regexString = `(\\W*\\b${name})(\\b[^\\w]*)`
     let matcher = new RegExp(regexString)
@@ -144,13 +144,11 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
     mouse: {
       pos: [0, 0],
       downPos: [0, 0],
+      lastPos: [0, 0],
       down: false
     },
     inDemo: true,
-    rng: {
-      state: 0xF00DB4BE,
-      inc: 0,
-    }
+    paddingWidth: 8,
   }
 
   state.demo = {
@@ -162,38 +160,26 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
   const MoveMouse = (x, y) => {
     let ratioX = canvas.width / canvas.clientWidth
     let ratioY = canvas.height / canvas.clientHeight
+    state.mouse.lastPos[0] = state.mouse.pos[0]
+    state.mouse.lastPos[1] = state.mouse.pos[1]
+
     state.mouse.pos[0] = x * ratioX
     state.mouse.pos[1] = y * ratioY
     state.dirty = true;
   }
 
-  canvas.addEventListener("mousedown", (e) => {
-    state.mouse.down = true
-    MoveMouse(e.offsetX, e.offsetY);
-    state.mouse.lastPos[0] = state.mouse.pos[0]
-    state.mouse.lastPos[1] = state.mouse.pos[1]
-
-    e.preventDefault()
-  }, { passive: false })
-
   canvas.addEventListener("mousemove", e => {
     MoveMouse(e.offsetX, e.offsetY)
-    e.preventDefault()
 
-    if (state.mouse.down) {
-      let dx = state.mouse.pos[0] - state.mouse.lastPos[0]
-      let dy = state.mouse.pos[1] - state.mouse.lastPos[1]
-
-      state.mouse.downPos[0] = state.mouse.pos[0]
-      state.mouse.downPos[1] = state.mouse.pos[1]
-
-      if (Math.abs(dx) < 1.0 && Math.abs(dy) < 1.0) {
-        return;
-      }
-    }
+    let dx = state.mouse.pos[0] - state.mouse.lastPos[0]
+    let dy = state.mouse.pos[1] - state.mouse.lastPos[1]
 
     state.inDemo = false
-  }, { passive: false })
+    if (Math.abs(dx) < 1.0 && Math.abs(dy) < 1.0) {
+      return;
+    }
+    state.dirty = true
+  })
 
 
   let t = AddVar('t', 'green', 0.0, 1.0, { precision: 3 });
@@ -227,18 +213,31 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
 
     if (!state.inDemo) {
       state.dirty = false
-      t.update(Math.round((state.mouse.pos[0] / canvas.width) * 100.0) / 100.0)
+      let width = canvas.width - state.paddingWidth * 2.0;
+      let ratio = (state.mouse.pos[0] - state.paddingWidth) / (width)
+      ratio = Math.max(0.0, Math.min(1.0, ratio))
+      let localT = Math.round(ratio * 100.0) / 100.0
+      t.update(localT)
     } else {
       // lerp to the next t
-      let demoT = state.demo.start * (1.0 - state.demo.t) + state.demo.end * state.demo.t
-      t.update(demoT)
-      if (state.demo.t >= 1.0) {
-        let maxValue = Math.max(state.demo.start, state.demo.end)
-        state.demo.start = state.demo.end
-        state.demo.end = Math.random();
-        state.demo.t = 0.0;
+      if (false) {
+        let demoT = state.demo.start * (1.0 - state.demo.t) + state.demo.end * state.demo.t
+        t.update(demoT)
+        if (state.demo.t >= 1.0) {
+          let maxValue = Math.max(state.demo.start, state.demo.end)
+          state.demo.start = state.demo.end
+          state.demo.end = Math.random();
+          state.demo.t = 0.0;
+        }
+        state.demo.t += Math.abs(state.demo.start - state.demo.end) * 0.01;
       }
-      state.demo.t += Math.abs(state.demo.start - state.demo.end) * 0.01;
+
+      if (true) {
+        let localT = Math.sin(state.demo.t) * Math.cos(state.demo.t * 0.1)
+        localT = Math.max(-1.0, Math.min(1.0, localT))
+        t.update(localT * 0.5 + 0.5)
+        state.demo.t += 0.01;
+      }
     }
 
     let vColor = LerpColor(
@@ -250,8 +249,8 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
     v.update(start.value * (1.0 - t.value) + end.value * t.value, vColor)
 
     ctx.reset();
-    ctx.translate(8, 0)
-    let width = canvas.width - 16;
+    ctx.translate(state.paddingWidth, 0)
+    let width = canvas.width - state.paddingWidth * 2.0;
     let gradient = ctx.createLinearGradient(0, 0, width, canvas.height)
 
     gradient.addColorStop(0.0, start.computedColor)
