@@ -309,7 +309,7 @@ export default function CreateOrbitCamera() {
     eye: [0.0, 2.0, 0.0],
     target: [0.0, 0.0, 0.0],
     up: [0.0, 1.0, 0.0],
-    minDistance: 1,
+    minDistance: 0.0001,
     maxDistance: 500,
     projection: new Float32Array(16),
     view: new Float32Array(16),
