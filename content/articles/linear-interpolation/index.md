@@ -10,6 +10,23 @@ Linear interpolation is a cornerstone algorithm in computer graphics. It provide
 
 <!-- more -->
 
+Linear Interpolation is known by a few names:
+
+- in [glsl](https://registry.khronos.org/OpenGL-Refpages/gl4/html/mix.xhtml) and [wgsl](https://www.w3.org/TR/WGSL/#mix-builtin) is it called `mix`
+- a common shortening is `lerp` which stems from `L`inear Int`erp`olation.
+
+Let's start simple with a 1D case, the equation for `lerp` is:
+
+```c
+lerp(start, end, t) = start + (1.0 - t) * end * t
+```
+
+where `start` and `end` are our starting and ending values and `t` is the ratio between them. `t` is commonly used as a percentage, but is not limited to the 0.0..1.0 range
+
+
+## Linear Interpolation (1D)
+
+Here's an example of how a 1D `lerp` function behaves - you can drag the slider around.
 <div id="Lerp1D">
 
 ```c++
@@ -21,6 +38,7 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
 <div class="center-align">
 <canvas width="1024" height="128"></canvas>
 </div>
+<p><br/><br/></p>
 </div>
 
 
