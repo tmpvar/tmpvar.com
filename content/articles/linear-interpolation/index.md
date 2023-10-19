@@ -30,10 +30,47 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
   let ctx = canvas.getContext('2d')
   const vars = {}
 
-  function AddVar(name, color, rangeLo, rangeHi, params = {}) {
+
+  function RandomFloat(rng) {
+    let oldstate = rng.state;
+    // Advance internal state
+    rng.state = oldstate * 6364136223846793005 + (rng.inc|1);
+    // Calculate output function (XSH RR), uses old state for max ILP
+    let xorshifted = ((oldstate >> 18) ^ oldstate) >> 27;
+    let rot = oldstate >> 59;
+    let v = (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
+    return Math.max(0.0, Math.min(1.0, Math.exp(v, -32)));
+  }
+
+
+  function ParseColorFloat(value) {
+    if (value.startsWith('#')) {
+      let v = parseInt(value.replace("#", ""), 16)
+
+      let r = (v >> 16) & 0xFF
+      let g = (v >> 8) & 0xFF
+      let b = (v >> 0) & 0xFF
+      return [r, g, b]
+    } else if (value.startsWith('rgb(')) {
+      value = value.replace('rgb(', '')
+      value = value.replace(')', '')
+      return value.split(',').map(v => parseFloat(v.trim()))
+    }
+}
+
+  function AddVar(name, color, rangeLo, rangeHi, params) {
+
+    params = Object.assign({
+      skipFirst: false,
+      precision: 2
+    }, params)
+
     let regexString = `(\\W*\\b${name})(\\b[^\\w]*)`
     let matcher = new RegExp(regexString)
-    let width = Math.max(rangeLo.toFixed(2).length, rangeHi.toFixed(2).length)
+    let width = Math.max(
+      rangeLo.toFixed(params.precision).length,
+      rangeHi.toFixed(params.precision).length
+    )
     let variable = {
       value: 0.0,
       name: name,
@@ -51,22 +88,24 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
         }
       }).filter(Boolean),
 
-      update(value) {
-        this.displayValue = value.toFixed(2).padStart(width, ' ')
+      update(value, rgbColor) {
+        let style = rgbColor ? `style="color:${rgbColor}"` : ''
+
+        this.displayValue = value.toFixed(params.precision).padStart(width, ' ')
         let className = `highlight-${this.color}`
         this.refs.forEach((ref, i) => {
           if (i == 0) {
             if (!params.skipFirst) {
               ref.el.innerHTML = ref.original.replace(
                 matcher,
-                `$1<span class="${className}"> = ${this.displayValue}</span>$2`
+                `$1<span ${style} class="${className}"> = ${this.displayValue}</span>$2`
               )
               this.computedColor = window.getComputedStyle(ref.el.querySelector('.' + className), null).getPropertyValue('color')
             }
           } else {
             ref.el.innerHTML = ref.original.replace(
               matcher,
-              `$1<span class="${className}">(${this.displayValue})</span>$2`
+              `$1<span ${style} class="${className}">(${this.displayValue})</span>$2`
             )
 
             if (params.skipFirst) {
@@ -90,6 +129,17 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
       downPos: [0, 0],
       down: false
     },
+    inDemo: true,
+    rng: {
+      state: 0xF00DB4BE,
+      inc: 0,
+    }
+  }
+
+  state.demo = {
+    start: Math.random(),
+    end: Math.random(),
+    t: 0.0,
   }
 
   const MoveMouse = (x, y) => {
@@ -124,10 +174,12 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
         return;
       }
     }
+
+    state.inDemo = false
   }, { passive: false })
 
 
-  let t = AddVar('t', 'green', 0.0, 1.0);
+  let t = AddVar('t', 'green', 0.0, 1.0, { precision: 3 });
   let v = AddVar('v', 'blue', 0.0, 1.0, {
     skipFirst: true,
   });
@@ -139,33 +191,80 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
   start.update(-10.0)
   end.update(50.0)
 
+  function Lerp(a, b, t) {
+    return a * (1.0 - t) + b * t
+  }
+
+  function LerpColor(start, end, t) {
+    let r = Lerp(start[0], end[0], t).toFixed(3)
+    let g = Lerp(start[1], end[1], t).toFixed(3)
+    let b = Lerp(start[2], end[2], t).toFixed(3)
+    return `rgb(${r}, ${g}, ${b})`
+  }
+
   function RenderFrame() {
     if (!state.dirty) {
       requestAnimationFrame(RenderFrame)
       return
     }
-    // state.dirty = false
-    t.update(Math.round((state.mouse.pos[0] / canvas.width) * 100.0) / 100.0)
-    v.update(start.value * (1.0 - t.value) + end.value * t.value)
+
+    if (!state.inDemo) {
+      state.dirty = false
+      t.update(Math.round((state.mouse.pos[0] / canvas.width) * 100.0) / 100.0)
+    } else {
+      // lerp to the next t
+      let demoT = state.demo.start * (1.0 - state.demo.t) + state.demo.end * state.demo.t
+      t.update(demoT)
+      if (state.demo.t >= 1.0) {
+        let maxValue = Math.max(state.demo.start, state.demo.end)
+        state.demo.start = state.demo.end
+        state.demo.end = Math.random();
+        state.demo.t = 0.0;
+      }
+      state.demo.t += Math.abs(state.demo.start - state.demo.end) * 0.01;
+    }
+
+    let vColor = LerpColor(
+      ParseColorFloat(start.computedColor),
+      ParseColorFloat(end.computedColor),
+      t.value
+    )
+
+    v.update(start.value * (1.0 - t.value) + end.value * t.value, vColor)
 
     ctx.reset();
-    let gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+    ctx.translate(8, 0)
+    let width = canvas.width - 16;
+    let gradient = ctx.createLinearGradient(0, 0, width, canvas.height)
+
     gradient.addColorStop(0.0, start.computedColor)
     gradient.addColorStop(1.0, end.computedColor)
     ctx.fillStyle = gradient
-    ctx.fillRect(0, 64, canvas.width, canvas.height - 96)
+    ctx.fillRect(0, 64, width, canvas.height - 96)
 
     // draw the x
     {
-      let x = canvas.width * t.value
+      let x = width * t.value
 
-      ctx.lineWidth = 3.0
-      ctx.strokeStyle = t.computedColor
+      ctx.lineWidth = 2.0
+      ctx.strokeStyle = '#fff'
+      ctx.fillStyle = '#fff'
       ctx.beginPath()
-      ctx.moveTo(x, 64)
-      ctx.lineTo(x, 96)
+      ctx.moveTo(x, 96)
+      ctx.lineTo(x, 64)
       ctx.stroke()
+      let sideLength = 8
+      let sideRadius = sideLength / 2.0;
+      ctx.moveTo(x + 1, 65)
+      ctx.lineTo(x + sideRadius, 66 - sideLength)
+      ctx.lineTo(x - sideRadius, 66 - sideLength)
+      ctx.lineTo(x - 1, 65)
 
+      ctx.moveTo(x + 1, 95)
+      ctx.lineTo(x + sideRadius, 94 + sideLength)
+      ctx.lineTo(x - sideRadius, 94 + sideLength)
+      ctx.lineTo(x - 1, 95)
+      ctx.fill()
 
       ctx.font = "18px Hack,monospace"
 
@@ -185,23 +284,26 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
         textEnd = textWidth
       }
 
-      if (textEnd >= canvas.width) {
-        textEnd = canvas.width
+      if (textEnd >= width) {
+        textEnd = width
         textStart = textEnd - textWidth
       }
+
+      textStart = Math.floor(textStart)
+      textEnd = Math.floor(textEnd)
 
       ctx.fillStyle = t.computedColor
       ctx.fillText(tText, textStart, 20)
 
-      ctx.fillStyle = v.computedColor
+      ctx.fillStyle = vColor
       ctx.fillText(vText, textStart, 48)
 
       ctx.fillStyle = start.computedColor;
-      ctx.fillText(`start(${start.displayValue})`, 0, 96 + 14 + 8)
+      ctx.fillText(`start(${start.displayValue})`, 0, 96 + 14 + 12)
 
       let endText = `end(${end.displayValue})`
       ctx.fillStyle = end.computedColor;
-      ctx.fillText(endText, canvas.width - ctx.measureText(endText).width, 96 + 14 + 8)
+      ctx.fillText(endText, width - ctx.measureText(endText).width, 96 + 14 + 12)
     }
     requestAnimationFrame(RenderFrame)
   }
