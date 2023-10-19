@@ -12,7 +12,7 @@ Linear interpolation is a cornerstone algorithm in computer graphics. It provide
 
 Linear Interpolation is known by a few names:
 
-- in [glsl](https://registry.khronos.org/OpenGL-Refpages/gl4/html/mix.xhtml) and [wgsl](https://www.w3.org/TR/WGSL/#mix-builtin) is it called `mix`
+- [glsl](https://registry.khronos.org/OpenGL-Refpages/gl4/html/mix.xhtml) and [wgsl](https://www.w3.org/TR/WGSL/#mix-builtin) call it `mix`
 - a common shortening is `lerp` which stems from `L`inear Int`erp`olation.
 
 Let's start simple with a 1D case, the equation for `lerp` is:
@@ -260,7 +260,7 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
 
     // draw the x
     {
-      let x = width * t.value
+      let x = Math.floor(width * t.value)
 
       ctx.lineWidth = 2.0
       ctx.strokeStyle = '#fff'
