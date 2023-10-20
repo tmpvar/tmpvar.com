@@ -43,7 +43,7 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
 
 ## Bilinear Interpolation (2D)
 
-Biliear interpolation can be computed by performing three 1D interpolations over:
+Bilinear interpolation can be computed by performing three 1D interpolations over:
 
 - the bottom corners
 - the top corners
@@ -69,6 +69,16 @@ f32 Lerp2D(f32 c00, f32 c10, f32 c01, f32 c11, f32 tx, f32 ty) {
 
 ## Trilinear Interpolation (3D)
 
+Trilinear interpolation works on the values located at the corners of a cube. We can break the problem down again into multiple 1D interpolations:
+
+- front face top edge
+- front face bottom edge
+- back face top edge
+- back face bottom edge
+- front-back top
+- front-back bottom
+- bottom top
+
 ```c++
 f32 Lerp3D(
   f32 c000, f32 c100, f32 c010, f32 c110,
@@ -76,14 +86,17 @@ f32 Lerp3D(
   f32 tx, f32 ty, f32 tz
 ) {
 
+  // front face
   f32 c00 = c000 * (1.0 - tx) + c100 * tx; // Lerp1D(c000, c100, tx)
   f32 c01 = c010 * (1.0 - tx) + c110 * tx; // Lerp1D(c100, c110, tx)
+
+  // back face
   f32 c10 = c001 * (1.0 - tx) + c101 * tx; // Lerp1D(c001, c101, tx)
   f32 c11 = c011 * (1.0 - tx) + c111 * tx; // Lerp1D(c011, c111, tx)
 
-  f32 c0 = c00 * (1.0 - ty) + c10 * ty;    // Lerp1D(c00, c01, tx)
-  f32 c1 = c01 * (1.0 - ty) + c11 * ty;    // Lerp1D(c00, c01, tx)
+  f32 c0 = c00 * (1.0 - ty) + c10 * ty;    // Lerp1D(c00, c01, ty)
+  f32 c1 = c01 * (1.0 - ty) + c11 * ty;    // Lerp1D(c00, c01, ty)
 
-  return c0 * (1.0 - z) + c1 * tz;         // Lerp1D(c0, c1, tx)
+  return c0 * (1.0 - z) + c1 * tz;         // Lerp1D(c0, c1, tz)
 }
 ```

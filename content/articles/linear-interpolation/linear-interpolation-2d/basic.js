@@ -212,16 +212,12 @@ function RenderFrame() {
     ctx.arc(cx, cy, radius, 0, Math.PI * 2.0)
     ctx.stroke()
 
-
     ctx.strokeStyle = '#fff'
     ctx.moveTo(cx, cy)
     ctx.lineTo(padding[0] + width, padding[1] + width * 0.5)
     ctx.lineTo(padding[0] + width + 20, padding[1] + width * 0.5)
     ctx.stroke()
-
-
     ctx.restore()
-
 
     let c = LerpColorBilinear(
       colorFloats.c00,
@@ -232,22 +228,8 @@ function RenderFrame() {
       values.ty
     )
 
-
     let vText = `v(${values.v.toFixed(2)})`
-    let vTextWidth = ctx.measureText(vText).width
     let tText = `t(${values.tx.toFixed(2)}, ${values.ty.toFixed(2)})`
-    let tTextWidth = ctx.measureText(tText).width
-
-    // let boxWidth = Math.max(vTextWidth, tTextWidth)
-    // let boxHalfWidth = Math.floor(boxWidth / 2)
-    // let boxHeight = 50
-    // let boxTop = cy - (20 + boxHeight)
-    // let boxBottom = boxTop + boxHeight
-    // ctx.fillStyle = "#010101"
-    // ctx.strokeStyle = "#DDD"
-    // ctx.lineWidth = 1.0
-    // ctx.fillRect(cx - boxHalfWidth, boxTop, boxWidth, boxHeight)
-    // ctx.strokeRect(cx - boxHalfWidth, boxTop, boxWidth, boxHeight)
 
     ctx.fillStyle = `rgb(${c[0]}, ${c[1]}, ${c[2]})`
     ctx.fillText(
@@ -262,12 +244,7 @@ function RenderFrame() {
       padding[0] + width + 30,
       padding[1] + width * 0.5 - 10
     )
-    // ctx.fillText(tText, Math.floor(cx - tTextWidth * 0.5), boxBottom - 10)
   }
-
-
-
-
   requestAnimationFrame(RenderFrame)
 }
 
