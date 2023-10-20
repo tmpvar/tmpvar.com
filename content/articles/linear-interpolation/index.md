@@ -25,7 +25,7 @@ where `start` and `end` are our starting and ending values and `t` is the ratio 
 
 
 ## Linear Interpolation (1D)
-<div class="interactive-demo" id="Lerp1D">
+<div id="LinearInterpolation1D-content">
 
 Here's an example of how a 1D `lerp` function behaves - you can drag the slider around.
 
@@ -35,26 +35,39 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
   return v;
 }
 ```
-<div class="center-align">
-<canvas width="1024" height="128"></canvas>
-</div>
-</div>
 
-
+  <div class="center-align">
+    <canvas width="1024" height="128"></canvas>
+  </div>
+</div>
 <script type="module" src="./linear-interpolation-1d.js"></script>
 
 ## Bilinear Interpolation (2D)
 
+<div id="LinearInterpolation2D-content">
+
 ```c++
-f32 Lerp2D(f32 c00, f32 c01, f32 c10, f32 c11, f32 tx, f32 ty) {
+f32 Lerp2D(
+  f32 c00,
+  f32 c10,
+  f32 c01,
+  f32 c11,
+  f32 tx,
+  f32 ty
+) {
   // interpolate on the X axis
-  f32 x0 = c00 * (1.0 - tx) + c01 * tx; // Lerp1D(c00, c01, tx);
-  f32 x1 = c10 * (1.0 - tx) + c11 * tx; // Lerp1D(c10, c11, tx);
+  f32 x0 = c00 * (1.0 - tx) + c10 * tx; // Lerp1D(c00, c10, tx);
+  f32 x1 = c01 * (1.0 - tx) + c11 * tx; // Lerp1D(c01, c11, tx);
 
   // interpolate on the Y axis
   return = x0 * (1.0 - ty) + x1 * ty;    // Lerp1D(x0, x1, ty);
 }
 ```
+  <div class="center-align">
+    <canvas width="512" height="512"></canvas>
+  </div>
+</div>
+<script type="module" src="./linear-interpolation-2d/basic.js"></script>
 
 ## Trilinear Interpolation (3D)
 

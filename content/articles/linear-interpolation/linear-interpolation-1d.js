@@ -1,4 +1,4 @@
-let rootEl = document.getElementById('Lerp1D')
+let rootEl = document.getElementById('LinearInterpolation1D-content')
 let canvas = rootEl.querySelector('canvas')
 let ctx = canvas.getContext('2d')
 const vars = {}
@@ -267,4 +267,4 @@ function RenderFrame() {
   requestAnimationFrame(RenderFrame)
 }
 
-RenderFrame()
+requestAnimationFrame(RenderFrame)

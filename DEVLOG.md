@@ -26,11 +26,6 @@
 - let controls live next to the canvas so you dont have to scroll up and down
 - only show side controls when the window is wide enough to handle them.
 - radiance-cascades/3d: render an analytic primitive
-
-## Pending
-- isosurface-extraction/sphere-march-cube: implement the approach from
-                                           'Ray Tracing of Signed Distance Function Grids'
-
 - radiance-cascades/3d: add scene specific params and process them
 - radiance-cascades/3d: add raymarching approach: Brute Force World Space
 - radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
@@ -39,6 +34,16 @@
 - radiance-cascades/3d: collect depth buffer and mipmap it into a
                         red/green (min/max) f32 texture
 - radiance-cascades/3d: trace screen space rays through hiz texture
+
+## Pending
+- linear-interpolation: add basic 2D interactive demo
+- linear-interpolation: add demo for line searching
+- linear-interpolation: add basic 3D interactive demo
+
+- isosurface-extraction/sphere-march-cube: implement the approach from
+                                           'Ray Tracing of Signed Distance Function Grids'
+
+
 
 ## 2023-10-17
 - isosurface-extraction/sphere-march-cube: add an approach selector
