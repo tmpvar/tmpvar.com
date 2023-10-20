@@ -47,19 +47,6 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
   let ctx = canvas.getContext('2d')
   const vars = {}
 
-
-  function RandomFloat(rng) {
-    let oldstate = rng.state;
-    // Advance internal state
-    rng.state = oldstate * 6364136223846793005 + (rng.inc|1);
-    // Calculate output function (XSH RR), uses old state for max ILP
-    let xorshifted = ((oldstate >> 18) ^ oldstate) >> 27;
-    let rot = oldstate >> 59;
-    let v = (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
-    return Math.max(0.0, Math.min(1.0, Math.exp(v, -32)));
-  }
-
-
   function ParseColorFloat(value) {
     if (value.startsWith('#')) {
       let v = parseInt(value.replace("#", ""), 16)
