@@ -23,73 +23,15 @@ function Lerp(a, b, t) {
 }
 
 function LerpColor(start, end, t) {
-  let r = Lerp(start[0], end[0], t).toFixed(3)
-  let g = Lerp(start[1], end[1], t).toFixed(3)
-  let b = Lerp(start[2], end[2], t).toFixed(3)
-  return `rgb(${r}, ${g}, ${b})`
+  let r = Lerp(start[0], end[0], t)
+  let g = Lerp(start[1], end[1], t)
+  let b = Lerp(start[2], end[2], t)
+  return [r, g, b]
 }
-
-function AddVar(name, color, rangeLo, rangeHi, params) {
-  params = Object.assign({
-    skipFirst: false,
-    precision: 2
-  }, params || {})
-
-  let regexString = `^(\\W*\\b${name})(\\b[^\\w]*)`
-  let matcher = new RegExp(regexString)
-  let width = Math.max(
-    rangeLo.toFixed(params.precision).length,
-    rangeHi.toFixed(params.precision).length
-  )
-  let variable = {
-    value: 0.0,
-    name: name,
-    color: color,
-    computedColor: '',
-    refs: Array.from(rootEl.querySelectorAll('span')).map(el => {
-      let original = el.innerText
-      if (original.match(matcher) == null) {
-        return false
-      }
-
-      return {
-        el,
-        original,
-      }
-    }).filter(Boolean),
-
-    update(value, rgbColor) {
-      let style = rgbColor ? `style="color:${rgbColor}"` : ''
-
-      this.displayValue = value.toFixed(params.precision).padStart(width, ' ')
-      let className = `highlight-${this.color}`
-      this.refs.forEach((ref, i) => {
-        if (i == 0) {
-          if (!params.skipFirst) {
-            ref.el.innerHTML = ref.original.replace(
-              matcher,
-              `$1<span ${style} class="${className}"> = ${this.displayValue}</span>$2`
-            )
-            this.computedColor = window.getComputedStyle(ref.el.querySelector('.' + className), null).getPropertyValue('color')
-          }
-        } else {
-          ref.el.innerHTML = ref.original.replace(
-            matcher,
-            `$1<span ${style} class="${className}">(${this.displayValue})</span>$2`
-          )
-
-          if (params.skipFirst) {
-            this.computedColor = window.getComputedStyle(ref.el.querySelector('.' + className), null).getPropertyValue('color')
-          }
-        }
-      })
-
-      this.value = value;
-    },
-  }
-
-  vars[name] = variable
-  return variable
+function LerpColorBilinear(c00, c10, c01, c11, tx, ty) {
+  let x1 = LerpColor(c00, c10, tx)
+  let x2 = LerpColor(c01, c11, tx)
+  return LerpColor(x1, x2, ty)
 }
 
 const state = {
@@ -134,23 +76,69 @@ canvas.addEventListener("mousemove", e => {
   state.dirty = true
 })
 
+const values = {
+  c00: 0.0,
+  c10: 1.0,
+  c01: 2.0,
+  c11: 3.0,
 
-// let t = AddVar('t', 'green', 0.0, 1.0, { precision: 3 });
-// let v = AddVar('v', 'blue', 0.0, 1.0, {
-//   skipFirst: true,
-// });
-let c00 = AddVar('c00', 'pink', 0.0, 1.0);
-let c10 = AddVar('c10', 'salmon', 0.0, 1.0);
-let c01 = AddVar('c01', 'light-blue', 0.0, 1.0);
-let c11 = AddVar('c11', 'light-maroon', 0.0, 1.0);
+  tx: 0.0,
+  ty: 0.0,
+  v: 0.0,
+}
 
-state.mouse.pos[0] = 100.0;
+const colors = {
+  c00: '#666666',
+  c10: '#FF6666',
+  c01: '#66FF66',
+  c11: '#FFFF66',
+}
 
-c00.update(0.0)
-c10.update(1.0)
-c01.update(2.0)
-c11.update(3.0)
+const colorFloats = {}
+for (let [key, value] of Object.entries(colors)) {
+  colorFloats[key] = ParseColorFloat(value)
+}
+let bitmap = null
+let padding = [Math.floor(1024 / 3), 128]
+let width = 256
+{
+  let id = new ImageData(width, width)
+  for (let y = 0; y < width; y++) {
+    let ty = 1.0 - y / width;
+    let yoff = y * width * 4
+    for (let x = 0; x < width; x++) {
+      let tx = x / width
 
+      let c = LerpColorBilinear(
+        colorFloats.c00,
+        colorFloats.c10,
+        colorFloats.c01,
+        colorFloats.c11,
+        tx,
+        ty
+      )
+      id.data[yoff + x * 4 + 0] = c[0]
+      id.data[yoff + x * 4 + 1] = c[1]
+      id.data[yoff + x * 4 + 2] = c[2]
+      id.data[yoff + x * 4 + 3] = 255
+    }
+  }
+
+  bitmap = await createImageBitmap(id)
+}
+
+function Clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v))
+}
+
+function Lerp2D(c00, c10, c01, c11, tx, ty) {
+  // interpolate on the X axis
+  let x0 = c00 * (1.0 - tx) + c10 * tx; // Lerp1D(c00, c10, tx);
+  let x1 = c01 * (1.0 - tx) + c11 * tx; // Lerp1D(c01, c11, tx);
+
+  // interpolate on the Y axis
+  return x0 * (1.0 - ty) + x1 * ty;    // Lerp1D(x0, x1, ty);
+}
 
 function RenderFrame() {
   if (!state.dirty) {
@@ -161,165 +149,125 @@ function RenderFrame() {
   state.dirty = false
 
   ctx.reset()
+  ctx.drawImage(bitmap, padding[0], padding[1])
 
-  let width = canvas.width - state.paddingWidth * 2.0;
+  // update tx
+  {
+    let ratio = (state.mouse.pos[0] - padding[0]) / (width)
+    ratio = Math.max(0.0, Math.min(1.0, ratio))
+    let localT = Math.round(ratio * 100.0) / 100.0
+    values.tx = localT
+  }
 
-  // TODO: build a bitmap with this gradient so it can match exactly instead
-  //       of having some weird stuff going on
+  // update ty
+  {
+    let ratio = (state.mouse.pos[1] - padding[1]) / (width)
+    ratio = Math.max(0.0, Math.min(1.0, ratio))
+    let localT = 1.0 - Math.round(ratio * 100.0) / 100.0
+    values.ty = localT
+  }
 
-  let gradientx = ctx.createLinearGradient(128, 0, 256 + 128, 0)
-  gradientx.addColorStop(0.0, '#36c5f4')
-  gradientx.addColorStop(1.0, '#fa6e79')
-
-  let gradienty = ctx.createLinearGradient(0, 128, 0, 256 + 128)
-  gradienty.addColorStop(0.0, '#3388de')
-  gradienty.addColorStop(1.0, '#cc99ff')
-
-
-  ctx.save()
-  ctx.fillStyle = '#cc99ff'
-  ctx.fillRect(128, 128, 256, 256)
-  ctx.globalAlpha = 0.5;
-  ctx.globalCompositeOperation = 'multiply'
-  ctx.fillStyle = gradientx
-  ctx.fillRect(128, 128, 256, 256)
-  ctx.fillStyle = gradienty
-  ctx.fillRect(128, 128, 256, 256)
-  ctx.restore()
+  values.v = Lerp2D(
+    values.c00,
+    values.c10,
+    values.c01,
+    values.c11,
+    values.tx,
+    values.ty
+  )
 
   ctx.font = "16px Hack, monospace"
-
-  ctx.fillStyle = c00.computedColor;
-  let c00Text = `c00 = ${c00.displayValue}`
+  ctx.fillStyle = colors.c00;
+  let c00Text = `c00 = ${values.c00.toFixed(2)}`
   let c00TextWidth = ctx.measureText(c00Text).width
-  ctx.fillText(c00Text, 128 - c00TextWidth * 0.5, 128 + 256 + 30)
+  ctx.fillText(c00Text, padding[0] - c00TextWidth * 0.5, padding[1] + width + 30)
 
-  ctx.fillStyle = c10.computedColor;
-  let c10Text = `c10 = ${c10.displayValue}`
+  ctx.fillStyle = colors.c10;
+  let c10Text = `c10 = ${values.c10.toFixed(2)}`
   let c10TextWidth = ctx.measureText(c10Text).width
-  ctx.fillText(c10Text, 128 - c10TextWidth * 0.5 + 256, 128 + 256 + 30)
+  ctx.fillText(c10Text, padding[0] - c10TextWidth * 0.5 + width, padding[1] + width + 30)
 
-  ctx.fillStyle = c01.computedColor;
-  let c01Text = `c01 = ${c01.displayValue}`
+  ctx.fillStyle = colors.c01;
+  let c01Text = `c01 = ${values.c01.toFixed(2)}`
   let c01TextWidth = ctx.measureText(c01Text).width
-  ctx.fillText(c01Text, 128 - c01TextWidth * 0.5, 128 - 20)
+  ctx.fillText(c01Text, padding[0] - c01TextWidth * 0.5, padding[1] - 20)
 
-  ctx.fillStyle = c11.computedColor;
-  let c11Text = `c11 = ${c11.displayValue}`
+  ctx.fillStyle = colors.c11;
+  let c11Text = `c11 = ${values.c11.toFixed(2)}`
   let c11TextWidth = ctx.measureText(c11Text).width
-  ctx.fillText(c11Text, 128 - c11TextWidth * 0.5 + 256, 128 - 20)
+  ctx.fillText(c11Text, padding[0] - c11TextWidth * 0.5 + width, padding[1] - 20)
+
+
+  let cx = Clamp(state.mouse.pos[0], padding[0], padding[0] + width)
+  let cy = Clamp(state.mouse.pos[1], padding[1], padding[1] + width)
+
+  {
+    ctx.save()
+    let radius = 5
+    ctx.strokeStyle = "white"
+    ctx.lineWidth = 2
+    ctx.beginPath()
+
+    ctx.moveTo(cx + radius, cy)
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2.0)
+    ctx.stroke()
+
+
+    ctx.strokeStyle = '#fff'
+    ctx.moveTo(cx, cy)
+    ctx.lineTo(padding[0] + width, padding[1] + width * 0.5)
+    ctx.lineTo(padding[0] + width + 20, padding[1] + width * 0.5)
+    ctx.stroke()
+
+
+    ctx.restore()
+
+
+    let c = LerpColorBilinear(
+      colorFloats.c00,
+      colorFloats.c10,
+      colorFloats.c01,
+      colorFloats.c11,
+      values.tx,
+      values.ty
+    )
+
+
+    let vText = `v(${values.v.toFixed(2)})`
+    let vTextWidth = ctx.measureText(vText).width
+    let tText = `t(${values.tx.toFixed(2)}, ${values.ty.toFixed(2)})`
+    let tTextWidth = ctx.measureText(tText).width
+
+    // let boxWidth = Math.max(vTextWidth, tTextWidth)
+    // let boxHalfWidth = Math.floor(boxWidth / 2)
+    // let boxHeight = 50
+    // let boxTop = cy - (20 + boxHeight)
+    // let boxBottom = boxTop + boxHeight
+    // ctx.fillStyle = "#010101"
+    // ctx.strokeStyle = "#DDD"
+    // ctx.lineWidth = 1.0
+    // ctx.fillRect(cx - boxHalfWidth, boxTop, boxWidth, boxHeight)
+    // ctx.strokeRect(cx - boxHalfWidth, boxTop, boxWidth, boxHeight)
+
+    ctx.fillStyle = `rgb(${c[0]}, ${c[1]}, ${c[2]})`
+    ctx.fillText(
+      vText,
+      padding[0] + width + 30,
+      padding[1] + width * 0.5 + 10
+    )
+
+    ctx.fillStyle = '#fff'
+    ctx.fillText(
+      tText,
+      padding[0] + width + 30,
+      padding[1] + width * 0.5 - 10
+    )
+    // ctx.fillText(tText, Math.floor(cx - tTextWidth * 0.5), boxBottom - 10)
+  }
 
 
 
-  // if (!state.inDemo) {
-  //   let width = canvas.width - state.paddingWidth * 2.0;
-  //   let ratio = (state.mouse.pos[0] - state.paddingWidth) / (width)
-  //   ratio = Math.max(0.0, Math.min(1.0, ratio))
-  //   let localT = Math.round(ratio * 100.0) / 100.0
-  //   t.update(localT)
-  // } else {
-  //   // lerp to the next t
-  //   if (false) {
-  //     let demoT = state.demo.start * (1.0 - state.demo.t) + state.demo.end * state.demo.t
-  //     t.update(demoT)
-  //     if (state.demo.t >= 1.0) {
-  //       let maxValue = Math.max(state.demo.start, state.demo.end)
-  //       state.demo.start = state.demo.end
-  //       state.demo.end = Math.random();
-  //       state.demo.t = 0.0;
-  //     }
-  //     state.demo.t += Math.abs(state.demo.start - state.demo.end) * 0.01;
-  //   }
 
-  //   if (true) {
-  //     let localT = Math.sin(state.demo.t) * Math.cos(state.demo.t * 0.1)
-  //     localT = Math.max(-1.0, Math.min(1.0, localT))
-  //     t.update(localT * 0.5 + 0.5)
-  //     state.demo.t += 0.01;
-  //   }
-  // }
-
-  // let vColor = LerpColor(
-  //   ParseColorFloat(start.computedColor),
-  //   ParseColorFloat(end.computedColor),
-  //   t.value
-  // )
-
-  // v.update(start.value * (1.0 - t.value) + end.value * t.value, vColor)
-
-  // ctx.reset();
-  // ctx.translate(state.paddingWidth, 0)
-  // let width = canvas.width - state.paddingWidth * 2.0;
-  // let gradient = ctx.createLinearGradient(0, 0, width, canvas.height)
-
-  // gradient.addColorStop(0.0, start.computedColor)
-  // gradient.addColorStop(1.0, end.computedColor)
-  // ctx.fillStyle = gradient
-  // ctx.fillRect(0, 64, width, canvas.height - 96)
-
-  // // draw the x
-  // {
-  //   let x = Math.floor(width * t.value)
-
-  //   ctx.lineWidth = 2.0
-  //   ctx.strokeStyle = '#fff'
-  //   ctx.fillStyle = '#fff'
-  //   ctx.beginPath()
-  //   ctx.moveTo(x, 96)
-  //   ctx.lineTo(x, 64)
-  //   ctx.stroke()
-  //   let sideLength = 8
-  //   let sideRadius = sideLength / 2.0;
-  //   ctx.moveTo(x + 1, 65)
-  //   ctx.lineTo(x + sideRadius, 66 - sideLength)
-  //   ctx.lineTo(x - sideRadius, 66 - sideLength)
-  //   ctx.lineTo(x - 1, 65)
-
-  //   ctx.moveTo(x + 1, 95)
-  //   ctx.lineTo(x + sideRadius, 94 + sideLength)
-  //   ctx.lineTo(x - sideRadius, 94 + sideLength)
-  //   ctx.lineTo(x - 1, 95)
-  //   ctx.fill()
-
-  //   ctx.font = "18px Hack,monospace"
-
-  //   let tText = `t(${t.displayValue})`
-  //   let vText = `v(${v.displayValue})`
-
-  //   let textWidth = Math.max(
-  //     ctx.measureText(tText).width,
-  //     ctx.measureText(vText).width
-  //   )
-
-  //   let textStart = x - textWidth / 2.0
-  //   let textEnd = x + textWidth / 2.0
-
-  //   if (textStart < 0.0) {
-  //     textStart = 0.0
-  //     textEnd = textWidth
-  //   }
-
-  //   if (textEnd >= width) {
-  //     textEnd = width
-  //     textStart = textEnd - textWidth
-  //   }
-
-  //   textStart = Math.floor(textStart)
-  //   textEnd = Math.floor(textEnd)
-
-  //   ctx.fillStyle = t.computedColor
-  //   ctx.fillText(tText, textStart, 20)
-
-  //   ctx.fillStyle = vColor
-  //   ctx.fillText(vText, textStart, 48)
-
-  //   ctx.fillStyle = start.computedColor;
-  //   ctx.fillText(`start(${start.displayValue})`, 0, 96 + 14 + 12)
-
-  //   let endText = `end(${end.displayValue})`
-  //   ctx.fillStyle = end.computedColor;
-  //   ctx.fillText(endText, width - ctx.measureText(endText).width, 96 + 14 + 12)
-  // }
   requestAnimationFrame(RenderFrame)
 }
 
