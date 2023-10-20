@@ -18,6 +18,40 @@ function ParseColorFloat(value) {
   }
 }
 
+function WrapCodeLines() {
+  const el = rootEl.querySelector('pre code')
+  window.el = el;
+  // the spans have line breaks inside of them
+  let node = el.firstElementChild
+  let line = document.createElement('div')
+  line.className = 'line';
+  el.prepend(line)
+  while (node) {
+    let currentNode = node;
+    node = node.nextSibling
+    if (currentNode.nodeType == document.ELEMENT_NODE) {
+      let content = currentNode.innerHTML.replaceAll('\r', '')
+      if (content[content.length - 1] == '\n') {
+        currentNode.innerHTML = content.substring(0, content.length - 1)
+        line.append(currentNode)
+        let lastLine = line
+        line = document.createElement('div')
+        line.className = 'line'
+        lastLine.after(line)
+      } else {
+        line.append(currentNode);
+      }
+    } else {
+      line.append(currentNode);
+    }
+  }
+  if (!line.childNodes.length) {
+    line.remove()
+  }
+}
+
+WrapCodeLines()
+
 function AddVar(name, color, rangeLo, rangeHi, params) {
 
   params = Object.assign({
@@ -25,52 +59,111 @@ function AddVar(name, color, rangeLo, rangeHi, params) {
     precision: 2
   }, params || {})
 
-  let regexString = `(\\W*\\b${name})(\\b[^\\w]*)`
+  let regexString = `(.*\\b\\s*)(${name})(\\s*\\b[^\\w]*)`
   let matcher = new RegExp(regexString)
   let width = Math.max(
     rangeLo.toFixed(params.precision).length,
     rangeHi.toFixed(params.precision).length
   )
+
+  let refs = Array.from(rootEl.querySelectorAll('span')).map(el => {
+    let original = el.innerText
+    let matches = original.match(matcher)
+    if (matches == null) {
+      return false
+    }
+    let a = Array.from(matches)
+    a.shift()
+
+    el.parentElement.classList.add('inflated')
+    let output = document.createElement('div')
+    output.classList.add('variable-output')
+    el.parentElement.append(output)
+
+    let parentElement = el.parentElement
+    let prevElement = el.previousElementSibling;
+    el.remove()
+
+    let source = null;
+    let clones = a.filter(v => v !== '').map(v => {
+      let clone = el.cloneNode()
+      clone.innerText = v
+      if (v === name) {
+        source = clone
+      }
+      return clone
+    })
+
+    if (prevElement) {
+      prevElement.after.apply(prevElement, clones)
+    } else {
+      parentElement.prepend.apply(parentElement, clones)
+    }
+
+    return {
+      el: source,
+      output,
+      original,
+    }
+  }).filter(Boolean)
+
   let variable = {
     value: 0.0,
     name: name,
     color: color,
     computedColor: '',
-    refs: Array.from(rootEl.querySelectorAll('span')).map(el => {
-      let original = el.innerText
-      if (original.match(matcher) == null) {
-        return false
-      }
-
-      return {
-        el,
-        original,
-      }
-    }).filter(Boolean),
+    refs: refs,
 
     update(value, rgbColor) {
       let style = rgbColor ? `style="color:${rgbColor}"` : ''
 
+      // move this thing into the correct position
+      {
+        refs.forEach((ref, i) => {
+
+          // if (i === 0 && name == 'v') {
+          console.log(name, 'offset', ref.el.offsetLeft, ref.el.offsetTop)
+          ref.output.style.left = ref.el.offsetLeft + 'px';
+          ref.output.style.top = '0px';//(ref.el.offsetTop - 20) + 'px';
+          // ref.output.style.width = ref.el.offsetWidth + 'px';
+          // ref.output.style.backgroundColor = 'red'
+          // }
+        })
+      }
+
+
       this.displayValue = value.toFixed(params.precision).padStart(width, ' ')
-      let className = `highlight-${this.color}`
+
       this.refs.forEach((ref, i) => {
         if (i == 0) {
+          // ref.el.classList.add(className)
+          ref.el.style.color = this.color;
+          // ref.el.innerHTML = ref.original.replace(
+            //   matcher,
+            //   `$1<span ${style} class="${className}"> = ${this.displayValue}</span>$2`
+            // )
+            // this.computedColor = window.getComputedStyle(ref.el.querySelector('.' + className), null).getPropertyValue('color')
+          this.computedColor = window.getComputedStyle(ref.el, null).getPropertyValue('color')
           if (!params.skipFirst) {
-            ref.el.innerHTML = ref.original.replace(
-              matcher,
-              `$1<span ${style} class="${className}"> = ${this.displayValue}</span>$2`
-            )
-            this.computedColor = window.getComputedStyle(ref.el.querySelector('.' + className), null).getPropertyValue('color')
+            ref.output.style.color = this.color;
+            ref.output.innerText = `${this.displayValue}`
+            ref.output.style.width = (`${this.displayValue}`.length * 12.0) + 'px'
+          } else {
+            ref.output.remove()
           }
         } else {
-          ref.el.innerHTML = ref.original.replace(
-            matcher,
-            `$1<span ${style} class="${className}">(${this.displayValue})</span>$2`
-          )
+          ref.el.style.color = this.color;
+          // ref.el.classList.add(className)ref.el.style.color = this.color;
+          // ref.el.innerHTML = ref.original.replace(
+          //   matcher,
+          //   `$1<span ${style} class="${className}">(${this.displayValue})</span>$2`
+          // )
 
-          if (params.skipFirst) {
-            this.computedColor = window.getComputedStyle(ref.el.querySelector('.' + className), null).getPropertyValue('color')
-          }
+          // this.computedColor = window.getComputedStyle(ref.el.querySelector('.' + className), null).getPropertyValue('color')
+          this.computedColor = window.getComputedStyle(ref.el, null).getPropertyValue('color')
+          ref.output.style.color = this.color;
+          ref.output.innerText = `${this.displayValue}`
+          ref.output.style.width = (`${this.displayValue}`.length * 12.0) + 'px'
         }
       })
 
@@ -90,7 +183,7 @@ const state = {
     lastPos: [0, 0],
     down: false
   },
-  inDemo: true,
+  inDemo: false,
   paddingWidth: 8,
 }
 
@@ -125,12 +218,12 @@ canvas.addEventListener("mousemove", e => {
 })
 
 
-let t = AddVar('t', 'green', 0.0, 1.0, { precision: 3 });
-let v = AddVar('v', 'blue', 0.0, 1.0, {
+let t = AddVar('t', '#5ab552', 0.0, 1.0, { precision: 3 });
+let v = AddVar('v', '#3388de', 0.0, 1.0, {
   skipFirst: true,
 });
-let start = AddVar('start', 'pink', 0.0, 1.0);
-let end = AddVar('end', 'salmon', 0.0, 1.0);
+let start = AddVar('start', '#cc99ff', 0.0, 1.0);
+let end = AddVar('end', '#fa6e79', 0.0, 1.0);
 
 state.mouse.pos[0] = 100.0;
 

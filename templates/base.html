@@ -245,7 +245,6 @@
     .highlight-salmon {
       color: #fa6e79;
     }
-
     .highlight-light-maroon {
       color: #c878af;
     }
@@ -328,6 +327,25 @@
     h2 {
       margin-top: 2em;
       margin-bottom: 0.5em;
+    }
+
+    pre code div.line {
+      position: relative;
+    }
+    pre code div.line.inflated {
+      padding-top: 1.5em;
+    }
+
+    pre code div.line .variable-output {
+      position:absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 2px;
+      border: 1px solid #444;
+      padding: 3px;
+      margin: 0px;
+      text-align: center;
+      background-color: #333;
     }
 
   </style>
