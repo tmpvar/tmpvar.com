@@ -82,6 +82,35 @@ description = "Playground for various isosurface extraction techniques"
   <script type="module" src="2d/isosurface-extraction-2d.js"></script>
 </section>
 
+### Root Finding (2D)
+
+Given a square cell with sampled values in the corners, find the zero-crossings along a line segment.
+
+<section id="root-finding-2d-content">
+  <section class="controls">
+    <div class="c00-control control">
+      (0, 0): <input type="range" min="-3.0" max="3.0" value="-3.0" step="0.01">
+      <output></output>
+    </div>
+    <div class="c10-control control">
+      (1, 0): <input type="range" min="-3.0" max="3.0" value="3.0" step="0.01">
+      <output></output>
+    </div>
+    <div class="c01-control control">
+      (0, 1): <input type="range" min="-3.0" max="3.0" value="3.0" step="0.01">
+      <output></output>
+    </div>
+    <div class="c11-control control">
+      (1, 1): <input type="range" min="-3.0" max="3.0" value="3.0" step="0.01">
+      <output></output>
+    </div>
+  </section>
+  <section class="center-align">
+    <canvas width="1024" height="1024"></canvas>
+  </section>
+  <script type="module" src="2d/root-finding-2d.js"></script>
+</section>
+
 
 ## Interpolated Isosurface Viz (3D)
 
