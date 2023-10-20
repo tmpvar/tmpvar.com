@@ -11,13 +11,13 @@
 {% if not post.extra.unlisted %}
 <section class="article-entry">
   <h3><a href="{{ post.permalink }}">{{ post.title }}</h3></a></h3>
-  {% if post.extra.enableSampleImage %}
+  <!-- {% if post.extra.enableSampleImage %}
   <section class="center-align">
     <img
       src="{{ post.permalink }}/sample-image.png"
       alt="sample image" />
   </section>
-  {% endif %}
+  {% endif %} -->
   {{ post.summary | safe }}
 </section>
 {% endif %}
