@@ -18,70 +18,6 @@ function ParseColorFloat(value) {
   }
 }
 
-function AddVar(name, color, rangeLo, rangeHi, params) {
-
-  params = Object.assign({
-    skipFirst: false,
-    precision: 2
-  }, params || {})
-
-  let regexString = `(\\W*\\b${name})(\\b[^\\w]*)`
-  let matcher = new RegExp(regexString)
-  let width = Math.max(
-    rangeLo.toFixed(params.precision).length,
-    rangeHi.toFixed(params.precision).length
-  )
-  let variable = {
-    value: 0.0,
-    name: name,
-    color: color,
-    computedColor: '',
-    refs: Array.from(rootEl.querySelectorAll('span')).map(el => {
-      let original = el.innerText
-      if (original.match(matcher) == null) {
-        return false
-      }
-
-      return {
-        el,
-        original,
-      }
-    }).filter(Boolean),
-
-    update(value, rgbColor) {
-      let style = rgbColor ? `style="color:${rgbColor}"` : ''
-
-      this.displayValue = value.toFixed(params.precision).padStart(width, ' ')
-      let className = `highlight-${this.color}`
-      this.refs.forEach((ref, i) => {
-        if (i == 0) {
-          if (!params.skipFirst) {
-            ref.el.innerHTML = ref.original.replace(
-              matcher,
-              `$1<span ${style} class="${className}"> = ${this.displayValue}</span>$2`
-            )
-            this.computedColor = window.getComputedStyle(ref.el.querySelector('.' + className), null).getPropertyValue('color')
-          }
-        } else {
-          ref.el.innerHTML = ref.original.replace(
-            matcher,
-            `$1<span ${style} class="${className}">(${this.displayValue})</span>$2`
-          )
-
-          if (params.skipFirst) {
-            this.computedColor = window.getComputedStyle(ref.el.querySelector('.' + className), null).getPropertyValue('color')
-          }
-        }
-      })
-
-      this.value = value;
-    },
-  }
-
-  vars[name] = variable
-  return variable
-}
-
 const state = {
   dirty: true,
   mouse: {
@@ -124,18 +60,20 @@ canvas.addEventListener("mousemove", e => {
   state.dirty = true
 })
 
-
-let t = AddVar('t', 'green', 0.0, 1.0, { precision: 3 });
-let v = AddVar('v', 'blue', 0.0, 1.0, {
-  skipFirst: true,
-});
-let start = AddVar('start', 'pink', 0.0, 1.0);
-let end = AddVar('end', 'salmon', 0.0, 1.0);
-
 state.mouse.pos[0] = 100.0;
 
-start.update(-10.0)
-end.update(50.0)
+const values = {
+  start: -10.0,
+  end: 50.0,
+  t: 0.0,
+  v: 0.0,
+}
+
+const colors = {
+  start: '#666666',
+  end: '#FF6666',
+  t: '#fff',
+}
 
 function Lerp(a, b, t) {
   return a * (1.0 - t) + b * t
@@ -160,50 +98,35 @@ function RenderFrame() {
     let ratio = (state.mouse.pos[0] - state.paddingWidth) / (width)
     ratio = Math.max(0.0, Math.min(1.0, ratio))
     let localT = Math.round(ratio * 100.0) / 100.0
-    t.update(localT)
+    values.t = localT
   } else {
-    // lerp to the next t
-    if (false) {
-      let demoT = state.demo.start * (1.0 - state.demo.t) + state.demo.end * state.demo.t
-      t.update(demoT)
-      if (state.demo.t >= 1.0) {
-        let maxValue = Math.max(state.demo.start, state.demo.end)
-        state.demo.start = state.demo.end
-        state.demo.end = Math.random();
-        state.demo.t = 0.0;
-      }
-      state.demo.t += Math.abs(state.demo.start - state.demo.end) * 0.01;
-    }
-
-    if (true) {
-      let localT = Math.sin(state.demo.t) * Math.cos(state.demo.t * 0.1)
-      localT = Math.max(-1.0, Math.min(1.0, localT))
-      t.update(localT * 0.5 + 0.5)
-      state.demo.t += 0.01;
-    }
+    let localT = Math.sin(state.demo.t) * Math.cos(state.demo.t * 0.1)
+    localT = Math.max(-1.0, Math.min(1.0, localT))
+    values.t = localT * 0.5 + 0.5
+    state.demo.t += 0.01;
   }
 
   let vColor = LerpColor(
-    ParseColorFloat(start.computedColor),
-    ParseColorFloat(end.computedColor),
-    t.value
+    ParseColorFloat(colors.start),
+    ParseColorFloat(colors.end),
+    values.t
   )
 
-  v.update(start.value * (1.0 - t.value) + end.value * t.value, vColor)
+  values.v = values.start * (1.0 - values.t) + values.end * values.t
 
   ctx.reset();
   ctx.translate(state.paddingWidth, 0)
   let width = canvas.width - state.paddingWidth * 2.0;
   let gradient = ctx.createLinearGradient(0, 0, width, canvas.height)
 
-  gradient.addColorStop(0.0, start.computedColor)
-  gradient.addColorStop(1.0, end.computedColor)
+  gradient.addColorStop(0.0, colors.start)
+  gradient.addColorStop(1.0, colors.end)
   ctx.fillStyle = gradient
   ctx.fillRect(0, 64, width, canvas.height - 96)
 
   // draw the x
   {
-    let x = Math.floor(width * t.value)
+    let x = Math.floor(width * values.t)
 
     ctx.lineWidth = 2.0
     ctx.strokeStyle = '#fff'
@@ -227,8 +150,8 @@ function RenderFrame() {
 
     ctx.font = "18px Hack,monospace"
 
-    let tText = `t(${t.displayValue})`
-    let vText = `v(${v.displayValue})`
+    let tText = `t(${values.t.toFixed(3)})`
+    let vText = `v(${values.v.toFixed(3)})`
 
     let textWidth = Math.max(
       ctx.measureText(tText).width,
@@ -251,17 +174,17 @@ function RenderFrame() {
     textStart = Math.floor(textStart)
     textEnd = Math.floor(textEnd)
 
-    ctx.fillStyle = t.computedColor
+    ctx.fillStyle = colors.t
     ctx.fillText(tText, textStart, 20)
 
     ctx.fillStyle = vColor
     ctx.fillText(vText, textStart, 48)
 
-    ctx.fillStyle = start.computedColor;
-    ctx.fillText(`start(${start.displayValue})`, 0, 96 + 14 + 12)
+    ctx.fillStyle = colors.start
+    ctx.fillText(`start(${values.start})`, 0, 96 + 14 + 12)
 
-    let endText = `end(${end.displayValue})`
-    ctx.fillStyle = end.computedColor;
+    let endText = `end(${values.end})`
+    ctx.fillStyle = colors.end
     ctx.fillText(endText, width - ctx.measureText(endText).width, 96 + 14 + 12)
   }
   requestAnimationFrame(RenderFrame)

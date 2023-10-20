@@ -31,8 +31,7 @@ Here's an example of how a 1D `lerp` function behaves - you can drag the slider 
 
 ```c++
 f32 Lerp1D(f32 start, f32 end, f32 t) {
-  f32 v = start * (1.0 - t) + end * t;
-  return v;
+  return start * (1.0 - t) + end * t;
 }
 ```
 
@@ -44,27 +43,26 @@ f32 Lerp1D(f32 start, f32 end, f32 t) {
 
 ## Bilinear Interpolation (2D)
 
+Biliear interpolation can be computed by performing three 1D interpolations over:
+
+- the bottom corners
+- the top corners
+- the top and bottom
+
 <div id="LinearInterpolation2D-content">
 
 ```c++
-f32 Lerp2D(
-  f32 c00,
-  f32 c10,
-  f32 c01,
-  f32 c11,
-  f32 tx,
-  f32 ty
-) {
+f32 Lerp2D(f32 c00, f32 c10, f32 c01, f32 c11, f32 tx, f32 ty) {
   // interpolate on the X axis
   f32 x0 = c00 * (1.0 - tx) + c10 * tx; // Lerp1D(c00, c10, tx);
   f32 x1 = c01 * (1.0 - tx) + c11 * tx; // Lerp1D(c01, c11, tx);
 
   // interpolate on the Y axis
-  return = x0 * (1.0 - ty) + x1 * ty;    // Lerp1D(x0, x1, ty);
+  return x0 * (1.0 - ty) + x1 * ty;    // Lerp1D(x0, x1, ty);
 }
 ```
   <div class="center-align">
-    <canvas width="512" height="512"></canvas>
+    <canvas width="1024" height="512"></canvas>
   </div>
 </div>
 <script type="module" src="./linear-interpolation-2d/basic.js"></script>
