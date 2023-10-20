@@ -750,7 +750,7 @@ click/drag to move the light
     <div class="debugPerformance-control control">
       run continuously and collect frame timings <input type="checkbox" value="1" />
       <span class="timestamp-query-unavailable error" style="display:none">unavailabe, look in the javascript console for "timestamp-query"</span>
-      <div class="performance-output">
+      <div class="performance-output" style="margin-right: -50%">
         timings
         <code><pre></pre></code>
       </div>
