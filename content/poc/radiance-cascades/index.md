@@ -803,7 +803,7 @@ click/drag to move the light
         <output></output>
       </div>
       <div class="intervalRadius-control control">
-        interval radius (level 0): <input type="range" min="0" max="1024" value="6">
+        interval radius (level 0): <input type="range" min="0" max="256" value="6">
         <output></output>
       </div>
       <div class="intervalAccumulationDecay-control control">
