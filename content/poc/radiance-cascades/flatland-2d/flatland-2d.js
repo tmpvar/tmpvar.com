@@ -1679,8 +1679,9 @@ Example on Windows:
         return value
       })
 
-      Param('intervalRadius', 'i32', (parentEl, value) => {
-        parentEl.querySelector('output').innerHTML = `${value}`
+      Param('intervalRadius', 'f32', (parentEl, value) => {
+        value = Math.pow(value, 2.0)
+        parentEl.querySelector('output').innerHTML = `${value.toFixed(2)}`
         return value
       })
 
