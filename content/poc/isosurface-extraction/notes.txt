@@ -56,3 +56,15 @@ k0 + k1(O.x + t * D.x) + k2(O.y + t * D.y) + k3(O.x + t * D.x)(O.y + t * D.y) = 
 aka
 
 c2t^2 + c1t + c0 = 0
+
+
+
+----
+
+(s11 - s01 - (s10 - s00)) * (O.x + t * D.x) * (O.y + t * D.y) = c2t^2
+
+where
+
+c2 = -s00 + O.x * -(s10 - s00) + O.y * -(s01 - s00) +  (O.x * O.y) * -(s11 - s01 - (s10 - s00))
+c1 = D.x * -(s10 - s00) + D.y * -(s01 - s00) + (O.x * D.y + O.y * D.x) * -(s11 - s01 - (s10 - s00))
+c0 =

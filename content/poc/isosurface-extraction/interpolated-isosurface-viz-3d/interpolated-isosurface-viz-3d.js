@@ -826,12 +826,12 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       case 'manual': {
         // corners 0..8
         state.sceneParams[0] = state.params['scene-manual'].c000
-        state.sceneParams[1] = state.params['scene-manual'].c001
+        state.sceneParams[1] = state.params['scene-manual'].c100
         state.sceneParams[2] = state.params['scene-manual'].c010
-        state.sceneParams[3] = state.params['scene-manual'].c011
-        state.sceneParams[4] = state.params['scene-manual'].c100
+        state.sceneParams[3] = state.params['scene-manual'].c110
+        state.sceneParams[4] = state.params['scene-manual'].c001
         state.sceneParams[5] = state.params['scene-manual'].c101
-        state.sceneParams[6] = state.params['scene-manual'].c110
+        state.sceneParams[6] = state.params['scene-manual'].c011
         state.sceneParams[7] = state.params['scene-manual'].c111
         break;
       }
