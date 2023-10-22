@@ -138,7 +138,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
           (0, 0, 0): <input type="range" min="-2.0" max="2.0" value="2.0" step="0.01">
           <output></output>
         </div>
-        <div class="c001-control control">
+        <div class="c100-control control">
           (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="-2.0" step="0.01">
           <output></output>
         </div>
@@ -146,11 +146,11 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
           (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="-1.76" step="0.01">
           <output></output>
         </div>
-        <div class="c011-control control">
+        <div class="c110-control control">
           (1, 1, 0): <input type="range" min="-2.0" max="2.0" value="0.51" step="0.01">
           <output></output>
         </div>
-        <div class="c100-control control">
+        <div class="c001-control control">
           (0, 0, 1): <input type="range" min="-2.0" max="2.0" value="-0.97" step="0.01">
           <output></output>
         </div>
@@ -158,7 +158,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
           (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="0.7" step="0.01">
           <output></output>
         </div>
-        <div class="c110-control control">
+        <div class="c011-control control">
           (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="2.0" step="0.01">
           <output></output>
         </div>
