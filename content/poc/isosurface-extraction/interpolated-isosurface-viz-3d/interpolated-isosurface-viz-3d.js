@@ -567,7 +567,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
           let dx = rayDir.x;
           let dy = rayDir.y;
-          let dz = rayDir.z;
+          let dz = rayDir.y;
 
           let m0 = ox * oy;
           let m1 = dx * dy;
@@ -632,35 +632,33 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let eye = ubo.eye.xyz * 0.5 + 0.5;
           let rayDir = normalize(uvw - eye);
           var tInterval = RayAABB(vec3(0.0), vec3(1.0), eye, 1.0 / rayDir);
-          if (tInterval.y < 0.0) {
-            out.color = vec4(1.0, 0.0, 1.0, 1.0);
-            return out;
-          }
+          // if (tInterval.y < 0.0) {
+          //   out.color = vec4(1.0, 0.0, 1.0, 1.0);
+          //   return out;
+          // }
 
           var rayOrigin = eye;
           if (tInterval.x > 0.0) {
             rayOrigin = eye + rayDir * tInterval.x;
             tInterval.y -= tInterval.x;
-            tInterval.x = 0.000001;
-          } else {
             tInterval.x = 0.0;
           }
 
           var t = tInterval.x;
           let Constants = ComputeConstants(rayOrigin, rayDir);
 
-          let maxSteps = 10.0;
-          let kNumericEpsilon = 0.01;
+          let maxSteps = 1000.0;
+          let kNumericEpsilon = 0.001;
           var hit = false;
           var steps = 0.0;
-          while (steps < maxSteps) {
+          while (steps < maxSteps && t < tInterval.y) {
             let g =  EvalG(Constants, t);
             let gprime = EvalGPrime(Constants, t);
             let deltaT = g / gprime;
             t -= deltaT;
             steps += 1.0;
             if (abs(deltaT) <= kNumericEpsilon) {
-              out.color = vec4(ComputeNormal(eye + rayDir * t) * 0.5 + 0.5, 1.0);
+              out.color = vec4(ComputeNormal(rayOrigin + rayDir * t) * 0.5 + 0.5, 1.0);
               hit = true;
               break;
             }

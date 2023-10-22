@@ -77,7 +77,8 @@ function RootFinding2DBegin(rootEl) {
       requestAnimationFrame(RenderFrame)
       return
     }
-    // state.dirty = false
+
+    state.dirty = false
     // state.params.c00 = Math.sin(Date.now() * 0.001)
     requestAnimationFrame(RenderFrame)
 
@@ -89,10 +90,10 @@ function RootFinding2DBegin(rootEl) {
       let h = canvas.height
 
       for (let y = 0; y < h; y++) {
-        let ty = 1.0 - y/h;//Clamp((y - square.y) / square.h, 0.0, 1.0);
+        let ty = 1.0 - y/h
         let yoff = y * w * 4
         for (let x = 0; x < w; x++) {
-          let tx = x/w;//Clamp((x - square.x) / square.w, 0.0, 1.0)
+          let tx = x/w
 
           let v = Lerp2D(
             state.params.c00,
