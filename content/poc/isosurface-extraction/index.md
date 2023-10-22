@@ -174,7 +174,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
         <select>
           <option value="fixed-step-ray-march" selected>Fixed Step Raymarch</option>
           <!-- <option value="segment-marching">🚧 Segment Marching 🚧</option> -->
-          <option value="ray-tracing-signed-distance-grids">🚧 Ray Tracing Signed Distance Grids 🚧</option>
+          <option value="ray-tracing-signed-distance-grids" selected>🚧 Ray Tracing Signed Distance Grids 🚧</option>
         </select>
         <div class="shownBy-approach indent" showValue="fixed-step-ray-march">
           <div class="maxFixedSteps-control control">
