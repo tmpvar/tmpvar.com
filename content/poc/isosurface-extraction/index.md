@@ -13,7 +13,82 @@ description = "Playground for various isosurface extraction techniques"
   </section>
   <script type="module" src="2d/marching-squares.js"></script>
 
-**Note:** cases 5 (`0101`) and 10 (`1010`) are ambiguous, meaning we cannot know which which edges are connected by the corner states alone. The good news is that in 2D ths is quite simple to resolve - choose which edges are connected based on the value at the center of the cell. The center value can be either sampled, if you have a continuous function (like an SDF), or the average of the corner values will work fine.
+**Note:** cases 5 (`0101`) and 10 (`1010`) are ambiguous, meaning we cannot know which which edges are connected by the corner states alone. The good news is that in 2D this is quite simple to resolve - choose which edges are connected based on the value at the center of the cell. The center value can be found via:
+- sampling - if you have a continuous function like an SDF
+- bilinear interpolation - see: [/articles/linear-interpolation](/articles/linear-interpolation/#bilinear-interpolation-2d)
+- computed by taking the average of the corner values
+
+### Lookup Table + Basic Usage
+
+If you want to compute a continuous contour, you'll need to maintain a priority queue. An example of this can be found in [isosurface-extraction-2d.js](./2d/isosurface-extraction-2d.js) in the `CollectPolyLoops()` function. Otherwise, this will collect an unstructured array of line segments (segment soup if you will).
+
+```c
+//    corners         edges
+//
+//    0     1           0
+//     +---+          +---+
+//     |   |        3 |   | 1
+//     +---+          +---+
+//    3     2           2
+//
+
+static const i32 edgeConnectionCounts[16] = {
+  0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 0
+};
+
+// entry format: edgeStartIndex, endEndIndex, ...
+static i32 edgeConnections[16][8] = {
+  [-1, -1, -1, -1, -1, -1, -1, -1 ],
+  [ 0,  3, -1, -1, -1, -1, -1, -1 ],
+  [ 1,  0, -1, -1, -1, -1, -1, -1 ],
+  [ 1,  3, -1, -1, -1, -1, -1, -1 ],
+  [ 2,  1, -1, -1, -1, -1, -1, -1 ],
+  [ 0,  1,  2,  3,  0,  3,  2,  1 ],
+  [ 2,  0, -1, -1, -1, -1, -1, -1 ],
+  [ 2,  3, -1, -1, -1, -1, -1, -1 ],
+  [ 3,  2, -1, -1, -1, -1, -1, -1 ],
+  [ 0,  2, -1, -1, -1, -1, -1, -1 ],
+  [ 1,  0,  3,  2,  1,  2,  3,  0 ],
+  [ 1,  2, -1, -1, -1, -1, -1, -1 ],
+  [ 3,  1, -1, -1, -1, -1, -1, -1 ],
+  [ 0,  1, -1, -1, -1, -1, -1, -1 ],
+  [ 3,  0, -1, -1, -1, -1, -1, -1 ],
+  [-1, -1, -1, -1, -1, -1, -1, -1 ],
+};
+
+
+void AddSegments(u32 cellCode) {
+  const i32 segmentCount = edgeConnectionCounts[cellCode];
+
+  if (segmentCount == 0) {
+    return;
+  }
+
+  if (segmentCount == 1) {
+    // Add a segment between the two edge indices
+    PushSegment(
+      edgeConnections[cellCode][0],
+      edgeConnections[cellCode][1]
+    )
+    return;
+  }
+
+  Assert(
+    (cellCode == 5 || cellCode == 10),
+    "Only cases 5,10 should have multiple connections"
+  );
+
+  // Average, bilinear interpolate, or sample SDF
+  const f32 centerValue = GetCellCenterValue();
+  if (IsNegative(centerValue)) {
+    PushSegment(edgeConnections[cellCode][0], edgeConnections[cellCode][1]);
+    PushSegment(edgeConnections[cellCode][2], edgeConnections[cellCode][3]);
+  } else {
+    PushSegment(edgeConnections[cellCode][4], edgeConnections[cellCode][5]);
+    PushSegment(edgeConnections[cellCode][6], edgeConnections[cellCode][7]);
+  }
+}
+```
 
 </section>
 

@@ -44,8 +44,8 @@
 - isosurface-extraction: build marching squares lookup table code
 - isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
 
-
 ## 2023-10-23
+- isosurface-extraction: build marching squares lookup table code
 - isosurface-extraction: build marching squares lookup graphic
 ## 2023-10-17
 - linear-interpolation: add basic 2D interactive demo
