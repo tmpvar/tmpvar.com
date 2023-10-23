@@ -42,6 +42,7 @@
 
 ## Pending
 - isosurface-extraction: build marching squares lookup table code
+- isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
 
 
 ## 2023-10-23
