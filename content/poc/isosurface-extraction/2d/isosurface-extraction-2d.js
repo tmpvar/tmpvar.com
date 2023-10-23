@@ -860,6 +860,14 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
   }
 
+  if (ctx.reset == undefined) {
+    ctx.reset = () => {
+      let old = canvas.width
+      canvas.width = 0
+      canvas.width = old
+    }
+  }
+
   function DrawFrame() {
     ReadParams()
     const dirty = state.dirty || state.camera.dirty
