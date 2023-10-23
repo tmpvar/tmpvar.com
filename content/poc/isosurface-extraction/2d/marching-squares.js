@@ -72,6 +72,15 @@ function MarchingSquaresBegin(rootEl) {
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('2d')
 
+  if (ctx.reset == undefined) {
+    ctx.reset = () => {
+      let old = canvas.width
+      canvas.width = 0
+      canvas.width = old
+    }
+  }
+
+
   function RenderFrame() {
     ctx.reset()
 

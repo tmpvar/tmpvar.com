@@ -1,6 +1,14 @@
 let rootEl = document.getElementById('LinearInterpolation2D-content')
 let canvas = rootEl.querySelector('canvas')
 let ctx = canvas.getContext('2d')
+if (ctx.reset == undefined) {
+  ctx.reset = () => {
+    let old = canvas.width
+    canvas.width = 0
+    canvas.width = old
+  }
+}
+
 const vars = {}
 
 function ParseColorFloat(value) {

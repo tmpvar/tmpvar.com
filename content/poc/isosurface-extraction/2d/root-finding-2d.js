@@ -40,6 +40,14 @@ function RootFinding2DBegin(rootEl) {
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('2d')
 
+  if (ctx.reset == undefined) {
+    ctx.reset = () => {
+      let old = canvas.width
+      canvas.width = 0
+      canvas.width = old
+    }
+  }
+
   const third = Math.floor(canvas.width / 3)
   const square = {
     x: third,
