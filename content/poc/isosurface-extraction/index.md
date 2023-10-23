@@ -20,7 +20,7 @@ description = "Playground for various isosurface extraction techniques"
 
 ### Lookup Table + Basic Usage
 
-If you want to compute a continuous contour, you'll need to maintain a priority queue. An example of this can be found in [isosurface-extraction-2d.js](./2d/isosurface-extraction-2d.js) in the `CollectPolyLoops()` function. Otherwise, this will collect an unstructured array of line segments (segment soup if you will).
+If you want to compute a series of continuous contours, you'll need to maintain a priority queue and process the edge connections in order. An example of this can be found in [isosurface-extraction-2d.js](./2d/isosurface-extraction-2d.js) in the `CollectPolyLoops()` function. The following is a basic example that collects an unordered array of line segments (segment soup if you will).
 
 ```c
 //    corners         edges
