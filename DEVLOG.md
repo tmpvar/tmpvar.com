@@ -23,6 +23,11 @@
 - radiance-cascades/2d: how to fix the ringing artifacts?
 
 ## Next
+- linear-interpolation: add demo for line searching
+- linear-interpolation: add basic 3D interactive demo
+
+- isosurface-extraction/sphere-march-cube: implement the approach from
+                                           'Ray Tracing of Signed Distance Function Grids'
 - let controls live next to the canvas so you dont have to scroll up and down
 - only show side controls when the window is wide enough to handle them.
 - radiance-cascades/3d: render an analytic primitive
@@ -36,16 +41,13 @@
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## Pending
-- linear-interpolation: add basic 2D interactive demo
-- linear-interpolation: add demo for line searching
-- linear-interpolation: add basic 3D interactive demo
-
-- isosurface-extraction/sphere-march-cube: implement the approach from
-                                           'Ray Tracing of Signed Distance Function Grids'
+- isosurface-extraction: build marching squares lookup table code
 
 
-
+## 2023-10-23
+- isosurface-extraction: build marching squares lookup graphic
 ## 2023-10-17
+- linear-interpolation: add basic 2D interactive demo
 - isosurface-extraction/sphere-march-cube: add an approach selector
 - isosurface-extraction/sphere-march-cube: handle when the camera is inside of the cube
 - isosurface-extraction/sphere-march-cube: add solid rendering toggle

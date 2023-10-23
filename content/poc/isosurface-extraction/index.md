@@ -4,7 +4,20 @@ date = 2023-09-29
 description = "Playground for various isosurface extraction techniques"
 +++
 
-## 2D
+
+## Marching Squares
+
+<section id="marching-squares-content">
+ <section class="center-align">
+    <canvas width="1024" height="1024"></canvas>
+  </section>
+  <script type="module" src="2d/marching-squares.js"></script>
+
+**Note:** cases 5 (`0101`) and 10 (`1010`) are ambiguous, meaning we cannot know which which edges are connected by the corner states alone. The good news is that in 2D ths is quite simple to resolve - choose which edges are connected based on the value at the center of the cell. The center value can be either sampled, if you have a continuous function (like an SDF), or the average of the corner values will work fine.
+
+</section>
+
+## Isosurface Extraction (2D)
 
 <section id="isosurface-extraction-2d-content">
   <section class="controls">

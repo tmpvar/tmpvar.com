@@ -788,8 +788,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
                 // out.color = vec4(ComputeNormal(rayOrigin + rayDir * t) * 0.5 + 0.5, 1.0);
                 out.color = vec4(rayOrigin + rayDir * t, 1.0);
                 return out;
-                hit = true;
-                break;
+                // hit = true;
+                // break;
               }
 
               t += deltaT;
