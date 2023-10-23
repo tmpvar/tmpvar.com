@@ -177,10 +177,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let c10 = c001 * invFactor.x + c101 * factor.x;
           let c11 = c011 * invFactor.x + c111 * factor.x;
 
-          let c0 = c00 * invFactor.y + c10 * factor.y;
-          let c1 = c01 * invFactor.y + c11 * factor.y;
+          let c0 = c00 * invFactor.z + c10 * factor.z;
+          let c1 = c01 * invFactor.z + c11 * factor.z;
 
-          return c0 * invFactor.z + c1 * factor.z;
+          return c0 * invFactor.y + c1 * factor.y;
         }
 
         fn ComputeNormal(pos: vec3f) -> vec3f {
@@ -536,8 +536,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             s100 = 5
             s010 = 6
             s110 = 7
-
-            Note: these have been swapped to be z-up!
           */
 
           // compute the constants
@@ -567,7 +565,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
           let dx = rayDir.x;
           let dy = rayDir.y;
-          let dz = rayDir.y;
+          let dz = rayDir.z;
 
           let m0 = ox * oy;
           let m1 = dx * dy;
@@ -597,20 +595,101 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
                  constants[1];
         }
 
-        fn SolveQuadratic(a: f32, b: f32, c: f32) -> vec2f {
-          let q = -0.5 * (b + sign(b) * sqrt(pow(b, 2.0) - 4.0 * a * c));
-          return vec2f(q/a, c/q);
+
+        struct QuadraticRoots {
+          roots: vec2f,
+          count: i32,
+        };
+
+        fn SolveQuadratic(a: f32, b: f32, c: f32) -> QuadraticRoots {
+          var result: QuadraticRoots;
+          result.count = 0;
+
+          let q = -0.5 * (b + sign(b) * sqrt(b * b - 4 * a  * c));
+          if (q == 0.0) {
+            result.roots[0] = 0.0;
+            result.count = 1;
+            return result;
+          }
+
+          let x1 = q / a;
+          let x2 = c / (q * x1);
+
+          if (a == 0) {
+            result.roots[0] = x2;
+            result.count = 1;
+            return result;
+          }
+
+          result.roots[0] = min(x1, x2);
+          result.roots[1] = max(x1, x2);
+          result.count = 2;
+          return result;
         }
 
-        fn QuadraticRootCount(a: f32, b: f32, c: f32) -> f32 {
-          let discriminant = pow(b, 2.0) - 4.0 * a * c;
-          if (discriminant > 0.0) {
-            return 2.0;
-          } else if (discriminant == 0.0) {
-            return 1.0;
-          } else {
-            return 0.0;
+        fn SolveQuadraticGraphicsGems(a: f32, b: f32, c: f32) -> QuadraticRoots {
+          var result: QuadraticRoots;
+          result.count = 0;
+
+          let p = b / (2 * a);
+          let q = c / a;
+          let D = p * p - q;
+
+          if (abs(D) < 0.000001) {
+            result.roots[0] = -p;
+            result.count = 1;
+          } else if (D < 0) {
+            result.count = 0;
+          } else { /* if (D > 0) */
+            let sqrt_D = sqrt(D);
+            result.roots[0] =   sqrt_D - p;
+            result.roots[1] = - sqrt_D - p;
+            result.count = 2;
           }
+
+          return result;
+        }
+
+
+        struct CubicRoots {
+          roots: vec3f,
+          count: i32,
+        };
+
+        fn SolveCubic(a: f32, b: f32, c:f32, d: f32) -> CubicRoots {
+          var result: CubicRoots;
+          const TAU = ${Math.PI * 2.0};
+          let Q = (a * a - 3.0 * b) / 9.0;
+          let R = (2 * a * a * a - 9 * a * b + 27.0 * c) / 54.0;
+
+          let theta = acos(R/sqrt(Q * Q * Q));
+          var v = -2 * sqrt(Q) * vec3f(
+            cos(theta / 3.0),
+            cos((theta + TAU) / 3.0),
+            cos((theta - TAU) / 3.0),
+          ) - a / 3.0;
+
+          if (v.z < v.x) {
+            let tmp = v.x;
+            v.x = v.z;
+            v.z = tmp;
+          }
+
+          if (v.y < v.x) {
+            let tmp = v.x;
+            v.x = v.y;
+            v.y = tmp;
+          }
+
+          if (v.z < v.y) {
+            let tmp = v.y;
+            v.y = v.z;
+            v.z = tmp;
+          }
+
+          result.roots = v;
+          result.count = 3;
+          return result;
         }
 
         @fragment
@@ -626,20 +705,16 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let normal = normalize(cross(dFdxPos, dFdyPos));
 
           out.normal = vec4(normal, 1.0);
-          out.color = vec4(normal.xyz * 0.5 + 0.5, 1.0);
+          // out.color = vec4(normal.xyz * 0.5 + 0.5, 1.0);
 
           let uvw = (fragData.worldPosition * 0.5 + 0.5);
           let eye = ubo.eye.xyz * 0.5 + 0.5;
           let rayDir = normalize(uvw - eye);
           var tInterval = RayAABB(vec3(0.0), vec3(1.0), eye, 1.0 / rayDir);
-          // if (tInterval.y < 0.0) {
-          //   out.color = vec4(1.0, 0.0, 1.0, 1.0);
-          //   return out;
-          // }
 
           var rayOrigin = eye;
           if (tInterval.x > 0.0) {
-            rayOrigin = eye + rayDir * tInterval.x;
+            rayOrigin = saturate(eye + rayDir * tInterval.x);
             tInterval.y -= tInterval.x;
             tInterval.x = 0.0;
           }
@@ -647,25 +722,90 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           var t = tInterval.x;
           let Constants = ComputeConstants(rayOrigin, rayDir);
 
-          let maxSteps = 1000.0;
-          let kNumericEpsilon = 0.001;
+          // let result = SolveQuadratic(
+          //   3.0 * Constants[3],
+          //   2.0 * Constants[2],
+          //   Constants[1]
+          // );
+          let result = SolveQuadratic(
+            3.0 * Constants[3],
+            2.0 * Constants[2],
+            Constants[1]
+          );
+
+          if (result.count == 0) {
+            out.color = vec4(0.0, 1.0, 1.0, 1.0);
+            return out;
+          }
+
+          // let result = SolveCubic(Constants[3], Constants[2], Constants[1], Constants[0]);
+
           var hit = false;
-          var steps = 0.0;
-          while (steps < maxSteps && t < tInterval.y) {
-            let g =  EvalG(Constants, t);
-            let gprime = EvalGPrime(Constants, t);
-            let deltaT = g / gprime;
-            t -= deltaT;
-            steps += 1.0;
-            if (abs(deltaT) <= kNumericEpsilon) {
-              out.color = vec4(ComputeNormal(rayOrigin + rayDir * t) * 0.5 + 0.5, 1.0);
-              hit = true;
-              break;
+          const maxSteps = 1000.0;
+          const kNumericEpsilon = 0.0001;
+          var startT = t;
+
+          for (var i = 0; i <= result.count && !hit; i++) {
+            var root: f32;
+            if (i == result.count) {
+              root = tInterval.y;
+            } else {
+              root = result.roots[i];
             }
+
+            if (result.roots[i] < t) {
+              t = result.roots[i];
+              startT = t;
+              out.color = vec4(0.0, 1.0, 0.0, 1.0);
+              continue;
+            }
+
+            let start = EvalG(Constants, startT);
+            let end = EvalG(Constants, root);
+            if (sign(start) == sign(end)) {
+              startT = root;
+              continue;
+            }
+
+            t = startT;
+            var steps = 0.0;
+            while (steps < maxSteps) {
+              let g =  EvalG(Constants, t);
+              let gprime = EvalGPrime(Constants, t);
+              let deltaT = -(g / gprime);
+
+              // if (t < startT) {
+              //   out.color = vec4(1.0, 0.0, 0.0, 1.0);
+              //   break;
+              // }
+
+              // if (t > tInterval.y) {
+              //   out.color = vec4(0.0, 0.0, 1.0, 1.0);
+              //   break;
+              // }
+
+              if (abs(deltaT) < kNumericEpsilon) {
+                // out.color = vec4(ComputeNormal(rayOrigin + rayDir * t) * 0.5 + 0.5, 1.0);
+                out.color = vec4(rayOrigin + rayDir * t, 1.0);
+                return out;
+                hit = true;
+                break;
+              }
+
+              t += deltaT;
+              steps += 1.0;
+            }
+
+            startT = result.roots[i] / tInterval.y;
           }
 
           if (!hit) {
-            out.color = vec4(1.0, 0.0, 1.0, 1.0);
+            // if (result.count > 0) {
+              // out.color = vec4(JetLinear(result.roots[1] + 10.0), 1.0);
+              // out.color = vec4(JetLinear(1.0-closestT), 1.0);
+            // } else {
+              // out.color = vec4(1.0, 0.0, 1.0, 1.0);
+            // }
             // discard;
           }
 
