@@ -80,6 +80,69 @@ function MarchingSquaresBegin(rootEl) {
     }
   }
 
+  const corners = [[0, 0], [0, 0], [0, 0], [0, 0]]
+  const edges = [[0, 0], [0, 0], [0, 0], [0, 0]]
+  const edgeIndices = [[0, 1], [1, 2], [2, 3], [3, 0]]
+  const edgeStates = [0, 0, 0, 0]
+
+
+  const connections = [
+    false,
+    [0, 3],
+    [1, 0],
+    [1, 3],
+
+    [2, 1],
+    [[0, 1], [2, 3], [0, 3], [2, 1]],
+    [2, 0],
+    [2, 3],
+
+    [3, 2],
+    [0, 2],
+    [[1, 0], [3, 2], [1, 2], [3, 0]],
+    [1, 2],
+
+    [3, 1],
+    [0, 1],
+    [3, 0],
+    false
+  ]
+
+  // output the connections lookup table to the console
+  if (0) {
+    let out = `
+    // entry format: edgeStartIndex, endEndIndex, ...
+    static const i32 edgeConnections[16][8] = {
+    `
+
+    connections.forEach(connection => {
+      let flat = []
+      if (!connection) {
+        connection = []
+      } else if (Array.isArray(connection[0])) {
+
+        connection = connection.forEach(val => {
+          flat.push(val[0])
+          flat.push(val[1])
+        })
+      } else {
+        flat.push(connection[0])
+        flat.push(connection[1])
+      }
+
+      while (flat.length < 8) {
+        flat.push(-1)
+      }
+
+      let str = '  [' + flat.map(s => String(s).padStart(2, ' ')).join(', ') + ' ],\n'
+      out += str
+    })
+    out += `};`
+
+    console.log(out.replaceAll(/    /g, ''))
+  }
+
+
 
   function RenderFrame() {
     ctx.reset()
@@ -91,33 +154,6 @@ function MarchingSquaresBegin(rootEl) {
     const fontSize = 20
     let cornerRadius = 16;
     ctx.strokeStyle = ""
-    const corners = [[0, 0], [0, 0], [0, 0], [0, 0]]
-    const edges = [[0, 0], [0, 0], [0, 0], [0, 0]]
-    const edgeIndices = [[0, 1], [1, 2], [2, 3], [3, 0]]
-    const edgeStates = [0, 0, 0, 0]
-
-
-    const connections = [
-      false,
-      [0, 3],
-      [1, 0],
-      [1, 3],
-
-      [2, 1],
-      [[0, 1], [2, 3], [0, 3], [2, 1]],
-      [2, 0],
-      [2, 3],
-
-      [3, 2],
-      [0, 2],
-      [[1, 0], [3, 2], [1, 2], [3, 0]],
-      [1, 2],
-
-      [3, 1],
-      [0, 1],
-      [3, 0],
-      false
-    ]
 
     for (let code = 0; code < 16; code++) {
       let cellCode = code.toString(2).padStart(4, '0')

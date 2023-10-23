@@ -747,7 +747,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     state.loops = []
     let loop = []
     let queue = []
-    // Populate the queue with a single item
+    // Populate the queue with all known boundary cells
     {
       state.boundaryCells.forEach((cell, cellIndex) => {
         let edges = MarchingSquaresCodeToEdge[cell.marchingSquaresCode]
@@ -810,7 +810,7 @@ function IsosurfaceExtractionBegin(rootEl) {
 
         // Skip edges that do not continue the current contour
         if (startEdge != job.edgeIndex) {
-          // Note: put this at the front of the queue so that we don't end up processing it first
+          // Note: put this at the back of the queue so that we don't end up processing it first.
           //       the priority is to continue the contour that got us to this cell
           queue.unshift({
             cellIndex: cellIndex,
