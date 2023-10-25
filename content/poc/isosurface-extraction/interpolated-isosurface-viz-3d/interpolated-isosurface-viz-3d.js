@@ -16,6 +16,16 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     }
   }
 
+  function HexColorToVec3f(value) {
+    let v = parseInt(value.replace("#", ""), 16)
+
+    let r = (v >> 16) & 0xFF
+    let g = (v >> 8) & 0xFF
+    let b = (v >> 0) & 0xFF
+    return `vec3f(f32(${r / 255.0}),f32(${g / 255.0}),f32(${b / 255.0}))`
+  }
+
+
   const controlEl = rootEl.querySelector('.controls')
   const canvas = rootEl.querySelector('canvas')
   const ctx = canvas.getContext('webgpu')
@@ -92,6 +102,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           @interpolate(flat) @location(1) objectID: u32,
           @location(2) worldPosition: vec3f,
           @location(3) uv: vec2f,
+          @location(4) faceUV: vec2f,
+          @interpolate(flat) @location(5) faceNormal: vec3f,
+
         }
 
         struct UBOParams {
@@ -116,6 +129,17 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           out.position = ubo.worldToScreen * vec4(worldPosition, 1.0);
           out.objectID = objectID;
           out.uv = out.position.xy / out.position.w;
+
+          if (inNormal.x != 0.0) {
+            out.faceUV = inPosition.yz * 0.5 + 0.5;
+          } else if (inNormal.y != 0.0) {
+            out.faceUV = inPosition.xz * 0.5 + 0.5;
+          } else {
+            out.faceUV = inPosition.xy * 0.5 + 0.5;
+          }
+
+          out.faceNormal = inNormal;
+
           return out;
         }
 
@@ -173,8 +197,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let c111 = ubo.sceneParams[1][3];
 
           let c00 = c000 * invFactor.x + c100 * factor.x;
-          let c01 = c010 * invFactor.x + c110 * factor.x;
-          let c10 = c001 * invFactor.x + c101 * factor.x;
+          let c10 = c010 * invFactor.x + c110 * factor.x;
+          let c01 = c001 * invFactor.x + c101 * factor.x;
           let c11 = c011 * invFactor.x + c111 * factor.x;
 
           let c0 = c00 * invFactor.z + c10 * factor.z;
@@ -184,11 +208,15 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
 
         fn ComputeNormal(pos: vec3f) -> vec3f {
-          const eps = 0.0001; // or some other value
-          const h = vec2f(eps,0);
-          return normalize( vec3f(TrilinearInterpolation(pos+h.xyy) - TrilinearInterpolation(pos-h.xyy),
-                                  TrilinearInterpolation(pos+h.yxy) - TrilinearInterpolation(pos-h.yxy),
-                                  TrilinearInterpolation(pos+h.yyx) - TrilinearInterpolation(pos-h.yyx) ) );
+          const eps = 0.001; // or some other value
+          const h = vec2f(eps,0.0);
+          return normalize(
+             vec3f(
+              (TrilinearInterpolation(pos+h.xyy) - TrilinearInterpolation(pos-h.xyy)),
+              (TrilinearInterpolation(pos+h.yxy) - TrilinearInterpolation(pos-h.yxy)),
+              (TrilinearInterpolation(pos+h.yyx) - TrilinearInterpolation(pos-h.yyx))
+            )
+          );
         }
 
         fn MinComponent(a: vec3f) -> f32 {
@@ -429,6 +457,38 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       textures.normals,
       state.gpu.presentationFormat,
       /* wgsl */`
+        fn Mod(x: vec2f, y: f32) -> vec2f {
+          return x - y * floor(x / y);
+        }
+
+
+        // The MIT License -  Copyright © 2017 Inigo Quilez
+        // see: https://www.shadertoy.com/view/XtBfzz
+
+        // --- analytically box-filtered grid ---
+        fn GridTextureGradBox(p: vec2f, ddx: vec2f, ddy: vec2f, ratio: f32, t: f32) -> f32 {
+          // filter kernel
+          let w = max(
+            abs(ddx),
+            abs(ddy)
+          ) * 1.0 / t * ratio * 0.75;
+
+          // analytic (box) filtering
+          let a = p + 0.5 * w;
+          let b = p - 0.5 * w;
+          let i = (
+            floor(a)+min(fract(a)*ratio, vec2f(1.0))-
+            floor(b)-min(fract(b)*ratio, vec2f(1.0))
+          ) / (ratio*w);
+          //pattern
+          return (1.0-i.x)*(1.0-i.y);
+        }
+
+        fn ToneMapGooch(ndotl: f32, cool: vec3f, warm: vec3f) -> vec3f {
+          let num = (1.0 + ndotl) * 0.5;
+          return num * cool + (1.0 - num) * warm;
+        }
+
         @fragment
         fn FragmentMain(
           fragData: VertexOut
@@ -447,10 +507,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           var eye = ubo.eye.xyz * 0.5 + 0.5;
           let rayDir = normalize(uvw - eye);
           var tInterval = RayAABB(vec3(0.0), vec3(1.0), eye, 1.0 / rayDir);
-          if (tInterval.y < tInterval.x) {
-            out.color = vec4(1.0, 0.0, 1.0, 1.0);
-            return out;
-          }
 
           var rayOrigin = eye;
           if (tInterval.x > 0.0) {
@@ -469,28 +525,82 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let invMaxSteps = 1.0 / maxSteps;
           let eps = invMaxSteps * 4.0;
           let debugRenderSolid = ubo.debugParams[0].y;
+          var lastT = t;
+          var lastD = TrilinearInterpolation(rayOrigin + rayDir * tInterval.x);
           while(t < tInterval.y) {
             let pos = rayOrigin + rayDir * t;
-            if (t >= tInterval.x) {
-              let d = TrilinearInterpolation(pos);
-              if (
-                (debugRenderSolid > 0.0 && d <= 0.0) ||
-                abs(d) <= eps
-              ) {
-                out.color = vec4(1.0);
-                out.color = vec4(ComputeNormal(pos) * 0.5 + 0.5, 1.0);
-                hit = true;
-                break;
+            let d = TrilinearInterpolation(pos);
+            if (
+              (debugRenderSolid > 0.0 && d <= 0.0) ||
+              sign(lastD) != sign(d)
+            ) {
+              // let baseColor = ${HexColorToVec3f('#ffffff')};
+              let baseColor = ${HexColorToVec3f('#26854c')};
+              let hitNormal = sign(d) * ComputeNormal(pos);
+
+              const lightPos = vec3(2.0, 1.0, 0.5);
+              let ndotl = dot(hitNormal, -normalize((pos * 2.0 - 1.0) - lightPos));
+              var color = baseColor * max(0.4, ndotl);
+
+
+              // from 'A Non-Photorealistic lighting model for automatic technical illustration"
+              {
+                let alpha = 1.0;
+                let beta = 1.0;
+                let b = 0.4;
+                let y = 0.4;
+
+                let kcool = ${HexColorToVec3f('#0000FF')} * alpha;
+                let kwarm = ${HexColorToVec3f('#FFFF00')} * beta;
+
+                color = baseColor * ToneMapGooch(ndotl, kcool, kwarm);
               }
+              out.color = vec4(color, 1.0);
+              // out.color = vec4(hitNormal * 0.5 + 0.5, 1.0);
+              return out;
             }
+
+            lastD = d;
+            lastT = t;
             t += invMaxSteps;
             steps += 1.0;
           }
 
           if (t >= tInterval.y) {
-            out.color = vec4(((1.0 - steps/(maxSteps * 8)) + 1.0) / 6.0);
+            let baseColor = vec3f(0.4);
+            // out.color = vec4f(baseColor * g, 1.0);
+
+            // let dFdxPos = dpdx(fragData.worldPosition);
+            // let dFdyPos = dpdy(fragData.worldPosition);
+            var v: f32;
+
+
+            let divisions = 20.0;
+            let ratio = 20.0;
+            let faceUV = fragData.faceUV * divisions + 1.0 / ratio * 0.5;
+            if (fragData.faceNormal.x != 0.0) {
+              v = GridTextureGradBox(faceUV, dFdxPos.yz, dFdyPos.yz, ratio, saturate(t/tInterval.y));
+            } else if (fragData.faceNormal.y != 0.0) {
+              v = GridTextureGradBox(faceUV, dFdxPos.xz, dFdyPos.xz, ratio, saturate(t/tInterval.y));
+            } else {
+              v = GridTextureGradBox(faceUV, dFdxPos.xy, dFdyPos.xy, ratio, saturate(t/tInterval.y));
+            }
+
+            var color = baseColor * (1.0 - v);
+            // color = mix(color, vec3(1.0), 1.0 - exp( -0.5*t*t ) );
+
+
+            out.color = vec4(color, 1.0);
+            return out;
+
+
+            // if (length(modf(uvw).fract) > 0.5) {
+            //   out.color = vec4(1.0);
+            //   return out;
+            // }
+            // out.color = vec4(((1.0 - steps/(maxSteps * 8)) + 1.0) / 6.0);
             // out.color = vec4(normal * 0.5 + 0.5, 1.0);
-            hit = true;
+            // hit = true;
           }
 
           if (!hit) {
@@ -740,7 +850,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           if (IsZeroGraphicsGems(D)) {
             if (IsZeroGraphicsGems(q)) {
               result.roots[0] = 0.0;
-              result.count = 1;
+              result.count = -1;
             } else {
               let u = pow(-q, oneThird);
               let r0 = 2 * u;
@@ -884,23 +994,28 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let result = SolveCubicGraphicsGems(Constants);
           // let result = SolveCubic(Constants[3], Constants[2], Constants[1], Constants[0]);
 
+          if (result.count == -1) {
+            out.color = vec4(0.2, .5, 1.0, 1.0);
+            return out;
+          }
+
           let minRoot = i32(ubo.approachParams[0][0]);
           let maxRoot = min(result.count, i32(ubo.approachParams[0][1]));
           let fixedStepToggle = select(false, true, ubo.approachParams[0][2] > 0.0);
           out.color = vec4(0.1);
 
-          // Note: this _should_ work for cubic roots without any sort of stepping
-          for (var i = minRoot; i < maxRoot; i++) {
-            var root = result.roots[i];
-            if (root >= t && root < tInterval.y) {
-              let g = EvalG(Constants, root);
-              if (abs(g) < 0.01) {
-                out.color = vec4(0.0, 1.0, 0.0, 1.0);
-                break;
-              }
-            }
-          }
-          return out;
+          // // Note: this _should_ work for cubic roots without any sort of stepping
+          // for (var i = minRoot; i < maxRoot; i++) {
+          //   var root = result.roots[i];
+          //   if (root >= t && root < tInterval.y) {
+          //     let g = EvalG(Constants, root);
+          //     if (abs(g) < 0.01) {
+          //       out.color = vec4(0.0, 1.0, 0.0, 1.0);
+          //       break;
+          //     }
+          //   }
+          // }
+          // return out;
 
           if (fixedStepToggle) {
             for (var i = minRoot; i < maxRoot; i++) {
@@ -922,7 +1037,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
               return out;
             }
           } else {
-            for (var i = minRoot; i < maxRoot; i++) {
+            for (var i = minRoot; i <= maxRoot; i++) {
               var root = result.roots[i];
               if (root >= t && root < tInterval.y) {
                 let foundT = RaymarchNewtonRaphson(Constants, rayOrigin, rayDir, t, root);
@@ -941,6 +1056,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
                 out.color = vec4(0.0, 1.0, 0.0, 1.0);
                 return out;
               }
+
+              out.color = vec4(JetLinear(f32(result.count) / 3), 1.0);
+              return out;
+
             }
           }
           return out;

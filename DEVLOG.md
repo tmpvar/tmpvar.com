@@ -45,6 +45,8 @@
                          understand if the roots are even viable.
 - isosurface-extraction: build marching squares lookup table code
 - isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
+- isosurface-extraction: segment tracing - take larger fixed steps and when we detect a crossing
+                         run a few newton-raphson steps to find the actual crossing.
 
 ## 2023-10-24
 ## 2023-10-23
