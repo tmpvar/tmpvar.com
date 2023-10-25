@@ -485,7 +485,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
 
         fn ToneMapGooch(ndotl: f32, cool: vec3f, warm: vec3f) -> vec3f {
-          let num = (1.0 + ndotl) * 0.5;
+          let num = (1.0 + ndotl);
           return num * cool + (1.0 - num) * warm;
         }
 
@@ -538,23 +538,32 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
               let baseColor = ${HexColorToVec3f('#26854c')};
               let hitNormal = sign(d) * ComputeNormal(pos);
 
-              const lightPos = vec3(2.0, 1.0, 0.5);
-              let ndotl = dot(hitNormal, -normalize((pos * 2.0 - 1.0) - lightPos));
+              const lightPos = vec3(4.0, 1.0, 0.5);
+              let lightDir = normalize((pos * 2.0 - 1.0) - lightPos);
+              let ndotl = dot(hitNormal, lightDir);
               var color = baseColor * max(0.4, ndotl);
 
 
               // from 'A Non-Photorealistic lighting model for automatic technical illustration"
-              {
-                let alpha = 1.0;
-                let beta = 1.0;
+              if (true) {
+                let alpha = 0.6;
+                let beta = 0.5;
                 let b = 0.4;
                 let y = 0.4;
 
                 let kcool = ${HexColorToVec3f('#0000FF')} * alpha;
                 let kwarm = ${HexColorToVec3f('#FFFF00')} * beta;
 
-                color = baseColor * ToneMapGooch(ndotl, kcool, kwarm);
+                color = baseColor + ToneMapGooch(-ndotl, kcool, kwarm);
+                // color = ToneMapGooch(ndotl, kcool, kwarm);
               }
+              else
+              {
+                let reflectDir = reflect(-lightDir, hitNormal);
+                let spec = pow(max(dot(rayDir, reflectDir), 0.0), 2) * 0.1;
+                color = baseColor * max(0.5, ndotl) + vec3(1.0) * spec;
+              }
+
               out.color = vec4(color, 1.0);
               // out.color = vec4(hitNormal * 0.5 + 0.5, 1.0);
               return out;
