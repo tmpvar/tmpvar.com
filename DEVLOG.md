@@ -41,9 +41,12 @@
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## Pending
+- isosurface-extraction: run a fixed step ray march from minRoot->maxRoot in an attempt to
+                         understand if the roots are even viable.
 - isosurface-extraction: build marching squares lookup table code
 - isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
 
+## 2023-10-24
 ## 2023-10-23
 - isosurface-extraction: build marching squares lookup table code
 - isosurface-extraction: build marching squares lookup graphic
