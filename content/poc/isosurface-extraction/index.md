@@ -270,6 +270,32 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
             <output></output>
           </div>
         </div>
+        <div class="shownBy-approach indent" showValue="ray-tracing-signed-distance-grids">
+          <div class="minRoot-control control">
+            min root: <input type="range" min="0" max="3" value="0" step="1">
+            <output></output>
+          </div>
+          <div class="maxRoot-control control">
+            max root: <input type="range" min="0" max="3" value="3" step="1">
+            <output></output>
+          </div>
+          <div class="fixedStepToggle-control control">
+            debug w/ fixed steps <input type="checkbox" value="1" />
+          </div>
+        </div>
+        <div class="shownBy-approach indent" showValue="ray-tracing-signed-distance-grids">
+          <div class="minRoot-control control">
+            min root: <input type="range" min="0" max="3" value="0" step="1">
+            <output></output>
+          </div>
+          <div class="maxRoot-control control">
+            max root: <input type="range" min="0" max="3" value="3" step="1">
+            <output></output>
+          </div>
+          <div class="fixedStepToggle-control control">
+            debug w/ fixed steps <input type="checkbox" value="1" />
+          </div>
+        </div>
       </div>
     </div>
   </section>
