@@ -515,6 +515,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         textures.normals,
         state.gpu.presentationFormat,
       /* wgsl */`
+        const PI = ${Math.PI};
+        const TAU = ${Math.PI * 2.0};
 
         fn ComputeConstants(rayOrigin: vec3f, rayDir: vec3f) -> vec4f {
           /*
@@ -582,6 +584,17 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           );
         }
 
+        // // from: 'Interactive Raytracing for Isosurface Rendering' Parker et. al
+        // fn ComputeConstantsBruteForce(rayOrigin: vec3f, rayDir: vec3f) -> vec4f {
+
+        //   let a0 = rayOrigin;
+        //   let b0 = rayDir;
+
+        //   let a1
+
+
+        // }
+
         fn EvalG(constants: vec4f, t: f32) -> f32 {
           return constants[3] * pow(t, 3.0) +
                  constants[2] * pow(t, 2.0) +
@@ -641,9 +654,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           } else if (D < 0) {
             result.count = 0;
           } else { /* if (D > 0) */
-            let sqrt_D = sqrt(D);
-            result.roots[0] =   sqrt_D - p;
-            result.roots[1] = - sqrt_D - p;
+            let sqrt_D = sqrt(D) - p;
+            result.roots[0] = min(-p, p);
+            result.roots[1] = max(-p, p);
             result.count = 2;
           }
 
@@ -692,6 +705,141 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           return result;
         }
 
+        const EQN_EPS_GRAPHICS_GEMS: f32 = 1e-30;
+
+        fn IsZeroGraphicsGems(x: f32) -> bool {
+          return x > -EQN_EPS_GRAPHICS_GEMS && x < EQN_EPS_GRAPHICS_GEMS;
+        }
+
+        // TODO: as per 'Interactive RayTracing for Isosurface Rendering', they modify this function
+        //       to handle the A=0.0 case and they also bump up the EPS to 1e-30
+        fn SolveCubicGraphicsGems(c: vec4f) -> CubicRoots {
+          const oneThird = 1.0 / 3.0;
+
+          var result: CubicRoots;
+          result.count = 0;
+
+          // normal form: x^3 + Ax^2 + Bx + C = 0
+          let A = c[ 2 ] / c[ 3 ];
+          let B = c[ 1 ] / c[ 3 ];
+          let C = c[ 0 ] / c[ 3 ];
+
+          var s: vec2f;
+
+          // substitute x = y - A/3 to eliminate quadric term: x^3 +px + q = 0
+
+          let sq_A = A * A;
+          let p = oneThird * (- oneThird * sq_A + B);
+          let q = 1.0/2 * (2.0/27 * A * sq_A - oneThird * A * B + C);
+
+          /* use Cardano's formula */
+
+          let cb_p = p * p * p;
+          let D = q * q + cb_p;
+
+          if (IsZeroGraphicsGems(D)) {
+            if (IsZeroGraphicsGems(q)) {
+              result.roots[0] = 0.0;
+              result.count = 1;
+            } else {
+              let u = pow(-q, oneThird);
+              let r0 = 2 * u;
+              let r1 = -u;
+              result.roots[0] = min(r0, r1);
+              result.roots[1] = max(r0, r1);
+              result.count = 2;
+            }
+          } else if (D < 0) {
+            let phi = oneThird * acos(-q / sqrt(-cb_p));
+            let t = 2 * sqrt(-p);
+
+            result.roots[0] =   t * cos(phi);
+            result.roots[1] = - t * cos(phi + PI / 3);
+            result.roots[2] = - t * cos(phi - PI / 3);
+            var tmp: f32;
+
+            if (result.roots[0] > result.roots[1]) {
+              tmp = result.roots[0];
+              result.roots[0] = result.roots[1];
+              result.roots[1] = tmp;
+            }
+
+            if (result.roots[1] > result.roots[2]) {
+              tmp = result.roots[1];
+              result.roots[1] = result.roots[2];
+              result.roots[2] = tmp;
+            }
+
+            if (result.roots[0] > result.roots[1]) {
+              tmp = result.roots[0];
+              result.roots[0] = result.roots[1];
+              result.roots[1] = tmp;
+            }
+
+            result.count = 3;
+          } else {
+            let sqrt_D = sqrt(D);
+            let u = pow(sqrt_D - q, oneThird);
+            let v = - pow(sqrt_D + q, oneThird);
+            result.roots[0] = u + v;
+            result.count = 1;
+          }
+
+          // resubstitute
+
+          let sub = oneThird * A;
+
+          for (var i = 0; i < result.count; i++) {
+            result.roots[i] -= sub;
+          }
+
+          return result;
+        }
+
+        fn EstimateStartingT(Constants: vec4f, tstart: f32, tend: f32) -> f32 {
+          let gend = EvalG(Constants, tend);
+          let gstart = EvalG(Constants, tstart);
+          return (gend * tstart - gstart * tend) / (gend - gstart);
+        }
+
+
+        fn RaymarchFixedStep(Constants: vec4f, rayOrigin: vec3f, rayDir: vec3f, startT: f32, maxT: f32) -> f32 {
+          let eps = 0.02;
+          let debugRenderSolid = ubo.debugParams[0].y;
+          var t = max(startT, EstimateStartingT(Constants, startT, maxT));
+
+          while(t < maxT) {
+            let pos = rayOrigin + rayDir * t;
+            let d = TrilinearInterpolation(pos);
+            if (abs(d) <= eps) {
+              return t;
+            }
+            t += 0.01;
+          }
+          return -1.0;
+        }
+
+        fn RaymarchNewtonRaphson(Constants: vec4f, rayOrigin: vec3f, rayDir: vec3f, startT: f32, maxT: f32) -> f32 {
+          var remainingSteps = 500;
+          const eps = 0.001;
+          var t = max(startT, EstimateStartingT(Constants, startT, maxT));
+          while (t >= startT && t < maxT && remainingSteps > 0) {
+            let g =  EvalG(Constants, t);
+            let gprime = EvalGPrime(Constants, t);
+            let deltaT = -(g / gprime);
+
+            if (abs(deltaT) < eps) {
+              return t;
+            }
+
+            t += deltaT;
+            remainingSteps--;
+          }
+
+          return -1.0;
+        }
+
+
         @fragment
         fn FragmentMain(
           fragData: VertexOut
@@ -727,88 +875,74 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           //   2.0 * Constants[2],
           //   Constants[1]
           // );
-          let result = SolveQuadratic(
-            3.0 * Constants[3],
-            2.0 * Constants[2],
-            Constants[1]
-          );
+          // let result = SolveQuadraticGraphicsGems(
+          //   3.0 * Constants[3],
+          //   2.0 * Constants[2],
+          //   Constants[1]
+          // );
 
-          if (result.count == 0) {
-            out.color = vec4(0.0, 1.0, 1.0, 1.0);
-            return out;
-          }
-
+          let result = SolveCubicGraphicsGems(Constants);
           // let result = SolveCubic(Constants[3], Constants[2], Constants[1], Constants[0]);
 
-          var hit = false;
-          const maxSteps = 1000.0;
-          const kNumericEpsilon = 0.0001;
-          var startT = t;
+          let minRoot = i32(ubo.approachParams[0][0]);
+          let maxRoot = min(result.count, i32(ubo.approachParams[0][1]));
+          let fixedStepToggle = select(false, true, ubo.approachParams[0][2] > 0.0);
+          out.color = vec4(0.1);
 
-          for (var i = 0; i <= result.count && !hit; i++) {
-            var root: f32;
-            if (i == result.count) {
-              root = tInterval.y;
-            } else {
-              root = result.roots[i];
-            }
-
-            if (result.roots[i] < t) {
-              t = result.roots[i];
-              startT = t;
-              out.color = vec4(0.0, 1.0, 0.0, 1.0);
-              continue;
-            }
-
-            let start = EvalG(Constants, startT);
-            let end = EvalG(Constants, root);
-            if (sign(start) == sign(end)) {
-              startT = root;
-              continue;
-            }
-
-            t = startT;
-            var steps = 0.0;
-            while (steps < maxSteps) {
-              let g =  EvalG(Constants, t);
-              let gprime = EvalGPrime(Constants, t);
-              let deltaT = -(g / gprime);
-
-              // if (t < startT) {
-              //   out.color = vec4(1.0, 0.0, 0.0, 1.0);
-              //   break;
-              // }
-
-              // if (t > tInterval.y) {
-              //   out.color = vec4(0.0, 0.0, 1.0, 1.0);
-              //   break;
-              // }
-
-              if (abs(deltaT) < kNumericEpsilon) {
-                // out.color = vec4(ComputeNormal(rayOrigin + rayDir * t) * 0.5 + 0.5, 1.0);
-                out.color = vec4(rayOrigin + rayDir * t, 1.0);
-                return out;
-                // hit = true;
-                // break;
+          // Note: this _should_ work for cubic roots without any sort of stepping
+          for (var i = minRoot; i < maxRoot; i++) {
+            var root = result.roots[i];
+            if (root >= t && root < tInterval.y) {
+              let g = EvalG(Constants, root);
+              if (abs(g) < 0.01) {
+                out.color = vec4(0.0, 1.0, 0.0, 1.0);
+                break;
               }
+            }
+          }
+          return out;
 
-              t += deltaT;
-              steps += 1.0;
+          if (fixedStepToggle) {
+            for (var i = minRoot; i < maxRoot; i++) {
+              var root = result.roots[i];
+              if (root > t && root < tInterval.y) {
+                let foundT = RaymarchFixedStep(Constants, rayOrigin, rayDir, t, root);
+                if (foundT >= tInterval.x) {
+                  out.color = vec4(1.0, 1.0, 0.0, 1.0);
+                  return out;
+                } else {
+                  t = root;
+                }
+              }
             }
 
-            startT = result.roots[i] / tInterval.y;
-          }
+            let foundT = RaymarchFixedStep(Constants, rayOrigin, rayDir, t, tInterval.y);
+            if (foundT > -1.0) {
+              out.color = vec4(1.0, 0.0, 1.0, 1.0);
+              return out;
+            }
+          } else {
+            for (var i = minRoot; i < maxRoot; i++) {
+              var root = result.roots[i];
+              if (root >= t && root < tInterval.y) {
+                let foundT = RaymarchNewtonRaphson(Constants, rayOrigin, rayDir, t, root);
+                if (foundT >= 0.0) {
+                  out.color = vec4(0.0, 1.0, 0.0, 1.0);
+                  return out;
+                } else {
+                  t = root;
+                }
+              }
+            }
 
-          if (!hit) {
-            // if (result.count > 0) {
-              // out.color = vec4(JetLinear(result.roots[1] + 10.0), 1.0);
-              // out.color = vec4(JetLinear(1.0-closestT), 1.0);
-            // } else {
-              // out.color = vec4(1.0, 0.0, 1.0, 1.0);
-            // }
-            // discard;
+            {
+              let foundT = RaymarchNewtonRaphson(Constants, rayOrigin, rayDir, t, tInterval.y);
+              if (foundT >= 0.0) {
+                out.color = vec4(0.0, 1.0, 0.0, 1.0);
+                return out;
+              }
+            }
           }
-
           return out;
         }
       `
@@ -992,9 +1126,17 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         break;
       }
     }
+
+    let approachParams = state.params['approach-' + state.params.approach]
     switch (state.params.approach) {
       case 'fixed-step-ray-march': {
-        state.approachParams[0] = state.params['approach-fixed-step-ray-march'].maxFixedSteps
+        state.approachParams[0] = approachParams.maxFixedSteps
+        break;
+      }
+      case 'ray-tracing-signed-distance-grids': {
+        state.approachParams[0] = approachParams.minRoot
+        state.approachParams[1] = approachParams.maxRoot
+        state.approachParams[2] = approachParams.fixedStepToggle ? 1.0 : 0.0
         break;
       }
     }
