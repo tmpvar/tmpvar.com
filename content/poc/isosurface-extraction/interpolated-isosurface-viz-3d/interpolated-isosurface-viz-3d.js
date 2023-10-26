@@ -50,6 +50,17 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
   state.camera.state.distance = 3.0;
   state.camera.state.scrollSensitivity = 0.05;
 
+  // restore camera state
+  {
+    let str = localStorage.getItem('isosurface-extraction-3d/camera')
+    try {
+      Object.assign(state.camera.state, JSON.parse(str || '{}'))
+      console.log(state.camera.state);
+    } catch (e) {
+      localStorage.setItem('isosurface-extraction-3d/camera', '{}')
+    }
+  }
+
   try {
     state.gpu = await InitGPU(ctx);
   } catch (e) {
@@ -1193,6 +1204,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     state.lastFrameTime = now
 
     if (state.camera.tick(canvas.width, canvas.height, deltaTime)) {
+      localStorage.setItem('isosurface-extraction-3d/camera', JSON.stringify(state.camera.state));
       state.dirty = true;
     }
 
@@ -1315,8 +1327,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
       renderFunction(
         pass,
-        state.camera.state.worldToScreen,
-        state.camera.state.screenToWorld,
+        state.camera.computed.worldToScreen,
+        state.camera.computed.screenToWorld,
         [0, 0, 0],
         state.camera.state.eye,
         [canvas.width, canvas.height],
