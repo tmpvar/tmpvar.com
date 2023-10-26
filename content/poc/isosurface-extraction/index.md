@@ -243,11 +243,11 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
           <output></output>
         </div>
         <div class="c101-control control">
-          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="-2.0" step="0.01">
           <output></output>
         </div>
         <div class="c011-control control">
-          (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="2.0" step="0.01">
+          (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="-2.0" step="0.01">
           <output></output>
         </div>
         <div class="c111-control control">
