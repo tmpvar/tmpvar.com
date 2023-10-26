@@ -765,6 +765,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           return x > -EQN_EPS_GRAPHICS_GEMS && x < EQN_EPS_GRAPHICS_GEMS;
         }
 
+        fn IsNegative(v: f32) -> bool {
+          let bits = bitcast<u32>(v);
+          return (bits & (1<<31)) > 0;
+        }
+
         fn SolveQuadraticGraphicsGems(a: f32, b: f32, c: f32) -> QuadraticRoots {
           var result: QuadraticRoots;
           result.count = 0;
