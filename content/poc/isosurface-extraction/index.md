@@ -218,7 +218,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
       <div class="scene-control control">
         <select>
           <option value="time-varying" selected>Time Varying</option>
-          <option value="manual">Manual</option>
+          <option value="manual" selected>Manual</option>
         </select>
       </div>
       <div class="shownBy-scene indent" showValue="manual">
@@ -227,23 +227,23 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
           <output></output>
         </div>
         <div class="c100-control control">
-          (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="-2.0" step="0.01">
+          (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="2.0" step="0.01">
           <output></output>
         </div>
         <div class="c010-control control">
-          (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="-1.76" step="0.01">
+          (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c110-control control">
-          (1, 1, 0): <input type="range" min="-2.0" max="2.0" value="0.51" step="0.01">
+          (1, 1, 0): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c001-control control">
-          (0, 0, 1): <input type="range" min="-2.0" max="2.0" value="-0.97" step="0.01">
+          (0, 0, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c101-control control">
-          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="0.7" step="0.01">
+          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c011-control control">
@@ -251,7 +251,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
           <output></output>
         </div>
         <div class="c111-control control">
-          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="-0.28" step="0.01">
+          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="-2.0" step="0.01">
           <output></output>
         </div>
       </div>
@@ -262,7 +262,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
         <select>
           <option value="fixed-step-ray-march" selected>Fixed Step Raymarch</option>
           <!-- <option value="segment-marching">🚧 Segment Marching 🚧</option> -->
-          <option value="ray-tracing-signed-distance-grids">🚧 Ray Tracing Signed Distance Grids 🚧</option>
+          <option value="ray-tracing-signed-distance-grids" selected>🚧 Ray Tracing Signed Distance Grids 🚧</option>
         </select>
         <div class="shownBy-approach indent" showValue="fixed-step-ray-march">
           <div class="maxFixedSteps-control control">
@@ -279,17 +279,8 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
             max root: <input type="range" min="0" max="3" value="3" step="1">
             <output></output>
           </div>
-          <div class="fixedStepToggle-control control">
-            debug w/ fixed steps <input type="checkbox" value="1" />
-          </div>
-        </div>
-        <div class="shownBy-approach indent" showValue="ray-tracing-signed-distance-grids">
-          <div class="minRoot-control control">
-            min root: <input type="range" min="0" max="3" value="0" step="1">
-            <output></output>
-          </div>
-          <div class="maxRoot-control control">
-            max root: <input type="range" min="0" max="3" value="3" step="1">
+          <div class="maxNewtonRaphsonSteps-control control">
+            max Newton-Raphson steps: <input type="range" min="0" max="100" value="10" step="1">
             <output></output>
           </div>
           <div class="fixedStepToggle-control control">
