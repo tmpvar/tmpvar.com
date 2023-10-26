@@ -311,17 +311,22 @@ export default function CreateOrbitCamera() {
     up: [0.0, 1.0, 0.0],
     minDistance: 0.0001,
     maxDistance: 500,
-    projection: new Float32Array(16),
-    view: new Float32Array(16),
-    worldToScreen: new Float32Array(16),
-    screenToWorld: new Float32Array(16),
     sensitivity: 0.1,
     scrollSensitivity: 1.0,
     fov: 90 * DegreesToRadians,
   }
 
+  const computed = {
+    projection: new Float32Array(16),
+    view: new Float32Array(16),
+    worldToScreen: new Float32Array(16),
+    screenToWorld: new Float32Array(16),
+  }
+
   return {
     state: state,
+    computed: computed,
+
 
     rotate(dx, dy) {
       dx *= state.sensitivity
@@ -391,16 +396,16 @@ export default function CreateOrbitCamera() {
       state.eye[0] = Math.sin(state.pitch) * Math.cos(state.yaw) * state.distance
       state.eye[1] = Math.cos(state.pitch) * state.distance
 
-      LookAt(state.view, state.eye, state.target, state.up)
+      LookAt(computed.view, state.eye, state.target, state.up)
       PerspectiveZO(
-        state.projection,
+        computed.projection,
         state.fov,
         width / height,
         state.minDistance,
         state.maxDistance
       )
-      Multiply(state.worldToScreen, state.projection, state.view)
-      Invert(state.screenToWorld, state.worldToScreen)
+      Multiply(computed.worldToScreen, computed.projection, computed.view)
+      Invert(computed.screenToWorld, computed.worldToScreen)
       return ret
     }
   }
