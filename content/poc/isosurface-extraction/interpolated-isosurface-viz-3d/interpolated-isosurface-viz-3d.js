@@ -767,7 +767,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
         fn IsNegative(v: f32) -> bool {
           let bits = bitcast<u32>(v);
-          return (bits & (1<<31)) > 0;
+          return (bits & (1<<31)) != 0;
         }
 
         fn SolveQuadraticGraphicsGems(a: f32, b: f32, c: f32) -> QuadraticRoots {
