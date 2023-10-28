@@ -714,16 +714,74 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           );
         }
 
-        // // from: 'Interactive Raytracing for Isosurface Rendering' Parker et. al
-        // fn ComputeConstantsBruteForce(rayOrigin: vec3f, rayDir: vec3f) -> vec4f {
+        // from: 'Interactive Raytracing for Isosurface Rendering' Parker et. al
+        fn ComputeConstantsBruteForce(rayOrigin: vec3f, rayDir: vec3f) -> vec4f {
+          let a0 = 1.0 - rayOrigin;
+          let b0 = rayDir;
+          let a1 = rayOrigin;
+          let b1 = -rayDir;
 
-        //   let a0 = rayOrigin;
-        //   let b0 = rayDir;
+          let p000 = ubo.sceneParams[0][0];
+          let p100 = ubo.sceneParams[0][1];
+          let p010 = ubo.sceneParams[0][2];
+          let p110 = ubo.sceneParams[0][3];
 
-        //   let a1
+          let p001 = ubo.sceneParams[1][0];
+          let p101 = ubo.sceneParams[1][1];
+          let p011 = ubo.sceneParams[1][2];
+          let p111 = ubo.sceneParams[1][3];
 
 
-        // }
+          let A = (
+            b0.x * b0.y * b0.z * p000 +
+            b1.x * b1.y * b1.z * p100 +
+            b0.x * b0.y * b0.z * p010 +
+            b1.x * b1.y * b1.z * p110 +
+
+            b0.x * b0.y * b0.z * p001 +
+            b1.x * b1.y * b1.z * p101 +
+            b0.x * b0.y * b0.z * p011 +
+            b1.x * b1.y * b1.z * p111
+          );
+
+          let B = (
+            (a0.x * b0.y * b0.z + b0.x * a0.y * b0.z + b0.x * b0.y * a0.z) * p000 +
+            (a1.x * b1.y * b1.z + b1.x * a1.y * b1.z + b1.x * b1.y * a1.z) * p100 +
+            (a0.x * b0.y * b0.z + b0.x * a0.y * b0.z + b0.x * b0.y * a0.z) * p010 +
+            (a1.x * b1.y * b1.z + b1.x * a1.y * b1.z + b1.x * b1.y * a1.z) * p110 +
+
+            (a0.x * b0.y * b0.z + b0.x * a0.y * b0.z + b0.x * b0.y * a0.z) * p001 +
+            (a1.x * b1.y * b1.z + b1.x * a1.y * b1.z + b1.x * b1.y * a1.z) * p101 +
+            (a0.x * b0.y * b0.z + b0.x * a0.y * b0.z + b0.x * b0.y * a0.z) * p011 +
+            (a1.x * b1.y * b1.z + b1.x * a1.y * b1.z + b1.x * b1.y * a1.z) * p111
+          );
+
+          let C = (
+            (b0.x * a0.y * a0.z + a0.x * b0.y * a0.z + a0.x * a0.y * b0.z) * p000 +
+            (b1.x * a1.y * a1.z + a1.x * b1.y * a1.z + a1.x * a1.y * b1.z) * p100 +
+            (b0.x * a0.y * a0.z + a0.x * b0.y * a0.z + a0.x * a0.y * b0.z) * p010 +
+            (b1.x * a1.y * a1.z + a1.x * b1.y * a1.z + a1.x * a1.y * b1.z) * p110 +
+
+            (b0.x * a0.y * a0.z + a0.x * b0.y * a0.z + a0.x * a0.y * b0.z) * p001 +
+            (b1.x * a1.y * a1.z + a1.x * b1.y * a1.z + a1.x * a1.y * b1.z) * p101 +
+            (b0.x * a0.y * a0.z + a0.x * b0.y * a0.z + a0.x * a0.y * b0.z) * p011 +
+            (b1.x * a1.y * a1.z + a1.x * b1.y * a1.z + a1.x * a1.y * b1.z) * p111
+          );
+
+          let D = (
+            (a0.x * a0.y * a0.z) * p000 +
+            (a1.x * a1.y * a1.z) * p100 +
+            (a0.x * a0.y * a0.z) * p010 +
+            (a1.x * a1.y * a1.z) * p110 +
+
+            (a0.x * a0.y * a0.z) * p001 +
+            (a1.x * a1.y * a1.z) * p101 +
+            (a0.x * a0.y * a0.z) * p011 +
+            (a1.x * a1.y * a1.z) * p111
+          );
+
+          return vec4f(A, B, C, D);
+        }
 
         fn EvalG(constants: vec4f, t: f32) -> f32 {
           return constants[3] * pow(t, 3.0) +
