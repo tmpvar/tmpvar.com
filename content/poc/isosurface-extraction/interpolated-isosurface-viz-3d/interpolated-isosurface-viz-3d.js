@@ -862,6 +862,49 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           return result;
         }
 
+        // see: https://people.csail.mit.edu/bkph/articles/Quadratics.pdf
+        fn SolveQuadraticBertholdHorn(a: f32, b: f32, c: f32) -> QuadraticRoots {
+          var result: QuadraticRoots;
+          result.count = 0;
+
+          if (IsZeroGraphicsGems(a)) {
+            result.roots[0] = - c / b;
+            result.count = 1;
+            return result;
+          }
+
+          let s = sqrt(b * b - 4.0 * a * c);
+          if (b >= 0.0) {
+            let q = -b - s;
+
+            if (IsZeroGraphicsGems(q)) {
+              result.count = 0;
+              return result;
+            }
+
+            let x1 = q / (2.0 * a);
+            let x2 = (2.0 * c) / q;
+
+            result.roots[0] = min(x1, x2);
+            result.roots[1] = max(x1, x2);
+            result.count = 2;
+          } else {
+            let q = -b + s;
+
+            if (IsZeroGraphicsGems(q)) {
+              result.count = 0;
+              return result;
+            }
+
+            let x1 = (2.0 * c) / q;
+            let x2 = q / (2.0 * a);
+            result.roots[0] = min(x1, x2);
+            result.roots[1] = max(x1, x2);
+            result.count = 2;
+          }
+
+          return result;
+        }
 
         struct CubicRoots {
           roots: vec3f,
