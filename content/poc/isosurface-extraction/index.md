@@ -223,15 +223,15 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
       </div>
       <div class="shownBy-scene indent" showValue="manual">
         <div class="c000-control control">
-          (0, 0, 0): <input type="range" min="-2.0" max="2.0" value="2.0" step="0.01">
+          (0, 0, 0): <input type="range" min="-2.0" max="2.0" value="-2" step="0.01">
           <output></output>
         </div>
         <div class="c100-control control">
-          (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="2.0" step="0.01">
+          (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c010-control control">
-          (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="-2" step="0.01">
           <output></output>
         </div>
         <div class="c110-control control">
@@ -243,15 +243,15 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
           <output></output>
         </div>
         <div class="c101-control control">
-          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="-2.0" step="0.01">
+          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c011-control control">
-          (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="-2.0" step="0.01">
+          (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c111-control control">
-          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="-2.0" step="0.01">
+          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
       </div>
@@ -262,7 +262,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
         <select>
           <option value="fixed-step-ray-march" selected>Fixed Step Raymarch</option>
           <!-- <option value="segment-marching">🚧 Segment Marching 🚧</option> -->
-          <option value="ray-tracing-signed-distance-grids" selected>🚧 Ray Tracing Signed Distance Grids 🚧</option>
+          <option value="ray-tracing-signed-distance-grids">🚧 Ray Tracing Signed Distance Grids 🚧</option>
         </select>
         <div class="shownBy-approach indent" showValue="fixed-step-ray-march">
           <div class="maxFixedSteps-control control">

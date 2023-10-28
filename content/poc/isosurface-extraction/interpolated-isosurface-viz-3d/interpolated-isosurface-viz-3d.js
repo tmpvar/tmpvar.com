@@ -500,6 +500,45 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           return num * cool + (1.0 - num) * warm;
         }
 
+        fn IsNegative(v: f32) -> bool {
+          return (bitcast<u32>(v) & (1<<31)) != 0;
+        }
+
+
+        // d is the previous interpolated value that allows us to determine which side of
+        // the surface we were on before the zero crossing
+        fn ComputeColor(pos: vec3f, rayDir: vec3f, d: f32) -> vec4f {
+          let baseColor = ${HexColorToVec3f('#26854c')};
+          let hitNormal = sign(d) * ComputeNormal(pos);
+
+          const lightPos = vec3(4.0, 1.0, 0.5);
+          let lightDir = normalize((pos * 2.0 - 1.0) - lightPos);
+          let ndotl = dot(hitNormal, lightDir);
+          var color = baseColor * max(0.4, ndotl);
+          let reflectDir = reflect(-lightDir, hitNormal);
+          let spec = pow(max(dot(rayDir, reflectDir), 0.0), 2) * 0.1;
+
+          // from 'A Non-Photorealistic lighting model for automatic technical illustration"
+          if (true) {
+            let alpha = 0.6;
+            let beta = 0.5;
+            let b = 0.4;
+            let y = 0.4;
+
+            let kcool = ${HexColorToVec3f('#0000FF')} * alpha;
+            let kwarm = ${HexColorToVec3f('#FFFF00')} * beta;
+
+            color = baseColor + ToneMapGooch(-ndotl, kcool, kwarm);
+            // color = ToneMapGooch(ndotl, kcool, kwarm);
+            color += spec;
+          } else {
+            let spec = pow(max(dot(rayDir, reflectDir), 0.0), 16);
+            color = baseColor * max(0.5, ndotl) + vec3(1.0) * spec;
+          }
+
+          return vec4f(color, 1.0);
+        }
+
         @fragment
         fn FragmentMain(
           fragData: VertexOut
@@ -541,42 +580,12 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           while(t < tInterval.y) {
             let pos = rayOrigin + rayDir * t;
             let d = TrilinearInterpolation(pos);
-            if (
-              (debugRenderSolid > 0.0 && d <= 0.0) ||
-              sign(lastD) != sign(d)
-            ) {
-              // let baseColor = ${HexColorToVec3f('#ffffff')};
-              let baseColor = ${HexColorToVec3f('#26854c')};
-              let hitNormal = sign(d) * ComputeNormal(pos);
-
-              const lightPos = vec3(4.0, 1.0, 0.5);
-              let lightDir = normalize((pos * 2.0 - 1.0) - lightPos);
-              let ndotl = dot(hitNormal, lightDir);
-              var color = baseColor * max(0.4, ndotl);
-
-
-              // from 'A Non-Photorealistic lighting model for automatic technical illustration"
-              if (true) {
-                let alpha = 0.6;
-                let beta = 0.5;
-                let b = 0.4;
-                let y = 0.4;
-
-                let kcool = ${HexColorToVec3f('#0000FF')} * alpha;
-                let kwarm = ${HexColorToVec3f('#FFFF00')} * beta;
-
-                color = baseColor + ToneMapGooch(-ndotl, kcool, kwarm);
-                // color = ToneMapGooch(ndotl, kcool, kwarm);
-              }
-              else
-              {
-                let reflectDir = reflect(-lightDir, hitNormal);
-                let spec = pow(max(dot(rayDir, reflectDir), 0.0), 2) * 0.1;
-                color = baseColor * max(0.5, ndotl) + vec3(1.0) * spec;
-              }
-
-              out.color = vec4(color, 1.0);
-              // out.color = vec4(hitNormal * 0.5 + 0.5, 1.0);
+            if (d == 0.0) {
+              out.color = ComputeColor(pos, rayDir, lastD);
+              return out;
+            } else if (IsNegative(lastD) != IsNegative(d)) {
+              // TODO: linear interpolation to find a better estimate of the zero crossing t value
+              out.color = ComputeColor(pos, rayDir, lastD);
               return out;
             }
 
@@ -588,13 +597,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
           if (t >= tInterval.y) {
             let baseColor = vec3f(0.4);
-            // out.color = vec4f(baseColor * g, 1.0);
-
-            // let dFdxPos = dpdx(fragData.worldPosition);
-            // let dFdyPos = dpdy(fragData.worldPosition);
             var v: f32;
-
-
             let divisions = 20.0;
             let ratio = 20.0;
             let faceUV = (fragData.faceUV) * divisions;// + 1.0 / ratio * 0.5;
@@ -607,20 +610,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             }
 
             var color = baseColor * (1.0 - v);
-            // color = mix(color, vec3(1.0), 1.0 - exp( -0.5*t*t ) );
-
 
             out.color = vec4(color, 1.0);
             return out;
-
-
-            // if (length(modf(uvw).fract) > 0.5) {
-            //   out.color = vec4(1.0);
-            //   return out;
-            // }
-            // out.color = vec4(((1.0 - steps/(maxSteps * 8)) + 1.0) / 6.0);
-            // out.color = vec4(normal * 0.5 + 0.5, 1.0);
-            // hit = true;
           }
 
           if (!hit) {
@@ -780,6 +772,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             (a1.x * a1.y * a1.z) * p111
           );
 
+          // return vec4f(D, C, B, A);
           return vec4f(A, B, C, D);
         }
 
@@ -835,8 +828,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
 
         fn IsNegative(v: f32) -> bool {
-          let bits = bitcast<u32>(v);
-          return (bits & (1<<31)) != 0;
+          return (bitcast<u32>(v) & (1<<31)) != 0;
         }
 
         fn SolveQuadraticGraphicsGems(a: f32, b: f32, c: f32) -> QuadraticRoots {
@@ -1108,10 +1100,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             tInterval.x = 0.0;
           }
 
-          let Constants = ComputeConstants(rayOrigin, rayDir);
+          let Constants = ComputeConstantsBruteForce(rayOrigin, rayDir);
 
           // solve via quadratic roots
-          {
+          if (false) {
             // var result = SolveQuadratic(
             //   3.0 * Constants[3],
             //   2.0 * Constants[2],
@@ -1153,6 +1145,47 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
                 if (foundT >= 0.0) {
                   out.color += vec4(0.0, 0.2, 0.0, 1.0);
                   // return out;
+                }
+              } else {
+                out.color += vec4(0.4, 0.0, 0.0, 1.0);
+              }
+              lastRoot = root;
+            }
+          }
+
+          // solve via quadratic roots
+          if (true) {
+
+            var result = SolveCubicGraphicsGems(Constants);
+
+            // color based on root count
+            {
+              var col = i32(result.count + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+              col = col % vec3<i32>(255, 253, 127);
+              out.color = vec4(vec3f(col) / 255.0, 1.0);
+            }
+
+            // out.color = vec4(0.0, 0.0, ((f32(result.count) * 0.5) * 0.1), 1.0);
+            if (result.count == 2) {
+              out.color = vec4(0.0, 0.0, 0.0, 1.0);
+            }
+
+            // result.roots[0] = max(0.0, result.roots[0]);
+            // result.roots[1] = min(tInterval.y, result.roots[1]);
+            result.roots[result.count] = tInterval.y;
+            result.count++;
+
+            var lastRoot = tInterval.x;
+            for (var i = 0; i <= result.count; i++) {
+              var root = result.roots[i];
+
+              let lg = EvalG(Constants, lastRoot);
+              let cg = EvalG(Constants, root);
+              if (sign(lg) != sign(cg) || lg == cg) {
+                let foundT = RaymarchNewtonRaphson(Constants, rayOrigin, rayDir, lastRoot, root);
+                if (foundT != -1.0) {
+                  out.color += vec4(0.0, 0.2, 0.0, 1.0);
+                  return out;
                 }
               } else {
                 out.color += vec4(0.4, 0.0, 0.0, 1.0);
@@ -1431,7 +1464,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         state.camera.computed.worldToScreen,
         state.camera.computed.screenToWorld,
         [0, 0, 0],
-        state.camera.state.eye,
+        state.camera.computed.eye,
         [canvas.width, canvas.height],
         objectID,
         state.sceneParams,
