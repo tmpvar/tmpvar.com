@@ -240,7 +240,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
           <output></output>
         </div>
         <div class="c101-control control">
-          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="-2" step="0.01">
           <output></output>
         </div>
         <div class="c011-control control">
@@ -248,7 +248,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
           <output></output>
         </div>
         <div class="c111-control control">
-          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="-1.5" step="0.01">
           <output></output>
         </div>
       </div>
@@ -263,7 +263,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
         </select>
         <div class="shownBy-approach indent" showValue="fixed-step-ray-march">
           <div class="maxFixedSteps-control control">
-            max fixed steps: <input type="range" min="10.0" max="1000.0" value="200.0" step="1.0">
+            max fixed steps: <input type="range" min="1.0" max="1000.0" value="200.0" step="1.0">
             <output></output>
           </div>
         </div>

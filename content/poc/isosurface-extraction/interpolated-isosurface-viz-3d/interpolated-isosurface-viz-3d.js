@@ -217,7 +217,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
 
         fn ComputeNormal(pos: vec3f) -> vec3f {
-          const eps = 0.001; // or some other value
+          const eps = 0.00001; // or some other value
           const h = vec2f(eps,0.0);
           return normalize(
              vec3f(
@@ -534,6 +534,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             color = baseColor * max(0.5, ndotl) + vec3(1.0) * spec;
           }
 
+          color = hitNormal * 0.5 + 0.5;
+
           return vec4f(color, 1.0);
         }
 
@@ -571,9 +573,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
           let maxSteps = ubo.approachParams[0].x;
           let invMaxSteps = 1.0 / maxSteps;
-          let eps = invMaxSteps * 4.0;
           var lastT = t;
-          var lastD = TrilinearInterpolation(rayOrigin + rayDir * tInterval.x);
+          var lastD = TrilinearInterpolation(rayOrigin);
+          var lastSlope = (TrilinearInterpolation(rayOrigin + rayDir * invMaxSteps) - lastD) / invMaxSteps;
           while(t < tInterval.y) {
             let pos = rayOrigin + rayDir * t;
             let d = TrilinearInterpolation(pos);
@@ -582,14 +584,39 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
               return out;
             } else if (IsNegative(lastD) != IsNegative(d)) {
               // TODO: linear interpolation to find a better estimate of the zero crossing t value
-              out.color = ComputeColor(pos, rayDir, lastD);
+              let tguess = t;// + abs(d - lastD) / (t - lastT);
+              let newPos = rayOrigin + rayDir * tguess;
+              out.color = ComputeColor(newPos, rayDir, lastD);
               return out;
             }
 
+            let deltaT = t - lastT;
+            let deltaD = d - lastD;
+            let slope = deltaD / deltaT;
+            t += invMaxSteps;
+
+
+            if (IsNegative(lastSlope) != IsNegative(slope)) {
+              // TODO: linear interpolation to find a better estimate of the zero crossing t value
+              // if (deltaD == 0.0) {
+              //   continue;
+              // }
+              // let tguess = lastT;// + slope * min(d, lastD) / deltaD;//abs(d - lastD) / (t - lastT);
+              // let newPos = rayOrigin + rayDir * tguess;
+              // out.color = ComputeColor(newPos, rayDir, lastD);
+              // return out;
+              out.color += vec4(0.0, 0.8, 0.0, 1.0);
+              hit = true;
+            }
+            lastSlope = slope;
+
             lastD = d;
             lastT = t;
-            t += invMaxSteps;
             steps += 1.0;
+          }
+
+          if (hit) {
+            return out;
           }
 
           if (t >= tInterval.y) {
