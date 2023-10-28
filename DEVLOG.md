@@ -41,7 +41,6 @@
 - radiance-cascades/3d: trace screen space rays through hiz texture
 
 ## Pending
-- isosurface-extraction: why is y not up?
 - isosurface-extraction: fixed step, perform backtrack step
 
 - isosurface-extraction: run a fixed step ray march from minRoot->maxRoot in an attempt to
@@ -52,7 +51,8 @@
                          run a few newton-raphson steps to find the actual crossing.
 - isosurface-extraction: better lighting for direct
 
-## 2023-10-24
+## 2023-10-28
+- isosurface-extraction: why is y not up?
 ## 2023-10-23
 - isosurface-extraction: build marching squares lookup table code
 - isosurface-extraction: build marching squares lookup graphic

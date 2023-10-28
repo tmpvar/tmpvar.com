@@ -192,11 +192,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
 
         fn TrilinearInterpolation(uvw: vec3f) -> f32{
-          // let factor = saturate(uvw);
-          // let factor = fract(uvw);
           let factor = uvw;
+
           let invFactor = 1.0 - factor;
-          // format: c{X}{Y}{Z}
           let c000 = ubo.sceneParams[0][0];
           let c100 = ubo.sceneParams[0][1];
           let c010 = ubo.sceneParams[0][2];
@@ -212,10 +210,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let c01 = c001 * invFactor.x + c101 * factor.x;
           let c11 = c011 * invFactor.x + c111 * factor.x;
 
-          let c0 = c00 * invFactor.z + c10 * factor.z;
-          let c1 = c01 * invFactor.z + c11 * factor.z;
+          let c0 = c00 * invFactor.y + c10 * factor.y;
+          let c1 = c01 * invFactor.y + c11 * factor.y;
 
-          return c0 * invFactor.y + c1 * factor.y;
+          return c0 * invFactor.z + c1 * factor.z;
         }
 
         fn ComputeNormal(pos: vec3f) -> vec3f {
