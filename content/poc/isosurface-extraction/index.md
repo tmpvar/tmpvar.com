@@ -209,9 +209,6 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
       <div class="debugRenderStepCount-control control">
         render step count <input type="checkbox" value="1" />
       </div>
-      <div class="debugRenderSolid-control control">
-        render solid <input type="checkbox" value="1" />
-      </div>
     </div>
     <h4>Scene</h4>
     <div class="indent">
@@ -259,7 +256,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
     <h4>Approach</h4>
     <div class="indent">
       <div class="approach-control control">
-        <select>
+        <select style="display:none">
           <option value="fixed-step-ray-march" selected>Fixed Step Raymarch</option>
           <!-- <option value="segment-marching">🚧 Segment Marching 🚧</option> -->
           <option value="ray-tracing-signed-distance-grids">🚧 Ray Tracing Signed Distance Grids 🚧</option>
