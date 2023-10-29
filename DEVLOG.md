@@ -23,6 +23,12 @@
 - radiance-cascades/2d: how to fix the ringing artifacts?
 
 ## Next
+- isosurface-extraction: fixed step, perform backtrack step
+- isosurface-extraction: run a fixed step ray march from minRoot->maxRoot in an attempt to
+                         understand if the roots are even viable.
+- isosurface-extraction: segment tracing - take larger fixed steps and when we detect a crossing
+                         run a few newton-raphson steps to find the actual crossing.
+- isosurface-extraction: better lighting for direct
 - linear-interpolation: add demo for line searching
 - linear-interpolation: add basic 3D interactive demo
 
@@ -39,20 +45,24 @@
 - radiance-cascades/3d: collect depth buffer and mipmap it into a
                         red/green (min/max) f32 texture
 - radiance-cascades/3d: trace screen space rays through hiz texture
+- isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
 
 ## Pending
-- isosurface-extraction: fixed step, perform backtrack step
-
-- isosurface-extraction: run a fixed step ray march from minRoot->maxRoot in an attempt to
-                         understand if the roots are even viable.
-- isosurface-extraction: build marching squares lookup table code
-- isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
-- isosurface-extraction: segment tracing - take larger fixed steps and when we detect a crossing
-                         run a few newton-raphson steps to find the actual crossing.
-- isosurface-extraction: better lighting for direct
+- isosurface-extraction: draw surface on the box faces
+- isosurface-extraction: draw a second box controlled by the same camera
+- isosurface-extraction: port the learning marching cubes code
+- isosurface-extraction: render the marching cubes output for the current scene
+- isosurface-extraction: extend the learning marching cubes code to handle the subcases and
+                         disambiguation
+- isosurface-extraction: render the marching cubes 33 output for the current scene
 
 ## 2023-10-28
+- isosurface-extraction: I asked Simon about how he's rendering the surface directly and
+                         he said it's just brute force
+                         https://mastodon.gamedev.place/@tmpvar/111314313225273691
 - isosurface-extraction: why is y not up?
+## 2023-10-24
+- isosurface-extraction: build marching squares lookup table code
 ## 2023-10-23
 - isosurface-extraction: build marching squares lookup table code
 - isosurface-extraction: build marching squares lookup graphic
