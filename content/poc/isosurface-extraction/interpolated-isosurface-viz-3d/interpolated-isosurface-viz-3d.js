@@ -534,7 +534,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             color = baseColor * max(0.5, ndotl) + vec3(1.0) * spec;
           }
 
-          color = hitNormal * 0.5 + 0.5;
+          // color = hitNormal * 0.5 + 0.5;
 
           return vec4f(color, 1.0);
         }
@@ -596,18 +596,18 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             t += invMaxSteps;
 
 
-            if (IsNegative(lastSlope) != IsNegative(slope)) {
-              // TODO: linear interpolation to find a better estimate of the zero crossing t value
-              // if (deltaD == 0.0) {
-              //   continue;
-              // }
-              // let tguess = lastT;// + slope * min(d, lastD) / deltaD;//abs(d - lastD) / (t - lastT);
-              // let newPos = rayOrigin + rayDir * tguess;
-              // out.color = ComputeColor(newPos, rayDir, lastD);
-              // return out;
-              out.color += vec4(0.0, 0.8, 0.0, 1.0);
-              hit = true;
-            }
+            // if (IsNegative(lastSlope) != IsNegative(slope)) {
+            //   // TODO: linear interpolation to find a better estimate of the zero crossing t value
+            //   // if (deltaD == 0.0) {
+            //   //   continue;
+            //   // }
+            //   // let tguess = lastT;// + slope * min(d, lastD) / deltaD;//abs(d - lastD) / (t - lastT);
+            //   // let newPos = rayOrigin + rayDir * tguess;
+            //   // out.color = ComputeColor(newPos, rayDir, lastD);
+            //   // return out;
+            //   out.color += vec4(0.0, 0.8, 0.0, 1.0);
+            //   hit = true;
+            // }
             lastSlope = slope;
 
             lastD = d;
