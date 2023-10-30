@@ -20,9 +20,9 @@ Unfortunately, when spending the time to write the POC in Javascript is usually 
 
 ## Goals
 
-### one OS level allocation
+### one OS-level allocation
 
-I've become accustomed to pre-allocating a heap and splitting it into regions to be sub-allocated. This means that systems can manage their own memory in the best way that makes sense for them. Reaching for the OS level `malloc()` is just wasteful in many cases.
+I've become accustomed to pre-allocating a heap and splitting it into regions to be sub-allocated. This means that systems can manage their own memory in the best way that makes sense for them. Reaching for the OS-level `malloc()` is just wasteful in many cases.
 
 Ideally, all of the memory that the C code uses is instantiated on the JS side via an `ArrayBuffer`.
 
