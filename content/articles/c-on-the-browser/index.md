@@ -51,6 +51,7 @@ Thankfully the LLVM project has supported wasm for some time now - let's see how
 refs:
  - [depth-first.com](https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/)
  - [surma.dev](https://surma.dev/things/c-to-webassembly/)
+ - [https://aransentin.github.io/cwasm/](https://aransentin.github.io/cwasm/)
 
 ```bash
 clang \
