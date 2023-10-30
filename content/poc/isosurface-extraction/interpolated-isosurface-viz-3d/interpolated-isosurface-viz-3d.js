@@ -2,6 +2,9 @@ import CreateOrbitCamera from "./orbit-camera.js"
 import CreateParamReader from "./params.js"
 import CreateCubeMesh from './primitive-cube.js'
 
+import * as vec4 from './gl-matrix/vec4.js'
+import * as vec3 from './gl-matrix/vec3.js'
+
 InterpolatedIsosurfaceBegin(
   document.getElementById('interpolated-isosurface-viz-3d-content')
 )
@@ -517,23 +520,55 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ]
       })
 
+      let corner = vec4.create()
+      let scratch = vec4.create()
+      let dir = vec3.create();
       return function BlitOverlay(
         commandEncoder,
         queue,
-        frameTextureView
+        frameTextureView,
+        worldToScreen,
+        eye
       ) {
+        vec3.normalize(dir, eye)
         overlayContext.canvas.width = 0
         overlayContext.canvas.width = 1024
 
-        overlayContext.ctx.fillStyle = "orange"
-        overlayContext.ctx.fillRect(10, 10, 100, 100);
+        let ctx = overlayContext.ctx;
+        ctx.fillStyle = "orange"
+        const width = overlayContext.canvas.width
+        const height = overlayContext.canvas.height
+        corner[3] = 1
+        for (let x = -1.0; x <= 1.0; x += 2.0) {
+          corner[0] = x;
+          for (let y = -1.0; y <= 1.0; y += 2.0) {
+            corner[1] = y
+            for (let z = -1.0; z <= 1.0; z += 2.0) {
+              corner[2] = z
+
+              vec3.normalize(scratch, corner)
+              let d = vec3.dot(dir, scratch)
+
+              if (d > -0.45) {
+                vec4.transformMat4(scratch, corner, worldToScreen)
+                ctx.beginPath()
+                scratch[0] /= scratch[3]
+                scratch[1] /= scratch[3]
+
+                let px = Math.floor((scratch[0] * 0.5 + 0.5) * width)
+                let py = Math.floor((scratch[1] * 0.5 + 0.5) * height)
+                ctx.arc(px, py, 5, 0, Math.PI * 2.0)
+                ctx.fill()
+              }
+            }
+          }
+        }
 
         queue.copyExternalImageToTexture(
           { source: overlayContext.canvas },
           { texture: overlayContext.texture },
           [overlayContext.canvas.width, overlayContext.canvas.height]
         )
-
 
         let colorAttachment = {
           view: frameTextureView,
@@ -1072,7 +1107,13 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       pass.end();
     }
 
-    state.gpu.programs.drawOverlay(commandEncoder, state.gpu.device.queue, frameTextureView)
+    state.gpu.programs.drawOverlay(
+      commandEncoder,
+      state.gpu.device.queue,
+      frameTextureView,
+      state.camera.computed.worldToScreen,
+      state.camera.computed.eye
+    )
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
 
