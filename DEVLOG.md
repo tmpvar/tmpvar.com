@@ -50,7 +50,8 @@
 ## Pending
 - isosurface-extraction: draw surface on the box faces
 - isosurface-extraction: draw a second box controlled by the same camera
-- isosurface-extraction: port the learning marching cubes code
+- isosurface-extraction: port a single triangle from the mc code
+- isosurface-extraction: port the rest of the learning marching cubes code
 - isosurface-extraction: render the marching cubes output for the current scene
 - isosurface-extraction: extend the learning marching cubes code to handle the subcases and
                          disambiguation
