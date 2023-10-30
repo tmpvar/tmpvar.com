@@ -416,6 +416,147 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         pass.draw(mesh.vertexCount, 1);
       }
     },
+
+    BlitOverlay(gpu, overlayContext) {
+      const labelPrefix = gpu.labelPrefix + 'BlitOverlay/'
+      const device = gpu.device
+
+      const source = /* wgsl */`
+        struct VertexOut {
+          @builtin(position) position : vec4f,
+          @location(0) uv : vec2f
+        }
+
+        const vertPos = array<vec2<f32>, 3>(
+          vec2f(-1.0,-1.0),
+          vec2f(-1.0, 4.0),
+          vec2f( 4.0,-1.0)
+        );
+
+        @vertex
+        fn VertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
+          var output : VertexOut;
+          var pos = vertPos[vertexIndex];
+          output.position = vec4f(pos, 0.0, 1.0);
+          output.uv = pos * 0.5 + 0.5;
+          return output;
+        }
+
+        const PI: f32 = 3.141592653589793;
+        const TAU: f32 = PI * 2;
+
+        @group(0) @binding(0) var overlayTexture: texture_2d<f32>;
+
+        @fragment
+        fn FragmentMain(fragData: VertexOut) -> @location(0) vec4f {
+          var scale = 1.0;
+          let dims = vec2f(textureDimensions(overlayTexture));
+          var pixelPos = vec2<i32>(fragData.uv * dims);
+
+          return textureLoad(overlayTexture, pixelPos, 0);
+        }
+      `;
+
+      const shaderModule = device.createShaderModule({
+        label: `${labelPrefix}/ShaderModule`,
+        code: source
+      })
+
+      const bindGroupLayout = device.createBindGroupLayout({
+        label: `${labelPrefix}BindGroupLayout`,
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: {
+              sampleType: 'float'
+            }
+          }
+        ]
+      })
+
+      const pipeline = device.createRenderPipeline({
+        label: `${labelPrefix}RenderPipeline`,
+        vertex: {
+          module: shaderModule,
+          entryPoint: 'VertexMain',
+        },
+        fragment: {
+          module: shaderModule,
+          entryPoint: 'FragmentMain',
+          targets: [{
+            format: gpu.presentationFormat,
+            blend: {
+              color: {
+                srcFactor: 'one',
+                operation: 'add',
+                dstFactor: 'one-minus-src-alpha',
+              },
+              alpha: {},
+            },
+          }],
+        },
+        primitive: {
+          topology: 'triangle-list'
+        },
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [
+            bindGroupLayout,
+          ]
+        }),
+      })
+
+      const bindGroup = device.createBindGroup({
+        label: `${labelPrefix}BindGroup`,
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: overlayContext.texture.createView()
+          }
+        ]
+      })
+
+      return function BlitOverlay(
+        commandEncoder,
+        queue,
+        frameTextureView
+      ) {
+        overlayContext.canvas.width = 0
+        overlayContext.canvas.width = 1024
+
+        overlayContext.ctx.fillStyle = "orange"
+        overlayContext.ctx.fillRect(10, 10, 100, 100);
+
+        queue.copyExternalImageToTexture(
+          { source: overlayContext.canvas },
+          { texture: overlayContext.texture },
+          [overlayContext.canvas.width, overlayContext.canvas.height]
+        )
+
+
+        let colorAttachment = {
+          view: frameTextureView,
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'load',
+          storeOp: 'store'
+        };
+
+        const renderPassDesc = {
+          colorAttachments: [
+            colorAttachment,
+          ]
+        };
+
+        let pass = commandEncoder.beginRenderPass(renderPassDesc)
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bindGroup)
+        pass.setViewport(0, 0, overlayContext.canvas.width, overlayContext.canvas.height, 0, 1);
+        pass.setScissorRect(0, 0, overlayContext.canvas.width, overlayContext.canvas.height);
+        pass.draw(3);
+        pass.end()
+      }
+    }
   }
 
   const textures = {
@@ -456,6 +597,28 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
   state.gpu.buffers = {}
   state.mesh = CreateCubeMesh(state.gpu)
+
+  {
+    state.overlay = {
+      canvas: document.createElement('canvas')
+    }
+    state.overlay.canvas.width = 1024
+    state.overlay.canvas.height = 1024
+    state.overlay.ctx = state.overlay.canvas.getContext('2d', {
+      alpha: true
+    })
+    state.overlay.texture = state.gpu.device.createTexture({
+      label: `${state.gpu.labelPrefix}Overlay`,
+      size: [canvas.width, canvas.height],
+      dimension: '2d',
+      usage: (
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.TEXTURE_BINDING
+      ),
+      format: 'rgba8unorm'
+    })
+  }
 
   state.gpu.programs = {
     raymarchFixedStep: shaders.RenderTriangleSoup(
@@ -651,6 +814,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
       `
     ),
+
+    drawOverlay: shaders.BlitOverlay(state.gpu, state.overlay)
   }
 
   async function InitGPU(ctx) {
@@ -906,6 +1071,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       )
       pass.end();
     }
+
+    state.gpu.programs.drawOverlay(commandEncoder, state.gpu.device.queue, frameTextureView)
+
     state.gpu.device.queue.submit([commandEncoder.finish()])
 
     requestAnimationFrame(RenderFrame)
