@@ -192,7 +192,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
 
         fn TrilinearInterpolation(uvw: vec3f) -> f32{
-          let factor = uvw;
+          let factor = vec3(1.0-uvw.x, uvw.y, uvw.z);
 
           let invFactor = 1.0 - factor;
           let c000 = ubo.sceneParams[0][0];
@@ -506,8 +506,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         // d is the previous interpolated value that allows us to determine which side of
         // the surface we were on before the zero crossing
         fn ComputeColor(pos: vec3f, rayDir: vec3f, d: f32) -> vec4f {
-          let baseColor = ${HexColorToVec3f('#26854c')};
-          let hitNormal = sign(d) * ComputeNormal(pos);
+          let baseColor = select(${HexColorToVec3f('#5ab552')}, ${HexColorToVec3f('#fa6e79')}, d >= 0.0);
+          let hitNormal = ComputeNormal(pos);
 
           const lightPos = vec3(4.0, 1.0, 0.5);
           let lightDir = normalize((pos * 2.0 - 1.0) - lightPos);
@@ -517,7 +517,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let spec = pow(max(dot(rayDir, reflectDir), 0.0), 2) * 0.1;
 
           // from 'A Non-Photorealistic lighting model for automatic technical illustration"
-          if (true) {
+          if (false) {
             let alpha = 0.6;
             let beta = 0.5;
             let b = 0.4;
@@ -530,8 +530,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             // color = ToneMapGooch(ndotl, kcool, kwarm);
             color += spec;
           } else {
-            let spec = pow(max(dot(rayDir, reflectDir), 0.0), 16);
-            color = baseColor * max(0.5, ndotl) + vec3(1.0) * spec;
+            let spec = pow(max(dot(rayDir, reflectDir), 0.0), 16) * 0.4;
+            color = baseColor * max(0.5, ndotl);// + vec3(1.0) * spec;
           }
 
           // color = hitNormal * 0.5 + 0.5;
