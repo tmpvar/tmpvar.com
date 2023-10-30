@@ -1,5 +1,5 @@
 +++
-title = "Running C in the browser with WebAssembly"
+title = "Running C on the browser with WebAssembly"
 date = 2023-10-29
 
 [extra]
