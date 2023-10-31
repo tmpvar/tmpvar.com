@@ -5,6 +5,7 @@ import CreateCubeMesh from './primitive-cube.js'
 import * as vec4 from './gl-matrix/vec4.js'
 import * as vec3 from './gl-matrix/vec3.js'
 
+
 InterpolatedIsosurfaceBegin(
   document.getElementById('interpolated-isosurface-viz-3d-content')
 )
@@ -42,12 +43,14 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     mouse: {
       pos: [0, 0],
       lastPos: [0, 0],
-      down: false
+      down: false,
     },
 
     debugParams: new Float32Array(16),
-    sceneParams: new Float32Array(16),
+    sceneParams: new Float32Array(8),
     approachParams: new Float32Array(16),
+
+    disableCameraMovement: false,
   }
 
   state.camera.state.distance = 3.0;
@@ -92,7 +95,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ['screenDims', 'vec4f', 16],
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
         ['screenToWorld', 'mat4x4<f32>', 16 * 4],
-        ['sceneParams', 'mat4x4<f32>', 16 * 4],
+        ['sceneParams', 'mat2x4<f32>', 16 * 2],
         ['approachParams', 'mat4x4<f32>', 16 * 4],
         ['debugParams', 'mat4x4<f32>', 16 * 4],
       ]
@@ -195,7 +198,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
 
         fn TrilinearInterpolation(uvw: vec3f) -> f32{
-          let factor = vec3(1.0-uvw.x, uvw.y, uvw.z);
+          let factor = uvw;
 
           let invFactor = 1.0 - factor;
           let c000 = ubo.sceneParams[0][0];
@@ -520,50 +523,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ]
       })
 
-      let corner = vec4.create()
-      let scratch = vec4.create()
-      let dir = vec3.create();
       return function BlitOverlay(
         commandEncoder,
         queue,
         frameTextureView,
-        worldToScreen,
-        eye
       ) {
-        vec3.normalize(dir, eye)
-        overlayContext.canvas.width = 0
-        overlayContext.canvas.width = 1024
-
-        let ctx = overlayContext.ctx;
-        ctx.fillStyle = "orange"
-        const width = overlayContext.canvas.width
-        const height = overlayContext.canvas.height
-        corner[3] = 1
-        for (let x = -1.0; x <= 1.0; x += 2.0) {
-          corner[0] = x;
-          for (let y = -1.0; y <= 1.0; y += 2.0) {
-            corner[1] = y
-            for (let z = -1.0; z <= 1.0; z += 2.0) {
-              corner[2] = z
-
-              vec3.normalize(scratch, corner)
-              let d = vec3.dot(dir, scratch)
-
-              if (d > -0.45) {
-                vec4.transformMat4(scratch, corner, worldToScreen)
-                ctx.beginPath()
-                scratch[0] /= scratch[3]
-                scratch[1] /= scratch[3]
-
-                let px = Math.floor((scratch[0] * 0.5 + 0.5) * width)
-                let py = Math.floor((scratch[1] * 0.5 + 0.5) * height)
-                ctx.arc(px, py, 5, 0, Math.PI * 2.0)
-                ctx.fill()
-              }
-            }
-          }
-        }
-
         queue.copyExternalImageToTexture(
           { source: overlayContext.canvas },
           { texture: overlayContext.texture },
@@ -635,7 +599,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
   {
     state.overlay = {
-      canvas: document.createElement('canvas')
+      canvas: document.createElement('canvas'),
+      hoveredCorner: -1,
+      draggingCorner: -1,
+      draggingLastPos: [0, 0]
     }
     state.overlay.canvas.width = 1024
     state.overlay.canvas.height = 1024
@@ -653,6 +620,161 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       ),
       format: 'rgba8unorm'
     })
+
+    let corner = vec4.create()
+    let scratch = vec4.create()
+    let dir = vec3.create();
+    let corners = [
+      [-1, -1, -1, 1],
+      [1, -1, -1, 1],
+      [-1, 1, -1, 1],
+      [1, 1, -1, 1],
+      [-1, -1, 1, 1],
+      [1, -1, 1, 1],
+      [-1, 1, 1, 1],
+      [1, 1, 1, 1],
+    ]
+
+    let cornerXYZID = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ]
+
+    state.overlay.update = (worldToScreen, eye) => {
+      vec3.normalize(dir, eye)
+      state.overlay.canvas.width = 0
+      state.overlay.canvas.width = 1024
+
+      let ctx = state.overlay.ctx;
+      const width = state.overlay.canvas.width
+      const height = state.overlay.canvas.height
+
+      for (let cornerIndex = 0; cornerIndex < 8; cornerIndex++) {
+        corner = corners[cornerIndex];
+
+        vec3.normalize(scratch, corner)
+        let d = vec3.dot(dir, scratch)
+
+        if (d > -0.45) {
+          vec4.transformMat4(scratch, corner, worldToScreen)
+          cornerXYZID[cornerIndex][0] = Math.floor(((scratch[0] / scratch[3]) * 0.5 + 0.5) * width)
+          cornerXYZID[cornerIndex][1] = Math.floor(((scratch[1] / scratch[3]) * 0.5 + 0.5) * height)
+          cornerXYZID[cornerIndex][2] = scratch[2] / scratch[3]
+          cornerXYZID[cornerIndex][3] = cornerIndex
+        } else {
+          cornerXYZID[cornerIndex][0] = -10000.0
+          cornerXYZID[cornerIndex][1] = -10000.0
+          cornerXYZID[cornerIndex][2] = 10000.0
+          cornerXYZID[cornerIndex][3] = 10000.0
+        }
+      }
+
+      cornerXYZID.sort((a, b) => {
+        return a[2] - b[2]
+      })
+
+      let radius = 5.0;
+      let radiusSquared = radius * radius;
+      if (!state.overlay.draggingCorner) {
+        state.overlay.hoveredCorner = -1
+      }
+
+      for (let cornerIndex = 0; cornerIndex < 8; cornerIndex++) {
+        corner = cornerXYZID[cornerIndex];
+
+        vec3.normalize(scratch, corner)
+        let d = vec3.dot(dir, scratch)
+
+        if (d > -0.45) {
+          ctx.beginPath()
+
+          let px = corner[0]
+          let py = corner[1]
+          let id = corner[3]
+
+          let dx = px - state.mouse.pos[0]
+          let dy = py - (height - state.mouse.pos[1])
+
+          let hovered = (dx * dx + dy * dy) < radiusSquared
+
+          hovered = hovered || state.overlay.draggingCorner == id
+
+          ctx.fillStyle = 'white'
+          if (state.overlay.hoveredCorner == id) {
+            if (hovered) {
+              ctx.fillStyle = 'orange'
+              state.overlay.hoveredCorner = id
+            } else {
+              state.overlay.hoveredCorner = -1
+            }
+          } else if (hovered) {
+            ctx.fillStyle = 'orange'
+            state.overlay.hoveredCorner = id
+          }
+
+          ctx.arc(px, py, 5, 0, Math.PI * 2.0)
+          ctx.fill()
+
+          {
+            ctx.save()
+            let v = state.sceneParams[id]
+            let offset = 10
+            ctx.lineWidth = 3
+            ctx.beginPath()
+            ctx.moveTo(px + radius + offset, py)
+            if (v < 0.0) {
+              ctx.strokeStyle = '#5ab552'
+              ctx.arc(px, py, radius + offset, 0, v / 2.0 * Math.PI, true)
+            } else {
+              ctx.strokeStyle = '#fa6e79'
+              ctx.arc(px, py, radius + offset, 0, v / 2.0 * Math.PI, false)
+            }
+
+            ctx.stroke()
+            ctx.restore()
+          }
+
+        }
+      }
+
+      if (!state.mouse.down) {
+        state.overlay.draggingCorner = -1
+      } else {
+        if (state.overlay.draggingCorner == -1) {
+          state.overlay.draggingLastPos[0] = state.mouse.pos[0]
+          state.overlay.draggingLastPos[1] = state.mouse.pos[1]
+        }
+        state.overlay.draggingCorner = state.overlay.hoveredCorner;
+      }
+
+      if (state.overlay.draggingCorner != -1) {
+
+        let dx = state.mouse.pos[0] - state.overlay.draggingLastPos[0]
+        let dy = state.mouse.pos[1] - state.overlay.draggingLastPos[1]
+
+        let diff = (dy + dx) * -0.01
+
+        // update the html control
+        let name = `c${(state.overlay.draggingCorner).toString(2).padStart(3, '0')}`
+        let v = state.params['scene-manual'][name] + diff;
+
+        controlEl.querySelector(`.${name}-control input`).value = v
+        state.overlay.draggingLastPos[0] = state.mouse.pos[0]
+        state.overlay.draggingLastPos[1] = state.mouse.pos[1]
+      }
+
+      if (state.overlay.hoveredCorner != -1 || state.overlay.draggingCorner != -1) {
+        state.disableCameraMovement = true
+      } else if (state.overlay.draggingCorner == -1) {
+        state.disableCameraMovement = false
+      }
+    }
   }
 
   state.gpu.programs = {
@@ -908,7 +1030,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         return;
       }
 
-      state.camera.rotate(dx, -dy)
+      if (!state.disableCameraMovement) {
+        state.camera.rotate(dx, -dy)
+      }
     }
   }, { passive: false })
 
@@ -1017,18 +1141,23 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         // corners 0..8
         state.sceneParams[0] = -0.5
         state.sceneParams[1] = 1
-        state.sceneParams[2] = Math.sin(Now() * 0.0001) * 4.0
+        state.sceneParams[2] = Math.sin(Now() * 0.0001) * 2.0
         state.sceneParams[3] = 1
         state.sceneParams[4] = 1
-        state.sceneParams[5] = -2.0 + Math.cos(Now() * 0.001) + Math.sin(Now() * 0.001) * 3.0
+        state.sceneParams[5] = Math.cos(Now() * 0.001) + Math.sin(Now() * 0.001) * 2.0
         state.sceneParams[6] = 1
-        state.sceneParams[7] = -4 - Math.sin(Now() * 0.0005) * 4.0
+        state.sceneParams[7] = Math.sin(Now() * 0.0005) * 2.0
 
         // keep rendering frames
         state.dirty = true;
         break;
       }
     }
+
+    state.overlay.update(
+      state.camera.computed.worldToScreen,
+      state.camera.computed.eye
+    )
 
     let approachParams = state.params['approach-' + state.params.approach]
     switch (state.params.approach) {
