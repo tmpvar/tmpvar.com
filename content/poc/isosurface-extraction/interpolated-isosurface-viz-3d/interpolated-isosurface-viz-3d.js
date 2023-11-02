@@ -529,7 +529,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         frameTextureView,
       ) {
         queue.copyExternalImageToTexture(
-          { source: overlayContext.canvas },
+          {
+            source: overlayContext.canvas,
+            flipY: true,
+          },
           { texture: overlayContext.texture },
           [overlayContext.canvas.width, overlayContext.canvas.height]
         )
@@ -751,6 +754,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
             ctx.stroke()
             ctx.restore()
+
+            ctx.font = "20px Hack, monospace"
+            ctx.fillText((id).toString(2).padStart(3, '0'), px, (py - radius + offset * 3))
           }
 
         }
