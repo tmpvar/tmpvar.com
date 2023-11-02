@@ -95,7 +95,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ['screenDims', 'vec4f', 16],
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
         ['screenToWorld', 'mat4x4<f32>', 16 * 4],
-        ['sceneParams', 'mat2x4<f32>', 16 * 2],
+        ['sceneParams', 'SceneParams', 16 * 2],
         ['approachParams', 'mat4x4<f32>', 16 * 4],
         ['debugParams', 'mat4x4<f32>', 16 * 4],
       ]
@@ -122,6 +122,17 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           @location(4) faceUV: vec2f,
           @interpolate(flat) @location(5) faceNormal: vec3f,
 
+        }
+
+        struct SceneParams {
+          c000: f32,
+          c100: f32,
+          c010: f32,
+          c110: f32,
+          c001: f32,
+          c101: f32,
+          c011: f32,
+          c111: f32,
         }
 
         struct UBOParams {
@@ -201,15 +212,15 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let factor = uvw;
 
           let invFactor = 1.0 - factor;
-          let c000 = ubo.sceneParams[0][0];
-          let c100 = ubo.sceneParams[0][1];
-          let c010 = ubo.sceneParams[0][2];
-          let c110 = ubo.sceneParams[0][3];
+          let c000 = ubo.sceneParams.c000;
+          let c100 = ubo.sceneParams.c100;
+          let c010 = ubo.sceneParams.c010;
+          let c110 = ubo.sceneParams.c110;
 
-          let c001 = ubo.sceneParams[1][0];
-          let c101 = ubo.sceneParams[1][1];
-          let c011 = ubo.sceneParams[1][2];
-          let c111 = ubo.sceneParams[1][3];
+          let c001 = ubo.sceneParams.c001;
+          let c101 = ubo.sceneParams.c101;
+          let c011 = ubo.sceneParams.c011;
+          let c111 = ubo.sceneParams.c111;
 
           let c00 = c000 * invFactor.x + c100 * factor.x;
           let c10 = c010 * invFactor.x + c110 * factor.x;
@@ -582,7 +593,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       // Note: I'm using u32 here because I want to use the format property to setup DebugBlit and
       //       r16uint is not supported for storage textures..
       format: 'r32uint',
-
     }),
 
     normals: state.gpu.device.createTexture({
@@ -628,14 +638,14 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     let scratch = vec4.create()
     let dir = vec3.create();
     let corners = [
-      [-1, -1, -1, 1],
-      [1, -1, -1, 1],
-      [-1, 1, -1, 1],
-      [1, 1, -1, 1],
-      [-1, -1, 1, 1],
-      [1, -1, 1, 1],
-      [-1, 1, 1, 1],
-      [1, 1, 1, 1],
+      [-1, -1, -1],
+      [1, -1, -1],
+      [-1, 1, -1],
+      [1, 1, -1],
+      [-1, -1, 1],
+      [1, -1, 1],
+      [-1, 1, 1],
+      [1, 1, 1],
     ]
 
     let cornerXYZID = [
@@ -666,6 +676,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       vec3.normalize(dir, eye)
       state.overlay.canvas.width = 0
       state.overlay.canvas.width = 1024
+      state.overlay.canvas.height = 1024
 
       let ctx = state.overlay.ctx;
       const width = state.overlay.canvas.width
@@ -677,11 +688,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         vec3.normalize(scratch, corner)
         let d = vec3.dot(dir, scratch)
 
-        if (d > -0.45) {
-          vec4.transformMat4(scratch, corner, worldToScreen)
-          cornerXYZID[cornerIndex][0] = Math.floor(((scratch[0] / scratch[3]) * 0.5 + 0.5) * width)
-          cornerXYZID[cornerIndex][1] = Math.floor(((scratch[1] / scratch[3]) * 0.5 + 0.5) * height)
-          cornerXYZID[cornerIndex][2] = scratch[2] / scratch[3]
+        if (true || d > -0.45) {
+          ProjectPoint(cornerXYZID[cornerIndex], corner, worldToScreen, width, height)
           cornerXYZID[cornerIndex][3] = cornerIndex
         } else {
           cornerXYZID[cornerIndex][0] = -10000.0
@@ -691,9 +699,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
       }
 
-      cornerXYZID.sort((a, b) => {
-        return a[2] - b[2]
-      })
+      // cornerXYZID.sort((a, b) => {
+      //   return a[2] - b[2]
+      // })
 
       let radius = 5.0;
       let radiusSquared = radius * radius;
@@ -707,7 +715,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         vec3.normalize(scratch, corner)
         let d = vec3.dot(dir, scratch)
 
-        if (d > -0.45) {
+        if (true || d > -0.45) {
           ctx.beginPath()
 
           let px = corner[0]
