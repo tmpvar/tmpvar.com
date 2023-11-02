@@ -808,20 +808,16 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
       // draw axes
       {
-        ctx.beginPath()
         let center = [0, 0, 0]
         ProjectPoint(center, center, worldToScreen, width, height)
-        ctx.moveTo(center[0], center[1])
-        ctx.arc(center[0], center[1], 1, 0, Math.PI * 2)
-        ctx.fillStyle = '#f0f'
-        ctx.fill()
 
+        ctx.lineWidth = 4
         let x = [1, 0, 0]
         ProjectPoint(x, x, worldToScreen, width, height)
         ctx.beginPath()
         ctx.moveTo(center[0], center[1])
         ctx.lineTo(x[0], x[1])
-        ctx.strokeStyle = '#F00'
+        ctx.strokeStyle = `rgba(${(1.0 * 0.5 + 0.5) * 255}, 127, 127, 1)`
         ctx.stroke()
 
         let y = [0, 1, 0]
@@ -829,7 +825,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ctx.beginPath()
         ctx.moveTo(center[0], center[1])
         ctx.lineTo(y[0], y[1])
-        ctx.strokeStyle = '#0F0'
+        ctx.strokeStyle = `rgba(127, ${(1.0 * 0.5 + 0.5) * 255}, 127, 1)`
         ctx.stroke()
 
         let z = [0, 0, 1]
@@ -837,7 +833,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         ctx.beginPath()
         ctx.moveTo(center[0], center[1])
         ctx.lineTo(z[0], z[1])
-        ctx.strokeStyle = '#00F'
+        ctx.strokeStyle = `rgba(127, 127, ${(1.0 * 0.5 + 0.5) * 255}, 1)`
         ctx.stroke()
       }
     }
@@ -1022,6 +1018,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             var color = baseColor * (1.0 - v);
 
             out.color = vec4(color, 1.0);
+
+            out.color = vec4((1.0 - v) * (fragData.faceNormal * 0.5 + 0.5), 1.0);
             return out;
           }
 
