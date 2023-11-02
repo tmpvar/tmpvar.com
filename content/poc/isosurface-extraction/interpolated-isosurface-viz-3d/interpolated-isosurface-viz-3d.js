@@ -646,6 +646,19 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       [0, 0, 0, 0],
     ]
 
+    function ProjectPoint(out, pos, worldToScreen, width, height) {
+      scratch[0] = pos[0]
+      scratch[1] = pos[1]
+      scratch[2] = pos[2]
+      scratch[3] = 1
+
+      vec4.transformMat4(scratch, scratch, worldToScreen)
+
+      out[0] = Math.floor(((scratch[0] / scratch[3]) * 0.5 + 0.5) * width)
+      out[1] = height - Math.floor(((scratch[1] / scratch[3]) * 0.5 + 0.5) * height)
+      out[2] = scratch[2] / scratch[3]
+    }
+
     state.overlay.update = (worldToScreen, eye) => {
       vec3.normalize(dir, eye)
       state.overlay.canvas.width = 0
