@@ -670,8 +670,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
       vec4.transformMat4(scratch, scratch, worldToScreen)
 
-      out[0] = Math.floor(((scratch[0] / scratch[3]) * 0.5 + 0.5) * width)
-      out[1] = height - Math.floor(((scratch[1] / scratch[3]) * 0.5 + 0.5) * height)
+      out[0] = Math.round(((scratch[0] / scratch[3]) * 0.5 + 0.5) * width)
+      out[1] = height - Math.round(((scratch[1] / scratch[3]) * 0.5 + 0.5) * height)
       out[2] = scratch[2] / scratch[3]
     }
 

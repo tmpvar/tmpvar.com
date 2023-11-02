@@ -220,35 +220,35 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
       </div>
       <div class="shownBy-scene indent" showValue="manual">
         <div class="c000-control control">
-          (0, 0, 0): <input type="range" min="-2.0" max="2.0" value="-2" step="0.01">
+          <code>000</code> <input type="range" min="-2.0" max="2.0" value="-2" step="0.01">
           <output></output>
         </div>
         <div class="c100-control control">
-          (1, 0, 0): <input type="range" min="-2.0" max="2.0" value="-2" step="0.01">
+          <code>100</code> <input type="range" min="-2.0" max="2.0" value="-2" step="0.01">
           <output></output>
         </div>
         <div class="c010-control control">
-          (0, 1, 0): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          <code>010</code> <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c110-control control">
-          (1, 1, 0): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          <code>110</code> <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c001-control control">
-          (0, 0, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          <code>001</code> <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c101-control control">
-          (1, 0, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          <code>101</code> <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c011-control control">
-          (0, 1, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          <code>011</code> <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
         <div class="c111-control control">
-          (1, 1, 1): <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
+          <code>111</code> <input type="range" min="-2.0" max="2.0" value="2" step="0.01">
           <output></output>
         </div>
       </div>
