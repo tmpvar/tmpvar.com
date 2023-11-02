@@ -766,6 +766,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             ctx.stroke()
             ctx.restore()
 
+            ctx.fillStyle = 'white';
             ctx.font = "20px Hack, monospace"
             ctx.fillText((id).toString(2).padStart(3, '0'), px, (py - radius + offset * 3))
           }
