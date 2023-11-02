@@ -58,7 +58,8 @@
                          disambiguation
 - isosurface-extraction: render the marching cubes 33 output for the current scene
 
-## 2023-10-29
+## 2023-11-02
+- isosurface-extraction: fix text aliasing
 ## 2023-10-28
 - isosurface-extraction: I asked Simon about how he's rendering the surface directly and
                          he said it's just brute force
