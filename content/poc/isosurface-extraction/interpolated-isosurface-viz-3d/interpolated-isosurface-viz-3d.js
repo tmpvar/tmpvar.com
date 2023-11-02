@@ -726,7 +726,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let id = corner[3]
 
           let dx = px - state.mouse.pos[0]
-          let dy = py - (height - state.mouse.pos[1])
+          let dy = py - (state.mouse.pos[1])
 
           let hovered = (dx * dx + dy * dy) < radiusSquared
 
