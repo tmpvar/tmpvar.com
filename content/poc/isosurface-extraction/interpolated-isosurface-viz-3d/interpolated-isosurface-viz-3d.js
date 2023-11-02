@@ -544,7 +544,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             source: overlayContext.canvas,
             flipY: true,
           },
-          { texture: overlayContext.texture },
+          {
+            texture: overlayContext.texture,
+            premultipliedAlpha: true,
+          },
           [overlayContext.canvas.width, overlayContext.canvas.height]
         )
 
