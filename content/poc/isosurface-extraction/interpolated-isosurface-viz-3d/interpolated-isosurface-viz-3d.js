@@ -774,6 +774,41 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       } else if (state.overlay.draggingCorner == -1) {
         state.disableCameraMovement = false
       }
+
+      // draw axes
+      {
+        ctx.beginPath()
+        let center = [0, 0, 0]
+        ProjectPoint(center, center, worldToScreen, width, height)
+        ctx.moveTo(center[0], center[1])
+        ctx.arc(center[0], center[1], 1, 0, Math.PI * 2)
+        ctx.fillStyle = '#f0f'
+        ctx.fill()
+
+        let x = [1, 0, 0]
+        ProjectPoint(x, x, worldToScreen, width, height)
+        ctx.beginPath()
+        ctx.moveTo(center[0], center[1])
+        ctx.lineTo(x[0], x[1])
+        ctx.strokeStyle = '#F00'
+        ctx.stroke()
+
+        let y = [0, 1, 0]
+        ProjectPoint(y, y, worldToScreen, width, height)
+        ctx.beginPath()
+        ctx.moveTo(center[0], center[1])
+        ctx.lineTo(y[0], y[1])
+        ctx.strokeStyle = '#0F0'
+        ctx.stroke()
+
+        let z = [0, 0, 1]
+        ProjectPoint(z, z, worldToScreen, width, height)
+        ctx.beginPath()
+        ctx.moveTo(center[0], center[1])
+        ctx.lineTo(z[0], z[1])
+        ctx.strokeStyle = '#00F'
+        ctx.stroke()
+      }
     }
   }
 
