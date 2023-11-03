@@ -337,7 +337,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         },
         primitive: {
           topology: 'triangle-list',
-          cullMode: 'front',
+          cullMode: 'back',
           frontFace: 'cw',
         },
         depthStencil: {
@@ -644,8 +644,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       format: 'rgba8unorm'
     })
 
-    let corner = vec4.create()
-    let scratch = vec4.create()
+    let cornerScratch = vec4.create()
     let dir = vec3.create();
     let corners = [
       [-1, -1, -1],
@@ -669,17 +668,18 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       [0, 0, 0, 0],
     ]
 
+    let projectPointScratch = vec4.create()
     function ProjectPoint(out, pos, worldToScreen, width, height) {
-      scratch[0] = pos[0]
-      scratch[1] = pos[1]
-      scratch[2] = pos[2]
-      scratch[3] = 1
+      projectPointScratch[0] = pos[0]
+      projectPointScratch[1] = pos[1]
+      projectPointScratch[2] = pos[2]
+      projectPointScratch[3] = 1
 
-      vec4.transformMat4(scratch, scratch, worldToScreen)
+      vec4.transformMat4(projectPointScratch, projectPointScratch, worldToScreen)
 
-      out[0] = Math.round(((scratch[0] / scratch[3]) * 0.5 + 0.5) * width)
-      out[1] = height - Math.round(((scratch[1] / scratch[3]) * 0.5 + 0.5) * height)
-      out[2] = scratch[2] / scratch[3]
+      out[0] = Math.round(((projectPointScratch[0] / projectPointScratch[3]) * 0.5 + 0.5) * width)
+      out[1] = height - Math.round(((projectPointScratch[1] / projectPointScratch[3]) * 0.5 + 0.5) * height)
+      out[2] = projectPointScratch[2] / projectPointScratch[3]
     }
 
     state.overlay.update = (worldToScreen, eye) => {
@@ -693,13 +693,26 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       const height = state.overlay.canvas.height
 
       for (let cornerIndex = 0; cornerIndex < 8; cornerIndex++) {
-        corner = corners[cornerIndex];
 
-        vec3.normalize(scratch, corner)
-        let d = vec3.dot(dir, scratch)
+        vec4.set(
+          cornerScratch,
+          corners[cornerIndex][0],
+          corners[cornerIndex][1],
+          corners[cornerIndex][2],
+          0.0
+        )
 
-        if (true || d > -0.45) {
-          ProjectPoint(cornerXYZID[cornerIndex], corner, worldToScreen, width, height)
+        vec3.normalize(cornerScratch, cornerScratch)
+        let d = vec3.dot(dir, cornerScratch)
+
+        if (state.params.debugRenderAllCorners || d > -0.35) {
+          ProjectPoint(
+            cornerXYZID[cornerIndex],
+            corners[cornerIndex],
+            worldToScreen,
+            width,
+            height
+          )
           cornerXYZID[cornerIndex][3] = cornerIndex
         } else {
           cornerXYZID[cornerIndex][0] = -10000.0
@@ -709,9 +722,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         }
       }
 
-      // cornerXYZID.sort((a, b) => {
-      //   return a[2] - b[2]
-      // })
+      cornerXYZID.sort((a, b) => {
+        return a[2] - b[2]
+      })
 
       let radius = 5.0;
       let radiusSquared = radius * radius;
@@ -720,66 +733,65 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       }
 
       for (let cornerIndex = 0; cornerIndex < 8; cornerIndex++) {
-        corner = cornerXYZID[cornerIndex];
 
-        vec3.normalize(scratch, corner)
-        let d = vec3.dot(dir, scratch)
+        let corner = cornerXYZID[cornerIndex];
+        let px = corner[0]
+        let py = corner[1]
+        let id = corner[3]
+        if (id > 8) {
+          continue;
+        }
 
-        if (true || d > -0.45) {
-          ctx.beginPath()
+        ctx.beginPath()
+        let dx = px - state.mouse.pos[0]
+        let dy = py - (state.mouse.pos[1])
 
-          let px = corner[0]
-          let py = corner[1]
-          let id = corner[3]
+        let hovered = (dx * dx + dy * dy) < radiusSquared
 
-          let dx = px - state.mouse.pos[0]
-          let dy = py - (state.mouse.pos[1])
+        hovered = !state.cameraCapturedMouse && (hovered || state.overlay.draggingCorner == id)
 
-          let hovered = (dx * dx + dy * dy) < radiusSquared
-
-          hovered = !state.cameraCapturedMouse && (hovered || state.overlay.draggingCorner == id)
-
-          ctx.fillStyle = 'white'
-          if (state.overlay.hoveredCorner == id) {
-            if (hovered) {
-              ctx.fillStyle = 'orange'
-              state.overlay.hoveredCorner = id
-            } else {
-              state.overlay.hoveredCorner = -1
-            }
-          } else if (hovered) {
+        ctx.fillStyle = 'white'
+        if (state.overlay.hoveredCorner == id) {
+          if (hovered) {
             ctx.fillStyle = 'orange'
             state.overlay.hoveredCorner = id
+          } else {
+            state.overlay.hoveredCorner = -1
+          }
+        } else if (hovered) {
+          ctx.fillStyle = 'orange'
+          state.overlay.hoveredCorner = id
+        }
+
+        ctx.arc(px, py, 5, 0, Math.PI * 2.0)
+        ctx.fill()
+
+        {
+          ctx.save()
+          let v = state.sceneParams[id]
+          let offset = 10
+          ctx.lineWidth = 3
+          ctx.beginPath()
+          ctx.moveTo(px + radius + offset, py)
+          if (v < 0.0) {
+            ctx.strokeStyle = '#5ab552'
+            ctx.arc(px, py, radius + offset, 0, v / 2.0 * Math.PI, true)
+          } else {
+            ctx.strokeStyle = '#fa6e79'
+            ctx.arc(px, py, radius + offset, 0, v / 2.0 * Math.PI, false)
           }
 
-          ctx.arc(px, py, 5, 0, Math.PI * 2.0)
-          ctx.fill()
-
-          {
-            ctx.save()
-            let v = state.sceneParams[id]
-            let offset = 10
-            ctx.lineWidth = 3
-            ctx.beginPath()
-            ctx.moveTo(px + radius + offset, py)
-            if (v < 0.0) {
-              ctx.strokeStyle = '#5ab552'
-              ctx.arc(px, py, radius + offset, 0, v / 2.0 * Math.PI, true)
-            } else {
-              ctx.strokeStyle = '#fa6e79'
-              ctx.arc(px, py, radius + offset, 0, v / 2.0 * Math.PI, false)
-            }
-
-            ctx.stroke()
-            ctx.restore()
-
+          ctx.stroke()
+          ctx.restore()
+          if (state.params.debugShowCornerLabels) {
             ctx.fillStyle = 'white';
-            ctx.font = "20px Hack, monospace"
+            ctx.font = "16px Hack, monospace"
             let label = Array.from((id).toString(2).padStart(3, '0')).reverse().join('')
             ctx.fillText(label, px, (py - radius + offset * 3))
           }
-
         }
+
+
       }
 
       if (!state.mouse.down) {
@@ -801,7 +813,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
         // update the html control
         let name = 'c' + Array.from((state.overlay.draggingCorner).toString(2).padStart(3, '0')).reverse().join('')
-        console.log('name', name)
         let v = state.params['scene-manual'][name] + diff;
 
         controlEl.querySelector(`.${name}-control input`).value = v
@@ -816,7 +827,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       }
 
       // draw axes
-      {
+      if (state.params.debugRenderAxes) {
         let center = [0, 0, 0]
         ProjectPoint(center, center, worldToScreen, width, height)
 
@@ -1027,8 +1038,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             var color = baseColor * (1.0 - v);
 
             out.color = vec4(color, 1.0);
-
-            out.color = vec4((1.0 - v) * (fragData.faceNormal * 0.5 + 0.5), 1.0);
             return out;
           }
 
@@ -1122,6 +1131,9 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
   const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
     Param('debugRenderStepCount', 'bool')
+    Param('debugRenderAxes', 'bool')
+    Param('debugRenderAllCorners', 'bool')
+    Param('debugRenderAllCorners', 'bool')
 
     Param('scene', 'string')
     Param('approach', 'string')
@@ -1221,13 +1233,6 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       invModelView[13],
       invModelView[14],
     )
-
-    // vec3.set(
-    //   state.eye,
-    //   state.camera.computed.eye[0],
-    //   state.camera.computed.eye[1],
-    //   state.camera.computed.eye[2],
-    // )
 
     mat4.invert(state.screenToWorld, state.worldToScreen)
 

@@ -209,6 +209,15 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
       <div class="debugRenderStepCount-control control">
         render step count <input type="checkbox" value="1" />
       </div>
+      <div class="debugRenderAxes-control control">
+        render axes <input type="checkbox" value="1" />
+      </div>
+      <div class="debugShowCornerLabels-control control">
+        render corner labels <input type="checkbox" value="1" />
+      </div>
+      <div class="debugRenderAllCorners-control control">
+        render all corners (disable occlusion culling) <input type="checkbox" value="1" />
+      </div>
     </div>
     <h4>Scene</h4>
     <div class="indent">
