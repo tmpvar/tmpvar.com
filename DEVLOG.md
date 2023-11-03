@@ -48,6 +48,8 @@
 - isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
 
 ## Pending
+- isosurface-extraction: corners are being swizzled somewhere such that 011 becomes 110
+- isosurface-extraction: right handed coordinate system does not play well with -1=0, 1=1
 - isosurface-extraction: direct manipulation via box corners
 - isosurface-extraction: draw surface on the box faces
 - isosurface-extraction: draw a second box controlled by the same camera
