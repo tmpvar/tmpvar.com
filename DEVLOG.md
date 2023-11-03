@@ -60,6 +60,7 @@
 - isosurface-extraction: render the marching cubes 33 output for the current scene
 
 ## 2023-11-03
+- isosurface-extraction: avoid dragging corners when rotating camera
 - isosurface-extraction: corners are being swizzled somewhere such that 011 becomes 110
 ## 2023-11-02
 - isosurface-extraction: fix text aliasing

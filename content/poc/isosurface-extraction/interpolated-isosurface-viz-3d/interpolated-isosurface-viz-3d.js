@@ -51,6 +51,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     approachParams: new Float32Array(16),
 
     disableCameraMovement: false,
+    cameraCapturedMouse: false,
   }
 
   state.camera.state.distance = 3.0;
@@ -730,7 +731,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
           let hovered = (dx * dx + dy * dy) < radiusSquared
 
-          hovered = hovered || state.overlay.draggingCorner == id
+          hovered = !state.cameraCapturedMouse && (hovered || state.overlay.draggingCorner == id)
 
           ctx.fillStyle = 'white'
           if (state.overlay.hoveredCorner == id) {
@@ -1070,9 +1071,13 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
   window.addEventListener("mouseup", e => {
     state.mouse.down = false
+    state.cameraCapturedMouse = false
   })
 
   canvas.addEventListener("mousedown", (e) => {
+    if (!state.disableCameraMovement) {
+      state.cameraCapturedMouse = true
+    }
     state.mouse.down = true
     MoveMouse(e.offsetX, e.offsetY);
     state.mouse.lastPos[0] = state.mouse.pos[0]
