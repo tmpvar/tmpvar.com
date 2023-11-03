@@ -48,7 +48,6 @@
 - isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
 
 ## Pending
-- isosurface-extraction: corners are being swizzled somewhere such that 011 becomes 110
 - isosurface-extraction: right handed coordinate system does not play well with -1=0, 1=1
 - isosurface-extraction: direct manipulation via box corners
 - isosurface-extraction: draw surface on the box faces
@@ -60,6 +59,8 @@
                          disambiguation
 - isosurface-extraction: render the marching cubes 33 output for the current scene
 
+## 2023-11-03
+- isosurface-extraction: corners are being swizzled somewhere such that 011 becomes 110
 ## 2023-11-02
 - isosurface-extraction: fix text aliasing
 ## 2023-10-28

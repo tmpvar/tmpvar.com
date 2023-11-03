@@ -768,7 +768,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
             ctx.fillStyle = 'white';
             ctx.font = "20px Hack, monospace"
-            ctx.fillText((id).toString(2).padStart(3, '0'), px, (py - radius + offset * 3))
+            let label = Array.from((id).toString(2).padStart(3, '0')).reverse().join('')
+            ctx.fillText(label, px, (py - radius + offset * 3))
           }
 
         }
@@ -792,7 +793,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         let diff = (dy + dx) * -0.01
 
         // update the html control
-        let name = `c${(state.overlay.draggingCorner).toString(2).padStart(3, '0')}`
+        let name = 'c' + Array.from((state.overlay.draggingCorner).toString(2).padStart(3, '0')).reverse().join('')
+        console.log('name', name)
         let v = state.params['scene-manual'][name] + diff;
 
         controlEl.querySelector(`.${name}-control input`).value = v
