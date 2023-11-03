@@ -2,6 +2,7 @@ import CreateOrbitCamera from "./orbit-camera.js"
 import CreateParamReader from "./params.js"
 import CreateCubeMesh from './primitive-cube.js'
 
+import * as mat4 from './gl-matrix/mat4.js'
 import * as vec4 from './gl-matrix/vec4.js'
 import * as vec3 from './gl-matrix/vec3.js'
 
@@ -52,6 +53,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
     disableCameraMovement: false,
     cameraCapturedMouse: false,
+
+    worldToScreen: mat4.create(),
+    screenToWorld: mat4.create(),
+    model: mat4.fromScaling(mat4.create(), [-1, 1, 1]),
+    eye: vec3.create(),
   }
 
   state.camera.state.distance = 3.0;
@@ -1194,6 +1200,37 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     }
     state.dirty = false;
 
+    mat4.multiply(
+      state.worldToScreen,
+      state.camera.computed.view,
+      state.model,
+    );
+
+    let invModelView = mat4.create()
+    mat4.invert(invModelView, state.worldToScreen)
+
+    mat4.multiply(
+      state.worldToScreen,
+      state.camera.computed.projection,
+      state.worldToScreen
+    );
+
+    vec3.set(
+      state.eye,
+      invModelView[12],
+      invModelView[13],
+      invModelView[14],
+    )
+
+    // vec3.set(
+    //   state.eye,
+    //   state.camera.computed.eye[0],
+    //   state.camera.computed.eye[1],
+    //   state.camera.computed.eye[2],
+    // )
+
+    mat4.invert(state.screenToWorld, state.worldToScreen)
+
     switch (state.params.scene) {
       case 'manual': {
         // corners 0..8
@@ -1226,8 +1263,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     }
 
     state.overlay.update(
-      state.camera.computed.worldToScreen,
-      state.camera.computed.eye
+      state.worldToScreen,
+      state.eye
     )
 
     let approachParams = state.params['approach-' + state.params.approach]
@@ -1294,10 +1331,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
       renderFunction(
         pass,
-        state.camera.computed.worldToScreen,
-        state.camera.computed.screenToWorld,
+        state.worldToScreen,
+        state.screenToWorld,
         [0, 0, 0],
-        state.camera.computed.eye,
+        state.eye,
         [canvas.width, canvas.height],
         objectID,
         state.sceneParams,
@@ -1311,8 +1348,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       commandEncoder,
       state.gpu.device.queue,
       frameTextureView,
-      state.camera.computed.worldToScreen,
-      state.camera.computed.eye
+      state.worldToScreen,
+      state.eye
     )
 
     state.gpu.device.queue.submit([commandEncoder.finish()])
