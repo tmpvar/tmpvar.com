@@ -787,7 +787,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
             ctx.fillStyle = 'white';
             ctx.font = "16px Hack, monospace"
             let label = Array.from((id).toString(2).padStart(3, '0')).reverse().join('')
-            ctx.fillText(label, px, (py - radius + offset * 3))
+            let width = ctx.measureText(label).width
+            ctx.fillText(label, Math.round(px - width * 0.5), (py - radius + offset * 3 + 8))
           }
         }
 
@@ -1308,7 +1309,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
   function ReadParams() {
     Param('debugRenderStepCount', 'bool')
     Param('debugRenderAxes', 'bool')
-    Param('debugRenderAllCorners', 'bool')
+    Param('debugShowCornerLabels', 'bool')
     Param('debugRenderAllCorners', 'bool')
 
     Param('scene', 'string')
