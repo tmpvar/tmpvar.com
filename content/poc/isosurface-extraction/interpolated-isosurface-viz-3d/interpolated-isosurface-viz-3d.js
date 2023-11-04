@@ -977,10 +977,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let invMaxSteps = 1.0 / maxSteps;
           var lastT = t;
           var lastD = TrilinearInterpolation(rayOrigin);
+          var d = lastD;
           var lastSlope = (TrilinearInterpolation(rayOrigin + rayDir * invMaxSteps) - lastD) / invMaxSteps;
           while(t < tInterval.y) {
             let pos = rayOrigin + rayDir * t;
-            let d = TrilinearInterpolation(pos);
+            d = TrilinearInterpolation(pos);
             if (d == 0.0) {
               out.color = ComputeColor(pos, rayDir, lastD);
               return out;
@@ -1037,6 +1038,10 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
             var color = baseColor * (1.0 - v);
 
+            if (d < 0.0 ) {
+              let c = ${HexColorToVec3f('#5ab552')};
+              color = color + (v * c) * 0.2;
+            }
             out.color = vec4(color, 1.0);
             return out;
           }
