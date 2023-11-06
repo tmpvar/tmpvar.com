@@ -647,8 +647,8 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     })
 
     mesh.update = () => {
-      state.gpu.device.queue.writeBuffer(this.positionBuffer, 0, this.positions)
-      state.gpu.device.queue.writeBuffer(this.normalBuffer, 0, this.normals)
+      state.gpu.device.queue.writeBuffer(mesh.positionBuffer, 0, mesh.positions)
+      state.gpu.device.queue.writeBuffer(mesh.normalBuffer, 0, mesh.normals)
     }
 
     mesh.positions[0] = 0.0
