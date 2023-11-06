@@ -433,8 +433,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
 
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, bindGroup)
-        pass.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
-        pass.setScissorRect(0, 0, canvas.width, canvas.height);
+
         pass.setVertexBuffer(0, mesh.positionBuffer);
         pass.setVertexBuffer(1, mesh.normalBuffer);
         pass.draw(mesh.vertexCount, 1);
@@ -545,6 +544,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
         commandEncoder,
         queue,
         frameTextureView,
+        rect
       ) {
         queue.copyExternalImageToTexture(
           {
@@ -1293,6 +1293,26 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       )
     })(),
 
+    renderMCOutput: shaders.RenderTriangleSoup(
+      state.gpu,
+      state.meshes.computedTriangles,
+      textures.objectID,
+      textures.depth,
+      textures.normals,
+      state.gpu.presentationFormat,
+      /* wgsl */`
+       @fragment
+        fn FragmentMain(
+          fragData: VertexOut
+        ) -> FragmentOut {
+          var out: FragmentOut;
+          out.color = vec4(1.0);
+          out.objectID = fragData.objectID;
+          return out;
+        }
+      `
+    ),
+
     drawOverlay: shaders.BlitOverlay(state.gpu, state.overlay)
   }
 
@@ -1574,7 +1594,28 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
       let pass = commandEncoder.beginRenderPass(renderPassDesc);
       const objectID = 0
 
+      let width = canvas.width
+      let height = canvas.height
+      pass.setViewport(0, 0, width, height, 0, 1);
+      pass.setScissorRect(0, 0, width, height);
+
       renderFunction(
+        pass,
+        state.worldToScreen,
+        state.screenToWorld,
+        [0, 0, 0],
+        state.eye,
+        [canvas.width, canvas.height],
+        objectID,
+        state.sceneParams,
+        state.approachParams,
+        state.debugParams
+      )
+
+      // pass.setViewport(halfWidth, 0, width, halfHeight, 0, 1);
+      // pass.setScissorRect(halfWidth, 0, halfWidth, halfHeight);
+
+      state.gpu.programs.renderMCOutput(
         pass,
         state.worldToScreen,
         state.screenToWorld,
