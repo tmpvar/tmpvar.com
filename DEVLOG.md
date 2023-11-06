@@ -48,8 +48,8 @@
 - isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
 
 ## Pending
-- isosurface-extraction: draw surface on the box faces
 - isosurface-extraction: draw a second box controlled by the same camera
+                         this is done simply by changing the viewport, but it messes up the 2d overlay
 - isosurface-extraction: port a single triangle from the mc code
 - isosurface-extraction: port the rest of the learning marching cubes code
 - isosurface-extraction: render the marching cubes output for the current scene
@@ -57,6 +57,10 @@
                          disambiguation
 - isosurface-extraction: render the marching cubes 33 output for the current scene
 
+## 2023-11-06
+- isosurface-extraction: draw a single triangle over the direct rendering
+## 2023-11-04
+- isosurface-extraction: draw surface on the box faces
 ## 2023-11-03
 - isosurface-extraction: direct manipulation via box corners
 - isosurface-extraction: right handed coordinate system does not play well with -1=0, 1=1
