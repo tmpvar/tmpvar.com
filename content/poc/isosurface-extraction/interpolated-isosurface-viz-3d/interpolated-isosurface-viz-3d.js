@@ -618,7 +618,68 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
   }
 
   state.gpu.buffers = {}
-  state.mesh = CreateCubeMesh(state.gpu)
+  state.meshes = {
+    cube: CreateCubeMesh(state.gpu),
+  }
+
+  // create mesh for computed triangles
+  {
+    const labelPrefix = `${state.gpu.labelPrefix}Mesh/ComputedTriangles/`
+    const mesh = {
+      label: labelPrefix,
+      vertexCount: 0,
+      maxVertices: 1024
+    }
+
+    mesh.positions = new Float32Array(mesh.maxVertices * 3)
+    mesh.normals = new Float32Array(mesh.maxVertices * 3)
+
+    mesh.positionBuffer = state.gpu.device.createBuffer({
+      label: `${labelPrefix}PositionBuffer`,
+      size: mesh.positions.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    })
+
+    mesh.normalBuffer = state.gpu.device.createBuffer({
+      label: `${labelPrefix}NormalBuffer`,
+      size: mesh.normals.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    })
+
+    mesh.update = () => {
+      state.gpu.device.queue.writeBuffer(this.positionBuffer, 0, this.positions)
+      state.gpu.device.queue.writeBuffer(this.normalBuffer, 0, this.normals)
+    }
+
+    mesh.positions[0] = 0.0
+    mesh.positions[1] = 0.0
+    mesh.positions[2] = 0.0
+
+    mesh.positions[3] = 1.0
+    mesh.positions[4] = 0.0
+    mesh.positions[5] = 0.0
+
+    mesh.positions[6] = 1.0
+    mesh.positions[7] = 1.0
+    mesh.positions[8] = 0.0
+
+    mesh.normals[0] = 0.0
+    mesh.normals[1] = 1.0
+    mesh.normals[2] = 0.0
+
+    mesh.normals[3] = 0.0
+    mesh.normals[4] = 1.0
+    mesh.normals[5] = 0.0
+
+    mesh.normals[6] = 0.0
+    mesh.normals[7] = 1.0
+    mesh.normals[8] = 0.0
+
+    mesh.update()
+    mesh.vertexCount = 3
+
+    state.meshes.computedTriangles = mesh
+  }
 
   {
     state.overlay = {
@@ -863,7 +924,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
   state.gpu.programs = {
     raymarchFixedStep: shaders.RenderTriangleSoup(
       state.gpu,
-      state.mesh,
+      state.meshes.cube,
       textures.objectID,
       textures.depth,
       textures.normals,
@@ -912,10 +973,11 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
           let baseColor = select(${HexColorToVec3f('#5ab552')}, ${HexColorToVec3f('#fa6e79')}, d >= 0.0);
           let hitNormal = ComputeNormal(pos);
 
-          const lightPos = vec3(4.0, 1.0, 0.5);
-          let lightDir = normalize((pos * 2.0 - 1.0) - lightPos);
+          const lightPos = vec3(1.0);
+          // let lightDir = normalize((pos * 2.0 - 1.0) - lightPos);
+          let lightDir = normalize(lightPos);
           let ndotl = dot(hitNormal, lightDir);
-          var color = baseColor * max(0.4, ndotl);
+          var color = baseColor * max(0.1, ndotl);
           let reflectDir = reflect(-lightDir, hitNormal);
           let spec = pow(max(dot(rayDir, reflectDir), 0.0), 2) * 0.1;
 
@@ -1063,7 +1125,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     raytraceSignedDistanceFunctionGrids: (function () {
       return shaders.RenderTriangleSoup(
         state.gpu,
-        state.mesh,
+        state.meshes.cube,
         textures.objectID,
         textures.depth,
         textures.normals,
