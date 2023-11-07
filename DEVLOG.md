@@ -1,4 +1,27 @@
 ## future
+- isosurface-extraction: fixed step, perform backtrack step
+- isosurface-extraction: run a fixed step ray march from minRoot->maxRoot in an attempt to
+                         understand if the roots are even viable.
+- isosurface-extraction: segment tracing - take larger fixed steps and when we detect a crossing
+                         run a few newton-raphson steps to find the actual crossing.
+- isosurface-extraction: better lighting for direct
+- linear-interpolation: add demo for line searching
+- linear-interpolation: add basic 3D interactive demo
+
+- isosurface-extraction/sphere-march-cube: implement the approach from
+                                           'Ray Tracing of Signed Distance Function Grids'
+- let controls live next to the canvas so you dont have to scroll up and down
+- only show side controls when the window is wide enough to handle them.
+- radiance-cascades/3d: render an analytic primitive
+- radiance-cascades/3d: add scene specific params and process them
+- radiance-cascades/3d: add raymarching approach: Brute Force World Space
+- radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
+- radiance-cascades/3d: add raymarching approach: Cascades World Space RayMarch
+
+- radiance-cascades/3d: collect depth buffer and mipmap it into a
+                        red/green (min/max) f32 texture
+- radiance-cascades/3d: trace screen space rays through hiz texture
+- isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
 - marching-squares: instead of line searching to the nearest cage point
                     maybe circle marching would be a better way to avoid crossing
                     multiple iso lines
@@ -23,31 +46,6 @@
 - radiance-cascades/2d: how to fix the ringing artifacts?
 
 ## Next
-- isosurface-extraction: fixed step, perform backtrack step
-- isosurface-extraction: run a fixed step ray march from minRoot->maxRoot in an attempt to
-                         understand if the roots are even viable.
-- isosurface-extraction: segment tracing - take larger fixed steps and when we detect a crossing
-                         run a few newton-raphson steps to find the actual crossing.
-- isosurface-extraction: better lighting for direct
-- linear-interpolation: add demo for line searching
-- linear-interpolation: add basic 3D interactive demo
-
-- isosurface-extraction/sphere-march-cube: implement the approach from
-                                           'Ray Tracing of Signed Distance Function Grids'
-- let controls live next to the canvas so you dont have to scroll up and down
-- only show side controls when the window is wide enough to handle them.
-- radiance-cascades/3d: render an analytic primitive
-- radiance-cascades/3d: add scene specific params and process them
-- radiance-cascades/3d: add raymarching approach: Brute Force World Space
-- radiance-cascades/3d: add raymarching approach: Cascades Screen Space Raymarch
-- radiance-cascades/3d: add raymarching approach: Cascades World Space RayMarch
-
-- radiance-cascades/3d: collect depth buffer and mipmap it into a
-                        red/green (min/max) f32 texture
-- radiance-cascades/3d: trace screen space rays through hiz texture
-- isosurface-extraction: use interval arithmetic for isosurface-extraction-2d
-
-## Pending
 - isosurface-extraction: draw a second box controlled by the same camera
                          this is done simply by changing the viewport, but it messes up the 2d overlay
 - isosurface-extraction: port a single triangle from the mc code
@@ -56,6 +54,15 @@
 - isosurface-extraction: extend the learning marching cubes code to handle the subcases and
                          disambiguation
 - isosurface-extraction: render the marching cubes 33 output for the current scene
+
+## Pending
+- isosurface-extraction: 2d add disambiguation based on the C00*C11 > C10*C01
+- isosurface-extraction: output corner state in a copy-able list of values
+- isosurface-extraction: add a demo that shows all of the 33 cases in one view
+                         the goal is to collect all of the cases into a list
+- isosurface-extraction: mesh a single cube using the lookup table and disambiguation cases
+- isosurface-extraction: add general "how to test if a mesh is maniford" testing section
+- isosurface-extraction: add randomized tester for manifold over a 5x5 grid
 
 ## 2023-11-06
 - isosurface-extraction: draw a single triangle over the direct rendering
