@@ -14,10 +14,11 @@ function Now() {
 // see: https://mastodon.gamedev.place/@sjb3d/110957635606866131
 const IsNegative = (function () {
   let isNegativeScratch = new DataView(new ArrayBuffer(8))
+  let mask = (1 << 31)
   return function IsNegative(value) {
     isNegativeScratch.setFloat64(0, value, true)
     let uints = isNegativeScratch.getUint32(4, true)
-    return (uints & 1 << 31) != 0 ? 1 : 0
+    return (uints & mask) == mask ? 1 : 0
   }
 })();
 
@@ -30,6 +31,7 @@ function IsosurfaceExtractionBegin(rootEl) {
   const Max = Math.max
 
   const EdgesPerCell = 4
+  const CornersPerCell = 4
   const TAU = Math.PI * 2.0
   const controlEl = rootEl.querySelector('.controls')
   const canvas = rootEl.querySelector('canvas')
@@ -72,6 +74,7 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     Param('performSubdivision', 'bool')
     Param('contourExtractionApproach', 'string')
+    Param('disambiguationApproach', 'string')
 
     Param('cellDiameter', 'i32', (parentEl, value, oldValue) => {
       let newValue = Math.pow(2, value)
@@ -659,7 +662,7 @@ function IsosurfaceExtractionBegin(rootEl) {
 
     // compute the distance to the upper left corner
     state.boundaryCells.forEach((cell, cellIndex) => {
-      let cellOffset = cellIndex * EdgesPerCell
+      let cellOffset = cellIndex * CornersPerCell
       // TODO: cache these instead of recomputing them..
       for (let cornerIndex = 0; cornerIndex < 4; cornerIndex++) {
         let d = SampleSDF(
@@ -741,6 +744,23 @@ function IsosurfaceExtractionBegin(rootEl) {
     }
   }
 
+  function Lerp2D(c00, c10, c01, c11, tx, ty) {
+    // interpolate on the X axis
+    let x0 = c00 * (1.0 - tx) + c10 * tx; // Lerp1D(c00, c10, tx);
+    let x1 = c01 * (1.0 - tx) + c11 * tx; // Lerp1D(c01, c11, tx);
+
+    // interpolate on the Y axis
+    return x0 * (1.0 - ty) + x1 * ty;    // Lerp1D(x0, x1, ty);
+  }
+
+
+  function DrawCorner(x, y, v) {
+    ctx.beginPath()
+    ctx.arc(x, y, Math.abs(v), 0, Math.PI * 2)
+    ctx.fillStyle = IsNegative(v) ? '#AA0' : '#0AA'
+    ctx.fill()
+  }
+
   function CollectPolyLoops() {
     let cellCount = state.boundaryCells.length
     let cellVisited = new Uint8Array(cellCount)
@@ -777,13 +797,85 @@ function IsosurfaceExtractionBegin(rootEl) {
 
       let edges = MarchingSquaresCodeToEdge[code]
       // Disambiguate cases 5,10 by collecting the center distance
-      if (edges.length > 1) {
+      if (code == 5 || code == 10) {
         let cell = state.boundaryCells[cellIndex]
-        let d = SampleSDF(cell.center[0], cell.center[1])
-        if (IsNegative(d)) {
-          edges = edges[1]
-        } else {
-          edges = edges[0]
+        let cellDiameter = cell.radius * 2.0
+        let cellOffset = cellIndex * CornersPerCell
+        switch (state.params.disambiguationApproach) {
+          case 'average': {
+            let A = state.cellDistances[cellOffset + BottomLeftCornerIndex]
+            let B = state.cellDistances[cellOffset + TopLeftCornerIndex]
+            let C = state.cellDistances[cellOffset + TopRightCornerIndex]
+            let D = state.cellDistances[cellOffset + BottomRightCornerIndex]
+            let avg = (A + B + C + D) * 0.25
+            if (IsNegative(avg)) {
+              edges = edges[1]
+            } else {
+              edges = edges[0]
+            }
+          }
+          case 'asymptote-intersection': {
+            let bl = state.cellDistances[cellOffset + BottomLeftCornerIndex]
+            let tl = state.cellDistances[cellOffset + TopLeftCornerIndex]
+            let tr = state.cellDistances[cellOffset + TopRightCornerIndex]
+            let br = state.cellDistances[cellOffset + BottomRightCornerIndex]
+
+            let alpha = (bl * tr + br * tl) / (bl + tr - br - tl)
+
+            let u = (bl - br) / (bl + tr - br - tl)
+            let v = (bl - tl) / (bl + tr - br - tl)
+
+            let x = cell.center[0] - cell.radius
+            let y = cell.center[1] - cell.radius
+
+            // alpha = Lerp2D(bl, br, tl, tr, u, v);
+            alpha = (br * tl - bl * tr)
+            DrawCorner(x, y, bl)
+            DrawCorner(x + cellDiameter, y, br)
+            DrawCorner(x + cellDiameter, y + cellDiameter, tr)
+            DrawCorner(x, y + cellDiameter, tl)
+
+            ctx.beginPath()
+            ctx.moveTo(x + cellDiameter * u, y)
+            ctx.lineTo(x + cellDiameter * u, y + cellDiameter)
+            ctx.moveTo(x, y + cellDiameter * v)
+            ctx.lineTo(x + cellDiameter, y + cellDiameter * v)
+            ctx.strokeStyle = "white"
+            ctx.stroke();
+
+            // ctx.beginPath()
+            // ctx.fillStyle = IsNegative(alpha) ? '#FF0' : '#0FF'
+            // ctx.arc(
+            //   x + cellDiameter * u,
+            //   y + cellDiameter * v,
+            //   Math.abs(alpha),
+            //   0,
+            //   Math.PI * 2
+            // )
+            // ctx.fill()
+            // ctx.fillText(`${code}`, cell.center[0], cell.center[1])
+
+            // console.log(bl, br, tr, tl)
+            // console.log('code', code, 'alpha', alpha)
+// return
+            // alpha = A*C - B*D
+            if (IsNegative(alpha)) {
+              edges = edges[1]
+            } else {
+              edges = edges[0]
+            }
+
+            break;
+          }
+          case 'sdf-sample': {
+            let d = SampleSDF(cell.center[0], cell.center[1])
+            if (IsNegative(d)) {
+              edges = edges[1]
+            } else {
+              edges = edges[0]
+            }
+            break;
+          }
         }
       }
 
@@ -875,7 +967,7 @@ function IsosurfaceExtractionBegin(rootEl) {
       requestAnimationFrame(DrawFrame)
       return
     }
-
+    state.dirty = dirty
     if (state.dirty) {
       state.timings = []
     }
