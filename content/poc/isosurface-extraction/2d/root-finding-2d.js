@@ -156,25 +156,29 @@ function RootFinding2DBegin(rootEl) {
               x > square.x && x < square.x + square.w &&
               y > square.y && y < square.y + square.h
             ) {
-              c[0] += 100.0
-              c[1] += 100.0
-              c[2] += 100.0
+              c[0] *= 0.8
+              c[1] *= 0.8
+              c[2] *= 0.8
             } else {
-              c[0] *= 0.65
-              c[1] *= 0.65
-              c[2] *= 0.65
+              c[0] *= 0.9
+              c[1] *= 0.9
+              c[2] *= 0.9
             }
           }
 
           if (!IsNegative(v)) {
-            if (
-              x > square.x && x < square.x + square.w &&
-              y > square.y && y < square.y + square.h
-            ) {
-              c[0] += 10.0
-              c[1] += 10.0
-              c[2] += 10.0
-            }
+            // if (
+            //   x > square.x && x < square.x + square.w &&
+            //   y > square.y && y < square.y + square.h
+            // ) {
+            c[0] += 60.0
+            c[1] += 60.0
+            c[2] += 60.0
+            // }
+          } else {
+            c[0] -= 20.0
+            c[1] -= 20.0
+            c[2] -= 20.0
           }
           state.imageData.data[yoff + x * 4 + 0] = c[0]
           state.imageData.data[yoff + x * 4 + 1] = c[1]
@@ -278,63 +282,161 @@ function RootFinding2DBegin(rootEl) {
       }
     }
 
+
+
     // draw the vertices
+    let verts = [
+      [0, 0],
+      [0, 0],
+      [0, 0],
+      [0, 0],
+    ]
     {
+
       if (ContainsCrossing(c00, c10)) {
         let t = c00 / (c00 - c10)
-        ctx.beginPath()
-        ctx.arc(
-          square.x + square.w * t,
-          square.y + square.h,
-          3,
-          0,
-          Math.PI * 2.0
-        )
-        ctx.fill()
-      }
+        verts[0][0] = square.x + square.w * t
+        verts[0][1] = square.y + square.h
 
-      if (ContainsCrossing(c01, c11)) {
-        let t = c01 / (c01 - c11)
         ctx.beginPath()
-        ctx.arc(
-          square.x + square.w * t,
-          square.y,
-          3,
-          0,
-          Math.PI * 2.0
-        )
-        ctx.fill()
-      }
-
-      if (ContainsCrossing(c00, c01)) {
-        let t = c01 / (c01 - c00)
-        ctx.beginPath()
-        ctx.arc(
-          square.x,
-          square.y + square.h * t,
-          3,
-          0,
-          Math.PI * 2.0
-        )
+        ctx.arc(verts[0][0], verts[0][1], 3, 0, Math.PI * 2.0)
         ctx.fill()
       }
 
       if (ContainsCrossing(c10, c11)) {
         let t = c11 / (c11 - c10)
+        verts[1][0] = square.x + square.w
+        verts[1][1] = square.y + square.h * t
+
         ctx.beginPath()
-        ctx.arc(
-          square.x + square.w,
-          square.y + square.h * t,
-          3,
-          0,
-          Math.PI * 2.0
-        )
+        ctx.arc(verts[1][0], verts[1][1], 3, 0, Math.PI * 2.0)
         ctx.fill()
+      }
+
+      if (ContainsCrossing(c01, c11)) {
+        let t = c01 / (c01 - c11)
+        verts[2][0] = square.x + square.w * t
+        verts[2][1] = square.y
+
+        ctx.beginPath()
+        ctx.arc(verts[2][0], verts[2][1], 3, 0, Math.PI * 2.0)
+        ctx.fill()
+      }
+
+      if (ContainsCrossing(c00, c01)) {
+        let t = c01 / (c01 - c00)
+        verts[3][0] = square.x
+        verts[3][1] = square.y + square.h * t
+
+        ctx.beginPath()
+        ctx.arc(verts[3][0], verts[3][1], 3, 0, Math.PI * 2.0)
+        ctx.fill()
+      }
+    }
+
+    // connect the verts
+    {
+      function DrawSegment(a, b) {
+        ctx.beginPath()
+        ctx.moveTo(a[0], a[1])
+        ctx.lineTo(b[0], b[1])
+        ctx.stroke()
+      }
+
+      //    corners         edges
+      //
+      //    0     1           0
+      //     +---+          +---+
+      //     |   |        3 |   | 1
+      //     +---+          +---+
+      //    3     2           2
+      //
+
+      const edgeConnectionCounts = [
+        0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 0
+      ];
+
+      // entry format: edgeStartIndex, endEndIndex, ...
+      const edgeConnections = [
+        [-1, -1, -1, -1, -1, -1, -1, -1],
+        [0, 3, -1, -1, -1, -1, -1, -1],
+        [1, 0, -1, -1, -1, -1, -1, -1],
+        [1, 3, -1, -1, -1, -1, -1, -1],
+        [2, 1, -1, -1, -1, -1, -1, -1],
+        [0, 1, 2, 3, 0, 3, 2, 1],
+        [2, 0, -1, -1, -1, -1, -1, -1],
+        [2, 3, -1, -1, -1, -1, -1, -1],
+        [3, 2, -1, -1, -1, -1, -1, -1],
+        [0, 2, -1, -1, -1, -1, -1, -1],
+        [1, 0, 3, 2, 1, 2, 3, 0],
+        [1, 2, -1, -1, -1, -1, -1, -1],
+        [3, 1, -1, -1, -1, -1, -1, -1],
+        [0, 1, -1, -1, -1, -1, -1, -1],
+        [3, 0, -1, -1, -1, -1, -1, -1],
+        [-1, -1, -1, -1, -1, -1, -1, -1],
+      ]
+
+      let cellCode = (
+        (IsNegative(c00) << 0) |
+        (IsNegative(c10) << 1) |
+        (IsNegative(c11) << 2) |
+        (IsNegative(c01) << 3)
+      )
+
+
+      const segmentCount = edgeConnectionCounts[cellCode];
+
+      if (segmentCount == 0) {
+        return;
+      }
+
+      ctx.strokeStyle = "#fff"
+      ctx.lineWidth = 2
+      if (segmentCount == 1) {
+        // Add a segment between the two edge indices
+        DrawSegment(
+          verts[edgeConnections[cellCode][0]],
+          verts[edgeConnections[cellCode][1]]
+        )
+        return;
+      }
+
+
+      // let centerValue = Lerp2D(
+      //   state.params.c00,
+      //   state.params.c10,
+      //   state.params.c01,
+      //   state.params.c11,
+      //   0.5,
+      //   0.5
+      // )
+
+      let centerValue = c10 * c01 - c00 * c11
+
+      // Asymptote Intersection or SDF Sampling
+      // const f32 centerValue = GetCellCenterValue();
+      if (IsNegative(centerValue)) {
+        DrawSegment(
+          verts[edgeConnections[cellCode][0]],
+          verts[edgeConnections[cellCode][1]]
+        );
+        DrawSegment(
+          verts[edgeConnections[cellCode][2]],
+          verts[edgeConnections[cellCode][3]]
+        );
+      } else {
+        DrawSegment(
+          verts[edgeConnections[cellCode][4]],
+          verts[edgeConnections[cellCode][5]]
+        );
+        DrawSegment(
+          verts[edgeConnections[cellCode][6]],
+          verts[edgeConnections[cellCode][7]]
+        );
       }
 
 
     }
-
   }
 
   requestAnimationFrame(RenderFrame)
