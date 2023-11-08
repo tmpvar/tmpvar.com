@@ -79,6 +79,20 @@ function RootFinding2DBegin(rootEl) {
     return Math.max(lo, Math.min(v, hi))
   }
 
+  // see: https://mastodon.gamedev.place/@sjb3d/110957635606866131
+  const IsNegative = (function () {
+    let isNegativeScratch = new DataView(new ArrayBuffer(8))
+    return function IsNegative(value) {
+      isNegativeScratch.setFloat64(0, value, true)
+      let uints = isNegativeScratch.getUint32(4, true)
+      return (uints & 1 << 31) != 0 ? 1 : 0
+    }
+  })();
+
+  function ContainsCrossing(a, b) {
+    return IsNegative(a) != IsNegative(b)
+  }
+
   function RenderFrame() {
     ReadParams()
     if (!state.dirty) {
@@ -148,6 +162,43 @@ function RootFinding2DBegin(rootEl) {
       ctx.strokeRect(square.x, square.y, square.w, square.h)
     }
 
+
+    let c00 = Lerp2D(
+      state.params.c00,
+      state.params.c10,
+      state.params.c01,
+      state.params.c11,
+      square.x / canvas.width,
+      square.y / canvas.height
+    )
+
+    let c10 = Lerp2D(
+      state.params.c00,
+      state.params.c10,
+      state.params.c01,
+      state.params.c11,
+      (square.x + square.w) / canvas.width,
+      square.y / canvas.height
+    )
+
+    let c01 = Lerp2D(
+      state.params.c00,
+      state.params.c10,
+      state.params.c01,
+      state.params.c11,
+      square.x / canvas.width,
+      (square.y + square.h) / canvas.height
+    )
+
+    let c11 = Lerp2D(
+      state.params.c00,
+      state.params.c10,
+      state.params.c01,
+      state.params.c11,
+      (square.x + square.w) / canvas.width,
+      (square.y + square.h) / canvas.height
+    )
+
     // draw the corner labels
     {
       ctx.fillStyle = '#fff'
@@ -155,17 +206,7 @@ function RootFinding2DBegin(rootEl) {
 
       // c00
       {
-        let v = Lerp2D(
-          state.params.c00,
-          state.params.c10,
-          state.params.c01,
-          state.params.c11,
-          square.x / canvas.width,
-          square.y / canvas.height
-        )
-
-
-        let text = `c00 = ${v.toFixed(2)}`
+        let text = `c00 = ${c00.toFixed(2)}`
         ctx.fillStyle = `#fff`
         ctx.fillText(
           text,
@@ -176,17 +217,7 @@ function RootFinding2DBegin(rootEl) {
 
       // c10
       {
-
-        let v = Lerp2D(
-          state.params.c00,
-          state.params.c10,
-          state.params.c01,
-          state.params.c11,
-          (square.x + square.w) / canvas.width,
-          square.y / canvas.height
-        )
-
-        let text = `c10 = ${v.toFixed(2)}`
+        let text = `c10 = ${c10.toFixed(2)}`
         ctx.fillText(
           text,
           square.x + square.w,
@@ -196,16 +227,9 @@ function RootFinding2DBegin(rootEl) {
 
       // c01
       {
-        let v = Lerp2D(
-          state.params.c00,
-          state.params.c10,
-          state.params.c01,
-          state.params.c11,
-          square.x / canvas.width,
-          (square.y + square.h) / canvas.height
-        )
 
-        let text = `c01 = ${v.toFixed(2)}`
+
+        let text = `c01 = ${c01.toFixed(2)}`
         ctx.fillText(
           text,
           square.x - ctx.measureText(text).width,
@@ -215,22 +239,70 @@ function RootFinding2DBegin(rootEl) {
 
       // c11
       {
-        let v = Lerp2D(
-          state.params.c00,
-          state.params.c10,
-          state.params.c01,
-          state.params.c11,
-          (square.x + square.w) / canvas.width,
-          (square.y + square.h) / canvas.height
-        )
-
-        let text = `c11 = ${state.params.c11.toFixed(2)}`
+        let text = `c11 = ${c11.toFixed(2)}`
         ctx.fillText(
           text,
           square.x + square.w,
           square.y - 10.0
         )
       }
+    }
+
+    // draw the vertices
+    {
+      if (ContainsCrossing(c00, c10)) {
+        let t = c00 / (c00 - c10)
+        ctx.beginPath()
+        ctx.arc(
+          square.x + square.w * t,
+          square.y + square.h,
+          3,
+          0,
+          Math.PI * 2.0
+        )
+        ctx.fill()
+      }
+
+      if (ContainsCrossing(c01, c11)) {
+        let t = c01 / (c01 - c11)
+        ctx.beginPath()
+        ctx.arc(
+          square.x + square.w * t,
+          square.y,
+          3,
+          0,
+          Math.PI * 2.0
+        )
+        ctx.fill()
+      }
+
+      if (ContainsCrossing(c00, c01)) {
+        let t = c01 / (c01 - c00)
+        ctx.beginPath()
+        ctx.arc(
+          square.x,
+          square.y + square.h * t,
+          3,
+          0,
+          Math.PI * 2.0
+        )
+        ctx.fill()
+      }
+
+      if (ContainsCrossing(c10, c11)) {
+        let t = c11 / (c11 - c10)
+        ctx.beginPath()
+        ctx.arc(
+          square.x + square.w,
+          square.y + square.h * t,
+          3,
+          0,
+          Math.PI * 2.0
+        )
+        ctx.fill()
+      }
+
+
     }
 
   }
