@@ -64,6 +64,8 @@
 - isosurface-extraction: add general "how to test if a mesh is maniford" testing section
 - isosurface-extraction: add randomized tester for manifold over a 5x5 grid
 
+## 2023-11-08
+- isosurface-extraction/root-finding-2d: reduce the iso lines to 1px and improve the visual a bit
 ## 2023-11-06
 - isosurface-extraction: draw a single triangle over the direct rendering
 ## 2023-11-04

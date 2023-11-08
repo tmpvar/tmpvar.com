@@ -28,11 +28,10 @@ function Lerp2D(c00, c10, c01, c11, tx, ty) {
   return x0 * (1.0 - ty) + x1 * ty;    // Lerp1D(x0, x1, ty);
 }
 
-function LerpColor(start, end, t) {
-  let r = Lerp(start[0], end[0], t)
-  let g = Lerp(start[1], end[1], t)
-  let b = Lerp(start[2], end[2], t)
-  return [r, g, b]
+function LerpColor(out, start, end, t) {
+  out[0] = Lerp(start[0], end[0], t)
+  out[1] = Lerp(start[1], end[1], t)
+  out[2] = Lerp(start[2], end[2], t)
 }
 
 function RootFinding2DBegin(rootEl) {
@@ -110,40 +109,71 @@ function RootFinding2DBegin(rootEl) {
     {
       let w = canvas.width
       let h = canvas.height
-
+      let c = [0, 0, 0, 0]
       for (let y = 0; y < h; y++) {
-        let ty = 1.0 - y/h
         let yoff = y * w * 4
         for (let x = 0; x < w; x++) {
-          let tx = x/w
+
+          let negativeCount = 0
+          for (let ly = -1; ly <= 1; ly += 1) {
+            let ty = 1.0 - (y + ly) / h
+            for (let lx = -1; lx <= 1; lx += 1) {
+              let tx = (x + lx)/w
+
+
+              let v = Lerp2D(
+                state.params.c00,
+                state.params.c10,
+                state.params.c01,
+                state.params.c11,
+                tx,
+                ty
+              )
+
+              if (IsNegative(v)) {
+                negativeCount++
+              }
+            }
+          }
 
           let v = Lerp2D(
             state.params.c00,
             state.params.c10,
             state.params.c01,
             state.params.c11,
-            tx,
-            ty
+            x / w,
+            1.0 - y / h
           )
-
-          let c = LerpColor(
+          LerpColor(
+            c,
             colorRange[0],
             colorRange[1],
             v * 0.5 + 0.5
           )
 
-          if (Math.abs(v) < 0.005) {
+          if (negativeCount > 0 && negativeCount < 9) {
             if (
               x > square.x && x < square.x + square.w &&
               y > square.y && y < square.y + square.h
             ) {
-              c[0] = 0
-              c[1] = 0
-              c[2] = 0
+              c[0] += 100.0
+              c[1] += 100.0
+              c[2] += 100.0
             } else {
-              c[0] *= 0.85
-              c[1] *= 0.85
-              c[2] *= 0.85
+              c[0] *= 0.65
+              c[1] *= 0.65
+              c[2] *= 0.65
+            }
+          }
+
+          if (!IsNegative(v)) {
+            if (
+              x > square.x && x < square.x + square.w &&
+              y > square.y && y < square.y + square.h
+            ) {
+              c[0] += 10.0
+              c[1] += 10.0
+              c[2] += 10.0
             }
           }
           state.imageData.data[yoff + x * 4 + 0] = c[0]
