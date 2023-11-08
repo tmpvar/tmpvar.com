@@ -184,21 +184,31 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
 
 <section id="root-finding-2d-content">
   <section class="controls">
-    <div class="c00-control control">
-      (0, 0): <input type="range" min="-3.0" max="3.0" value="-3.0" step="0.01">
-      <output></output>
+    <h4>Debug</h4>
+    <div class="indent">
+      <div class="debugAsymptoticDeciderBughunt-control control">
+        <input type="checkbox" value="1" checked >
+        asymptotic decider bug hunt
+      </div>
     </div>
-    <div class="c10-control control">
-      (1, 0): <input type="range" min="-3.0" max="3.0" value="2.8" step="0.01">
-      <output></output>
-    </div>
-    <div class="c01-control control">
-      (0, 1): <input type="range" min="-3.0" max="3.0" value="2.8" step="0.01">
-      <output></output>
-    </div>
-    <div class="c11-control control">
-      (1, 1): <input type="range" min="-3.0" max="3.0" value="-3.0" step="0.01">
-      <output></output>
+    <h4>Corner Values</h4>
+    <div class="indent">
+      <div class="c00-control control">
+        <code>c00</code> <input type="range" min="-3.0" max="3.0" value="-3.0" step="0.01">
+        <output></output>
+      </div>
+      <div class="c10-control control">
+        <code>c10</code> <input type="range" min="-3.0" max="3.0" value="2.8" step="0.01">
+        <output></output>
+      </div>
+      <div class="c01-control control">
+        <code>c01</code> <input type="range" min="-3.0" max="3.0" value="2.18" step="0.01">
+        <output></output>
+      </div>
+      <div class="c11-control control">
+        <code>c11</code> <input type="range" min="-3.0" max="3.0" value="-2.01" step="0.01">
+        <output></output>
+      </div>
     </div>
   </section>
   <section class="center-align">
