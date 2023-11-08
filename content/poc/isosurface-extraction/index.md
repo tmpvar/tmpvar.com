@@ -78,7 +78,7 @@ void AddSegments(u32 cellCode) {
     "Only cases 5,10 should have multiple connections"
   );
 
-  // Average, bilinear interpolate, or sample SDF
+  // Asymptote Intersection or SDF Sampling
   const f32 centerValue = GetCellCenterValue();
   if (IsNegative(centerValue)) {
     PushSegment(edgeConnections[cellCode][0], edgeConnections[cellCode][1]);
@@ -135,7 +135,7 @@ void AddSegments(u32 cellCode) {
         </div>
       </div>
       <div class="isolevel-control control">
-        <input type="range" min="-500" max="500" value="0.0" step="0.1"> isolevel
+        <input type="range" min="-500" max="500" value="-5.8" step="0.1"> isolevel
         <output></output>
       </div>
       <div class="lineSearchMaxSteps-control control">
@@ -150,6 +150,14 @@ void AddSegments(u32 cellCode) {
         </select>
         contour extraction approach
       </div>
+      <div class="disambiguationApproach-control control">
+        <select>
+            <option value="asymptote-intersection" selected>Asymptote Intersection</option>
+            <option value="sdf-sample">SDF Sample</option>
+            <option value="average">Average</option>
+        </select>
+        disambiguation approach
+      </div>
       <div class="performSubdivision-control control">
         <input type="checkbox" value="1" checked >
         subdivide
@@ -159,7 +167,7 @@ void AddSegments(u32 cellCode) {
         <output></output>
       </div>
       <div class="maxSubdivisionDepth-control control shownBy-performSubdivision">
-        <input type="range" min="2" max="12" value="8"> max subdivision depth
+        <input type="range" min="2" max="12" value="7"> max subdivision depth
         <output></output>
       </div>
     </div>
@@ -181,15 +189,15 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
       <output></output>
     </div>
     <div class="c10-control control">
-      (1, 0): <input type="range" min="-3.0" max="3.0" value="3.0" step="0.01">
+      (1, 0): <input type="range" min="-3.0" max="3.0" value="2.8" step="0.01">
       <output></output>
     </div>
     <div class="c01-control control">
-      (0, 1): <input type="range" min="-3.0" max="3.0" value="3.0" step="0.01">
+      (0, 1): <input type="range" min="-3.0" max="3.0" value="2.8" step="0.01">
       <output></output>
     </div>
     <div class="c11-control control">
-      (1, 1): <input type="range" min="-3.0" max="3.0" value="3.0" step="0.01">
+      (1, 1): <input type="range" min="-3.0" max="3.0" value="-3.0" step="0.01">
       <output></output>
     </div>
   </section>
