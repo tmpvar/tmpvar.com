@@ -47,17 +47,24 @@ function RootFinding2DBegin(rootEl) {
     }
   }
 
-  const third = Math.floor(canvas.width / 3)
   const square = {
-    x: third,
-    y: third,//(canvas.height - third) / 2,
-    w: third,
-    h: third,
+    x: 0.0,
+    y: 0.0,
+    w: canvas.width,
+    h: canvas.height,
   }
 
   const state = {
     dirty: true,
     params: {},
+
+    cornerTargets: {
+      t: -1.0,
+      c00: [0, 0],
+      c10: [0, 0],
+      c01: [0, 0],
+      c11: [0, 0],
+    },
     imageData: new ImageData(canvas.width, canvas.height),
   }
 
@@ -68,6 +75,78 @@ function RootFinding2DBegin(rootEl) {
 
   const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
+    Param('debugAsymptoticDeciderBughunt', 'bool')
+
+    if (state.cornerTargets.t == -1.0) {
+
+      Param('c00', 'f32')
+      Param('c10', 'f32')
+      Param('c01', 'f32')
+      Param('c11', 'f32')
+
+      state.cornerTargets.t = 1.0
+      state.cornerTargets.c00[0] = state.params.c00
+      state.cornerTargets.c00[1] = state.params.c00
+
+      state.cornerTargets.c10[0] = state.params.c10
+      state.cornerTargets.c10[1] = state.params.c10
+
+      state.cornerTargets.c01[0] = state.params.c01
+      state.cornerTargets.c01[1] = state.params.c01
+
+      state.cornerTargets.c11[0] = state.params.c11
+      state.cornerTargets.c11[1] = state.params.c11
+    }
+
+    if (state.params.debugAsymptoticDeciderBughunt && !state.cornerTargets.bugFound) {
+      if (state.cornerTargets.t >= 1.0) {
+        state.cornerTargets.t = 0.0;
+
+        state.cornerTargets.c00[0] = state.cornerTargets.c00[1]
+        state.cornerTargets.c10[0] = state.cornerTargets.c10[1]
+        state.cornerTargets.c01[0] = state.cornerTargets.c01[1]
+        state.cornerTargets.c11[0] = state.cornerTargets.c11[1]
+
+        state.cornerTargets.c00[1] = Math.random() * 2.0 - 1.0
+        state.cornerTargets.c10[1] = Math.random() * 2.0 - 1.0
+        state.cornerTargets.c01[1] = Math.random() * 2.0 - 1.0
+        state.cornerTargets.c11[1] = Math.random() * 2.0 - 1.0
+
+        // let decider = (Math.random() * 2.0 - 1.0) * 2.0
+        // if (IsNegative(decider)) {
+        //   state.cornerTargets.c00[1] = -state.cornerTargets.c00[1]
+        //   state.cornerTargets.c11[1] = -state.cornerTargets.c11[1]
+        // } else {
+        //   state.cornerTargets.c10[1] = -state.cornerTargets.c10[1]
+        //   state.cornerTargets.c01[1] = -state.cornerTargets.c00[1]
+        // }
+      } else {
+        state.dirty = true;
+        state.cornerTargets.t += 0.01
+
+        controlEl.querySelector('.c00-control input').value = Lerp(
+          state.cornerTargets.c00[0],
+          state.cornerTargets.c00[1],
+          state.cornerTargets.t
+        )
+        controlEl.querySelector('.c10-control input').value = Lerp(
+          state.cornerTargets.c10[0],
+          state.cornerTargets.c10[1],
+          state.cornerTargets.t
+        )
+        controlEl.querySelector('.c01-control input').value = Lerp(
+          state.cornerTargets.c01[0],
+          state.cornerTargets.c01[1],
+          state.cornerTargets.t
+        )
+        controlEl.querySelector('.c11-control input').value = Lerp(
+          state.cornerTargets.c11[0],
+          state.cornerTargets.c11[1],
+          state.cornerTargets.t
+        )
+      }
+    }
+
     Param('c00', 'f32')
     Param('c10', 'f32')
     Param('c01', 'f32')
