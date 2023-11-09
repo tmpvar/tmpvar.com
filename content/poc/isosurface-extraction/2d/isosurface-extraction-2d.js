@@ -679,15 +679,67 @@ function IsosurfaceExtractionBegin(rootEl) {
     state.cellVertices = []
     let lineIntersection = [0, 0]
     let radius = state.boundaryCells[0].radius
+    let diameter = radius * 2
     let corners = {}
     corners[TopLeftCornerIndex] = [-radius, +radius]
     corners[TopRightCornerIndex] = [+radius, +radius]
     corners[BottomRightCornerIndex] = [+radius, -radius]
     corners[BottomLeftCornerIndex] = [-radius, -radius]
-
+console.log(radius)
     // compute the distance to the upper left corner
     state.boundaryCells.forEach((cell, cellIndex) => {
       let cellOffset = cellIndex * CornersPerCell
+      let cx = cell.center[0]
+      let cy = cell.center[1]
+
+      let centerDistance = SampleSDF(cx, cy)
+      let o = radius * 2.0;
+
+      // // Bottom Left
+      // {
+      //   let d = (
+      //     centerDistance +
+      //     SampleSDF(cx - o, cy) +
+      //     SampleSDF(cx, cy - o) +
+      //     SampleSDF(cx - o, cy - o)
+      //   ) / 4
+      //   state.cellDistances[cellOffset + BottomLeftCornerIndex] = d
+      // }
+
+      // // Bottom Right
+      // {
+      //   let d = (
+      //     centerDistance +
+      //     SampleSDF(cx + o, cy) +
+      //     SampleSDF(cx, cy - o) +
+      //     SampleSDF(cx + o, cy - o)
+      //   ) / 4
+      //   state.cellDistances[cellOffset + BottomRightCornerIndex] = d
+      // }
+
+      // // Top Right
+      // {
+      //   let d = (
+      //     centerDistance +
+      //     SampleSDF(cx + o, cy) +
+      //     SampleSDF(cx, cy + o) +
+      //     SampleSDF(cx + o, cy + o)
+      //   ) / 4
+      //   state.cellDistances[cellOffset + TopRightCornerIndex] = d
+      // }
+
+      // // Top Left
+      // {
+      //   let d = (
+      //     centerDistance +
+      //     SampleSDF(cx - o, cy) +
+      //     SampleSDF(cx, cy + o) +
+      //     SampleSDF(cx - o, cy + o)
+      //   ) / 4
+      //   state.cellDistances[cellOffset + TopLeftCornerIndex] = d
+      // }
+
+
       // TODO: cache these instead of recomputing them..
       for (let cornerIndex = 0; cornerIndex < 4; cornerIndex++) {
         let d = SampleSDF(
@@ -862,7 +914,8 @@ function IsosurfaceExtractionBegin(rootEl) {
             ctx.translate(0, -canvas.height)
 
             ctx.font = `${24 / state.camera.state.zoom}px Hack,monospace`
-            ctx.fillText(code.toFixed(0), cell.center[0], canvas.height - cell.center[1])
+            // ctx.fillText(code.toFixed(0), cell.center[0], canvas.height - cell.center[1])
+            ctx.fillText(SampleSDF(cell.center[0], cell.center[1]).toFixed(2), cell.center[0], canvas.height - cell.center[1])
             ctx.fillText(bl.toFixed(2), x, canvas.height - y)
             ctx.fillText(br.toFixed(2), x + cellDiameter, canvas.height - y)
             ctx.fillText(tl.toFixed(2), x, canvas.height - y - cellDiameter)

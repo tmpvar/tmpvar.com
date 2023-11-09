@@ -514,6 +514,29 @@ function RootFinding2DBegin(rootEl) {
         );
       }
 
+      // draw the asymptotes
+      {
+        ctx.fillStyle = "#36c5f4"
+        ctx.strokeStyle = "#36c5f4"
+        let den = (c00 + c11 - c01 - c10)
+        let s = (c00 - c01) / den
+        let t = 1.0 - (c00 - c10) / den
+        ctx.beginPath()
+
+        ctx.moveTo(s * canvas.width, 0)
+        ctx.lineTo(s * canvas.width, canvas.height)
+
+        ctx.moveTo(0, t * canvas.height)
+        ctx.lineTo(canvas.width, t * canvas.height)
+
+        ctx.stroke()
+
+        ctx.beginPath()
+
+        ctx.arc(s * canvas.width, t * canvas.height, 10, 0, Math.PI * 2.0)
+        ctx.fill()
+      }
+
 
     }
   }
