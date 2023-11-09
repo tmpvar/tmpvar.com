@@ -68,7 +68,7 @@ async function InterpolatedIsosurfaceBegin(rootEl) {
     let str = localStorage.getItem('isosurface-extraction-3d/camera')
     try {
       Object.assign(state.camera.state, JSON.parse(str || '{}'))
-      console.log(state.camera.state);
+      // console.log(state.camera.state);
     } catch (e) {
       localStorage.setItem('isosurface-extraction-3d/camera', '{}')
     }

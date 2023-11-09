@@ -395,6 +395,31 @@ function IsosurfaceExtractionBegin(rootEl) {
     14: [[3, 0]],
   }
 
+  const EdgeConnectionCounts = [
+    0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 0
+  ];
+
+  // entry format: edgeStartIndex, endEndIndex, ...
+  const EdgeConnections = [
+    [-1, -1, -1, -1, -1, -1, -1, -1],
+    [0, 3, -1, -1, -1, -1, -1, -1],
+    [1, 0, -1, -1, -1, -1, -1, -1],
+    [1, 3, -1, -1, -1, -1, -1, -1],
+    [2, 1, -1, -1, -1, -1, -1, -1],
+    [0, 1, 2, 3, 0, 3, 2, 1],
+    [2, 0, -1, -1, -1, -1, -1, -1],
+    [2, 3, -1, -1, -1, -1, -1, -1],
+    [3, 2, -1, -1, -1, -1, -1, -1],
+    [0, 2, -1, -1, -1, -1, -1, -1],
+    [1, 0, 3, 2, 1, 2, 3, 0],
+    [1, 2, -1, -1, -1, -1, -1, -1],
+    [3, 1, -1, -1, -1, -1, -1, -1],
+    [0, 1, -1, -1, -1, -1, -1, -1],
+    [3, 0, -1, -1, -1, -1, -1, -1],
+    [-1, -1, -1, -1, -1, -1, -1, -1],
+  ]
+
+
   const TopEdgeIndex = 0
   const RightEdgeIndex = 1
   const BottomEdgeIndex = 2
@@ -801,6 +826,19 @@ function IsosurfaceExtractionBegin(rootEl) {
         let cell = state.boundaryCells[cellIndex]
         let cellDiameter = cell.radius * 2.0
         let cellOffset = cellIndex * CornersPerCell
+
+        let bl = state.cellDistances[cellOffset + BottomLeftCornerIndex]
+        let tl = state.cellDistances[cellOffset + TopLeftCornerIndex]
+        let tr = state.cellDistances[cellOffset + TopRightCornerIndex]
+        let br = state.cellDistances[cellOffset + BottomRightCornerIndex]
+
+
+        let u = (bl - br) / (bl + tr - br - tl)
+        let v = (bl - tl) / (bl + tr - br - tl)
+
+        let x = cell.center[0] - cell.radius
+        let y = cell.center[1] - cell.radius
+
         switch (state.params.disambiguationApproach) {
           case 'average': {
             let A = state.cellDistances[cellOffset + BottomLeftCornerIndex]
@@ -815,50 +853,23 @@ function IsosurfaceExtractionBegin(rootEl) {
             }
           }
           case 'asymptote-intersection': {
-            let bl = state.cellDistances[cellOffset + BottomLeftCornerIndex]
-            let tl = state.cellDistances[cellOffset + TopLeftCornerIndex]
-            let tr = state.cellDistances[cellOffset + TopRightCornerIndex]
-            let br = state.cellDistances[cellOffset + BottomRightCornerIndex]
 
-            let alpha = (bl * tr + br * tl) / (bl + tr - br - tl)
 
-            let u = (bl - br) / (bl + tr - br - tl)
-            let v = (bl - tl) / (bl + tr - br - tl)
 
-            let x = cell.center[0] - cell.radius
-            let y = cell.center[1] - cell.radius
+            ctx.save()
+            ctx.fillStyle = 'white'
+            ctx.scale(1, -1)
+            ctx.translate(0, -canvas.height)
 
-            // alpha = Lerp2D(bl, br, tl, tr, u, v);
-            alpha = (br * tl - bl * tr)
-            DrawCorner(x, y, bl)
-            DrawCorner(x + cellDiameter, y, br)
-            DrawCorner(x + cellDiameter, y + cellDiameter, tr)
-            DrawCorner(x, y + cellDiameter, tl)
+            ctx.font = `${24 / state.camera.state.zoom}px Hack,monospace`
+            ctx.fillText(code.toFixed(0), cell.center[0], canvas.height - cell.center[1])
+            ctx.fillText(bl.toFixed(2), x, canvas.height - y)
+            ctx.fillText(br.toFixed(2), x + cellDiameter, canvas.height - y)
+            ctx.fillText(tl.toFixed(2), x, canvas.height - y - cellDiameter)
+            ctx.fillText(tr.toFixed(2), x + cellDiameter, canvas.height - y - cellDiameter)
+            ctx.restore()
 
-            ctx.beginPath()
-            ctx.moveTo(x + cellDiameter * u, y)
-            ctx.lineTo(x + cellDiameter * u, y + cellDiameter)
-            ctx.moveTo(x, y + cellDiameter * v)
-            ctx.lineTo(x + cellDiameter, y + cellDiameter * v)
-            ctx.strokeStyle = "white"
-            ctx.stroke();
-
-            // ctx.beginPath()
-            // ctx.fillStyle = IsNegative(alpha) ? '#FF0' : '#0FF'
-            // ctx.arc(
-            //   x + cellDiameter * u,
-            //   y + cellDiameter * v,
-            //   Math.abs(alpha),
-            //   0,
-            //   Math.PI * 2
-            // )
-            // ctx.fill()
-            // ctx.fillText(`${code}`, cell.center[0], cell.center[1])
-
-            // console.log(bl, br, tr, tl)
-            // console.log('code', code, 'alpha', alpha)
-// return
-            // alpha = A*C - B*D
+            const alpha = br * tl - bl * tr
             if (IsNegative(alpha)) {
               edges = edges[1]
             } else {
@@ -868,6 +879,7 @@ function IsosurfaceExtractionBegin(rootEl) {
             break;
           }
           case 'sdf-sample': {
+            // let d = SampleSDF(x + cellDiameter * u, y + cellDiameter * v)
             let d = SampleSDF(cell.center[0], cell.center[1])
             if (IsNegative(d)) {
               edges = edges[1]
@@ -963,6 +975,7 @@ function IsosurfaceExtractionBegin(rootEl) {
   function DrawFrame() {
     ReadParams()
     const dirty = state.dirty || state.camera.dirty
+
     if (!dirty) {
       requestAnimationFrame(DrawFrame)
       return
