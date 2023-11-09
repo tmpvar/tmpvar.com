@@ -456,10 +456,10 @@ function RootFinding2DBegin(rootEl) {
       ]
 
       let cellCode = (
-        (IsNegative(c00) << 0) |
-        (IsNegative(c10) << 1) |
-        (IsNegative(c11) << 2) |
-        (IsNegative(c01) << 3)
+        (IsNegative(c00) << 3) |
+        (IsNegative(c10) << 2) |
+        (IsNegative(c11) << 1) |
+        (IsNegative(c01) << 0)
       )
 
 

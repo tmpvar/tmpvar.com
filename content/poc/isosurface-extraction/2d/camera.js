@@ -81,7 +81,7 @@ export default function CreateCamera(ctx) {
     mouse.pos[0] = newX
     mouse.pos[1] = newY
 
-    state.dirty = true;
+    camera.dirty = true;
   }
 
   canvas.addEventListener('mousedown', handleMouseDown)
