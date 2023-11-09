@@ -194,7 +194,7 @@ Given a square cell with sampled values in the corners, find the zero-crossings 
     <h4>Corner Values</h4>
     <div class="indent">
       <div class="c00-control control">
-        <code>c00</code> <input type="range" min="-3.0" max="3.0" value="-.545" step="0.001">
+        <code>c00</code> <input type="range" min="-3.0" max="3.0" value="0.045" step="0.001">
         <output></output>
       </div>
       <div class="c10-control control">

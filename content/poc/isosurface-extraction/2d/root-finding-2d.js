@@ -456,10 +456,10 @@ function RootFinding2DBegin(rootEl) {
       ]
 
       let cellCode = (
-        (IsNegative(c00) << 3) |
-        (IsNegative(c10) << 2) |
-        (IsNegative(c11) << 1) |
-        (IsNegative(c01) << 0)
+        (IsNegative(c00) << 0) |
+        (IsNegative(c10) << 1) |
+        (IsNegative(c11) << 2) |
+        (IsNegative(c01) << 3)
       )
 
 
@@ -516,8 +516,8 @@ function RootFinding2DBegin(rootEl) {
 
       // draw the asymptotes
       {
-        ctx.fillStyle = "#36c5f4"
-        ctx.strokeStyle = "#36c5f4"
+        ctx.fillStyle = "#5ab552"
+        ctx.strokeStyle = "#5ab552"
         let den = (c00 + c11 - c01 - c10)
         let s = (c00 - c01) / den
         let t = 1.0 - (c00 - c10) / den
