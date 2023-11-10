@@ -20,6 +20,7 @@ Things are simpler in 2D so we'll start there.
 
 ### Radiance Intervals (2D)
 <section id="radiance-intervals-2d-content">
+
   In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where relative to the previous level, each cascade level:
   - doubles the inner radius of the band
   - doubles the width of the band
@@ -27,17 +28,22 @@ Things are simpler in 2D so we'll start there.
   - halves the total number of rays
 
   <section class="controls">
-    <p>
-      level 0 ray count: <input type="range" min="4" max="8" value="4" name="level-0-ray-count">
-    </p>
-    <p>
-      branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="branching-factor">
+    <div class="level0RayCount-control control">
+      level 0 ray count: <input type="range" min="4" max="8" value="4" />
+      <output></output>
+    </div>
+    <div class="branchingFactor-control control">
+      branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2">
+      <output></output>
     </p>
   </section>
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
-  <script type="module" src="radiance-intervals-2d.js"></script>
+
+  source: <a href="flatland-2d/radiance-intervals-2d.js" target="_blank">flatland-2d/radiance-intervals-2d.js</a>
+
+  <script type="module" src="flatland-2d/radiance-intervals-2d.js"></script>
 </section>
 
 ### Ray Distributions (2D)
@@ -80,6 +86,9 @@ Things are simpler in 2D so we'll start there.
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
+
+  source: <a href="flatland-2d/probe-ray-distributions-2d.js" target="_blank">flatland-2d/probe-ray-distributions-2d.js</a>
+
   <script src="flatland-2d/probe-ray-distributions-2d.js" defer type="module"></script>
 </section>
 
@@ -104,7 +113,7 @@ Things are simpler in 2D so we'll start there.
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
-  <script type="module" src="probe-interpolation-2d.js"></script>
+  <script type="module" src="flatland-2d/probe-interpolation-2d.js"></script>
 </section>
 
 <!-- alias so the rename doesn't really break things-->
