@@ -19,132 +19,26 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
 Things are simpler in 2D so we'll start there.
 
 ### Radiance Intervals (2D)
-In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where relative to the previous level, each cascade level:
-- doubles the inner radius of the band
-- doubles the width of the band
-- doubles the number of rays per probe
-- halves the total number of rays
+<section id="radiance-intervals-2d-content">
+  In 2D these are bands/shells/annuluses/crusts(🍕) of radiance values where relative to the previous level, each cascade level:
+  - doubles the inner radius of the band
+  - doubles the width of the band
+  - doubles the number of rays per probe
+  - halves the total number of rays
 
-<section id="radiance-intervals-2d-controls">
-  <p>
-  level 0 ray count: <input type="range" min="4" max="8" value="4" name="level-0-ray-count">
-  </p>
-
-  <p>
-  branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="branching-factor">
-  </p>
+  <section class="controls">
+    <p>
+      level 0 ray count: <input type="range" min="4" max="8" value="4" name="level-0-ray-count">
+    </p>
+    <p>
+      branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="2" name="branching-factor">
+    </p>
+  </section>
+  <section class="center-align">
+    <canvas width="1024" height="1024"></canvas>
+  </section>
+  <script type="module" src="radiance-intervals-2d.js"></script>
 </section>
-
-<section class="center-align">
-  <canvas id="radiance-intervals-2d-canvas" width="1024" height="1024"></canvas>
-</section>
-
-<script>
-  // tuck this into a scope so we can have multiple interactive context2ds on this page
-  {
-    // Setup
-    let canvas = document.getElementById('radiance-intervals-2d-canvas');
-    let state = {
-      canvas: canvas,
-      ctx: canvas.getContext('2d'),
-      params: {
-        levelSlider: -1,
-        level0RayCountSlider: -1,
-        colorLowerLevels: -1,
-        showCascadeRayCounts: -1,
-      }
-    }
-
-    const Param = (name, value) => {
-      if (state.params[name] != value) {
-        state.params[name] = value;
-        return true;
-      }
-      return false;
-    }
-
-
-    // clear the canvas
-    state.ctx.fillStyle = '#111';
-    state.ctx.fillRect(0, 0, canvas.width, canvas.height);
-    let levelCount = 6;
-    let levelColors = [
-      '#f3a833',
-      '#9de64e',
-      '#36c5f4',
-      '#ffa2ac',
-      '#cc99ff',
-      '#ec273f',
-      '#de5d3a'
-    ]
-
-    const DrawRadianceIntervals = () => {
-      window.requestAnimationFrame(DrawRadianceIntervals)
-      let dirty = false;
-      let controlEl = document.getElementById('radiance-intervals-2d-controls')
-
-      dirty = dirty || Param(
-        'level0RayCountSlider',
-        parseFloat(controlEl.querySelector('input[name="level-0-ray-count"]').value)
-      )
-      dirty = dirty || Param(
-        'branchingFactor',
-        parseFloat(controlEl.querySelector('input[name="branching-factor"]').value)
-      )
-
-
-      if (!dirty) {
-        return
-      }
-
-      // clear the canvas
-      state.ctx.fillStyle = '#111';
-      state.ctx.fillRect(0, 0, canvas.width, canvas.height);
-      state.ctx.lineWidth = 2;
-
-      let centerX = Math.floor(state.canvas.width / 2.0)
-      let centerY = Math.floor(state.canvas.height / 2.0)
-      let startingProbeRadius = 16
-      let levelPadding = 0
-      // the number of rays cast at level 0
-      let baseAngularSteps = state.params.level0RayCountSlider;
-      let TAU = Math.PI * 2.0
-      let angleOffset = Math.PI * 0.25
-
-      for (var level=0; level <= levelCount; level++) {
-        state.ctx.strokeStyle = levelColors[level];
-
-        let radius = (startingProbeRadius << (level * state.params.branchingFactor)) - levelPadding;
-        let prevRadius = level > 0
-          ? (startingProbeRadius << ((level - 1) * state.params.branchingFactor)) - levelPadding
-          : 0;
-
-        if (prevRadius * 2.0 > canvas.width) {
-          break
-        }
-
-        state.ctx.beginPath()
-        state.ctx.moveTo(centerX + radius, centerY)
-        state.ctx.arc(centerX, centerY, radius, 0, Math.PI*2.0)
-        state.ctx.stroke();
-
-        let angularSteps = baseAngularSteps << (level * state.params.branchingFactor)
-        state.ctx.beginPath()
-        for (let step = 0; step<angularSteps; step++) {
-          let angle = TAU * (step + 0.5) / angularSteps;
-
-          state.ctx.moveTo(centerX + Math.sin(angle) * prevRadius, centerY + Math.cos(angle) * prevRadius)
-          state.ctx.lineTo(centerX + Math.sin(angle) * radius, centerY + Math.cos(angle) * radius)
-        }
-        state.ctx.stroke();
-      }
-
-    }
-
-    DrawRadianceIntervals()
-
-  }
-</script>
 
 ### Ray Distributions (2D)
 <section id="ray-distributions-2d-content">
