@@ -1,6 +1,5 @@
 import CreateParamReader from "./params.js"
 
-
 RadianceIntervals2DBegin(
   document.getElementById('radiance-intervals-2d-content')
 )
@@ -33,8 +32,25 @@ function RadianceIntervals2DBegin(rootEl) {
   ]
 
   function ReadParams() {
-    Param('level0RayCount', 'f32')
-    Param('branchingFactor', 'i32')
+    Param('level0RayCount', 'i32', (parentEl, value) => {
+      parentEl.querySelector('output').innerHTML = `<span class="highlight-orange">${value}</span>`
+      return value
+    })
+    Param('branchingFactor', 'i32', (parentEl, value) => {
+      let probeRayCount = state.params.level0RayCount;
+      let displayValue = Math.pow(2, value)
+      let examples = ([0, 1, 2, 3]).map(level => {
+        let shifted = state.params.probeRayCount << (value * level)
+        let powed = probeRayCount * Math.pow(2, value * level)
+        return powed
+      })
+
+      parentEl.querySelector('output').innerHTML = `
+          2<sup class="highlight-blue">${value}</sup> = ${displayValue} (<span class="highlight-orange">${probeRayCount}</span> * 2<sup>(<span  class="highlight-blue">${value}</span> * level)</sup> = ${examples.join(', ')}, ...)
+        `
+      return value
+    })
+
   }
 
   function DrawRadianceIntervals() {

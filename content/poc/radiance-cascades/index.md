@@ -26,6 +26,8 @@ Things are simpler in 2D so we'll start there.
   - doubles the width of the band
   - doubles the number of rays per probe
   - halves the total number of rays
+  - offsets the rays to avoid overlaps (e.g., <code>angle = TAU * (rayIndex + 0.5) / rayCount</code>)
+
 
   <section class="controls">
     <div class="level0RayCount-control control">
