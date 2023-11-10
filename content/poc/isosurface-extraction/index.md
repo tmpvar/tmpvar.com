@@ -116,6 +116,12 @@ void AddSegments(u32 cellCode) {
       <div class="debugDrawCellTextualInfo-control control">
         <input type="checkbox" value="1" /> draw cell textual info
       </div>
+      <div class="debugDrawDisambiguationDistanceValues-control control">
+        <input type="checkbox" value="1" /> draw distance values on ambiguous cells
+      </div>
+      <div class="debugDrawAsymptoteIntersection-control control">
+        <input type="checkbox" value="1" /> draw asymptote intersection on ambiguous cells
+      </div>
       <div class="debugLoopCollectionMaxSteps-control control">
         <input type="range" min="-1" max="500" value="-1"> max loop collection steps
         <output></output>
@@ -135,7 +141,7 @@ void AddSegments(u32 cellCode) {
         </div>
       </div>
       <div class="isolevel-control control">
-        <input type="range" min="-500" max="500" value="-5.8" step="0.1"> isolevel
+        <input type="range" min="-500" max="500" value="-5.6" step="0.1"> isolevel
         <output></output>
       </div>
       <div class="lineSearchMaxSteps-control control">
@@ -153,7 +159,8 @@ void AddSegments(u32 cellCode) {
       <div class="disambiguationApproach-control control">
         <select>
             <option value="asymptote-intersection" selected>Asymptote Intersection</option>
-            <option value="sdf-sample">SDF Sample</option>
+            <option value="sdf-sample-cell-center">SDF Sample (Cell Center)</option>
+            <option value="sdf-sample-asymptote-intersection" selected>SDF Sample (Asymptote Intersection)</option>
             <option value="average">Average</option>
         </select>
         disambiguation approach
@@ -167,7 +174,7 @@ void AddSegments(u32 cellCode) {
         <output></output>
       </div>
       <div class="maxSubdivisionDepth-control control shownBy-performSubdivision">
-        <input type="range" min="2" max="12" value="9"> max subdivision depth
+        <input type="range" min="2" max="12" value="10"> max subdivision depth
         <output></output>
       </div>
     </div>

@@ -1,7 +1,7 @@
 
 export default function CreateCamera(ctx) {
   var limits = {
-    zoom: [1, 100]
+    zoom: [1, 1000]
   }
 
   var mouse = {
