@@ -42,9 +42,9 @@ Things are simpler in 2D so we'll start there.
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
-
-  source: <a href="flatland-2d/radiance-intervals-2d.js" target="_blank">flatland-2d/radiance-intervals-2d.js</a>
-
+  <p>
+    source: <a href="flatland-2d/radiance-intervals-2d.js" target="_blank">flatland-2d/radiance-intervals-2d.js</a>
+  </p>
   <script type="module" src="flatland-2d/radiance-intervals-2d.js"></script>
 </section>
 
@@ -88,9 +88,9 @@ Things are simpler in 2D so we'll start there.
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
-
-  source: <a href="flatland-2d/probe-ray-distributions-2d.js" target="_blank">flatland-2d/probe-ray-distributions-2d.js</a>
-
+  <p>
+    source: <a href="flatland-2d/probe-ray-distributions-2d.js" target="_blank">flatland-2d/probe-ray-distributions-2d.js</a>
+  </p>
   <script src="flatland-2d/probe-ray-distributions-2d.js" defer type="module"></script>
 </section>
 
@@ -98,23 +98,30 @@ Things are simpler in 2D so we'll start there.
 
 <section id="probe-interpolation-2d-content">
   <section class="controls">
-    <p>
-      min level: <input type="range" min="0" max="6" value="1" name="minLevel-slider">
-    </p>
-    <p>
-      max level: <input type="range" min="0" max="6" value="2" name="maxLevel-slider">
-    </p>
-    <p>
-      branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="1" name="level-branching-factor">
-    </p>
-    <p>
-      level 0 ray count: <input type="range" min="1" max="32" value="4" name="level-0-ray-count">
+    <div class="minLevel-control control">
+      min level: <input type="range" min="0" max="6" value="1">
+      <output></output>
+    </div>
+    <div class="maxLevel-control control">
+      max level: <input type="range" min="0" max="6" value="2">
+      <output></output>
+    </div>
+    <div class="level0RayCount-control control">
+      level 0 ray count: <input type="range" min="1" max="32" value="4" />
+      <output></output>
+    </div>
+    <div class="branchingFactor-control control">
+      branching factor(N<sup>level</sup>): <input type="range" min="1" max="3" value="1">
+      <output></output>
     </p>
   </section>
 
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
   </section>
+  <p>
+    source: <a href="flatland-2d/probe-interpolation-2d.js" target="_blank">flatland-2d/probe-interpolation-2d.js</a>
+  </p>
   <script type="module" src="flatland-2d/probe-interpolation-2d.js"></script>
 </section>
 
@@ -222,7 +229,6 @@ Things are simpler in 2D so we'll start there.
   </section>
   <section class="center-align webgpu-required">
     <canvas id="flatland-2d-canvas" width="1024" height="1024"></canvas>
-    <script type="module" src="flatland-2d/flatland-2d.js" defer></script>
     <section class="center-align webgpu-missing error-border">
       <img src="/img/webgpu-responsive.svg" width="768" height="768" />
       <p class="error">
@@ -230,6 +236,10 @@ Things are simpler in 2D so we'll start there.
       <p>
     </section>
   </section>
+  <p>
+    source: <a href="flatland-2d/flatland-2d.js" target="_blank">flatland-2d/flatland-2d.js</a>
+  </p>
+  <script type="module" src="flatland-2d/flatland-2d.js"></script>
 </section>
 
 ## 3D

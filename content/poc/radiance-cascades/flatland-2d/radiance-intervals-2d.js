@@ -1,3 +1,5 @@
+// License: MIT https://tmpvar.mit-license.org/
+
 import CreateParamReader from "./params.js"
 
 RadianceIntervals2DBegin(
@@ -60,6 +62,7 @@ function RadianceIntervals2DBegin(rootEl) {
     if (!state.dirty) {
       return
     }
+    state.dirty = false
 
     // clear the canvas
     state.ctx.fillStyle = '#111';

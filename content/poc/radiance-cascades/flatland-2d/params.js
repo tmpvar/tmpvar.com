@@ -1,3 +1,5 @@
+// License: MIT https://tmpvar.mit-license.org/
+
 export default function CreateParamReader(state, controlEl, paramPrefix = null) {
   let params = state.params
   if (paramPrefix) {

@@ -1,3 +1,7 @@
+// License: MIT https://tmpvar.mit-license.org/
+
+import CreateParamReader from "./params.js";
+
 ProbeInterpolation2DBegin(
   document.getElementById('probe-interpolation-2d-content')
 )
@@ -9,50 +13,46 @@ function ProbeInterpolation2DBegin(rootEl) {
   let state = {
     canvas: canvas,
     ctx: canvas.getContext('2d'),
-    params: {
-      minLevel: 0,
-      maxLevel: 6,
-      level0RayCountSlider: 0,
-    }
+    params: {},
+    dirty: true,
   }
 
   state.ctx.lineWidth = 2;
 
-  const Param = (name, value) => {
-    if (state.params[name] != value) {
-      state.params[name] = value;
-      return true;
-    }
-    return false;
+  const Param = CreateParamReader(state, controlEl)
+
+  function ReadParams() {
+    Param('minLevel', 'i32')
+    Param('maxLevel', 'i32')
+    Param('level0RayCount', 'i32', (parentEl, value) => {
+      parentEl.querySelector('output').innerHTML = `<span class="highlight-orange">${value}</span>`
+      return value
+    })
+
+    Param('branchingFactor', 'i32', (parentEl, value) => {
+      let probeRayCount = state.params.level0RayCount;
+      let displayValue = Math.pow(2, value)
+      let examples = ([0, 1, 2, 3]).map(level => {
+        let shifted = state.params.probeRayCount << (value * level)
+        let powed = probeRayCount * Math.pow(2, value * level)
+        return powed
+      })
+
+      parentEl.querySelector('output').innerHTML = `
+          2<sup class="highlight-blue">${value}</sup> = ${displayValue} (<span class="highlight-orange">${probeRayCount}</span> * 2<sup>(<span  class="highlight-blue">${value}</span> * level)</sup> = ${examples.join(', ')}, ...)
+        `
+      return value
+    })
   }
 
   function DrawRayDistributions2D() {
+    ReadParams()
     window.requestAnimationFrame(DrawRayDistributions2D)
-
-    // html sliders/checkboxes
-    let dirty = false;
-    dirty = dirty || Param(
-      'minLevel',
-      parseFloat(controlEl.querySelector('input[name="minLevel-slider"]').value)
-    )
-    dirty = dirty || Param(
-      'maxLevel',
-      parseFloat(controlEl.querySelector('input[name="maxLevel-slider"]').value)
-    )
-
-    dirty = dirty || Param(
-      'branchingFactor',
-      parseFloat(controlEl.querySelector('input[name="level-branching-factor"]').value)
-    )
-
-    dirty = dirty || Param(
-      'level0RayCountSlider',
-      parseFloat(controlEl.querySelector('input[name="level-0-ray-count"]').value)
-    )
-
-    if (!dirty) {
+    if (!state.dirty) {
       return;
     }
+    state.dirty = false
+    console.log("here")
 
     // clear the canvas
     state.ctx.fillStyle = '#111';
@@ -69,13 +69,10 @@ function ProbeInterpolation2DBegin(rootEl) {
     ]
 
     // Draw the actual cascades
-    let levels = 6;
     let startingProbeRadius = 64;
-    let baseAngularSteps = state.params.level0RayCountSlider
+    let baseAngularSteps = state.params.level0RayCount
     let TAU = Math.PI * 2.0
 
-    let radianceIntervalStart = 0;
-    let cascadeRayCounts = [];
     let diameter = startingProbeRadius * 2
     let levelPadding = 0
     for (let level = state.params.minLevel; level <= state.params.maxLevel; level++) {
