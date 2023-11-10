@@ -1,3 +1,5 @@
+// License: MIT https://tmpvar.mit-license.org/
+
 import CreateParamReader from "./params.js";
 
 function ProbeRayDistributions2DBegin(rootEl) {
@@ -17,7 +19,6 @@ function ProbeRayDistributions2DBegin(rootEl) {
   }
 
   state.ctx.lineWidth = 2;
-
 
   const Param = CreateParamReader(state, controlEl)
 
@@ -95,7 +96,6 @@ function ProbeRayDistributions2DBegin(rootEl) {
 
     let cascadeRayCounts = [];
     let index = 0
-    console.clear()
     for (let level = 0; level <= state.params.maxLevel; level++) {
       let currentProbeDiameter = state.params.probeDiameter << level;
       let currentProbeRadius = currentProbeDiameter / 2
@@ -107,7 +107,7 @@ function ProbeRayDistributions2DBegin(rootEl) {
       let intervalEndRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
 
 
-      console.log(intervalStartRadius, intervalEndRadius, { currentProbeDiameter, r: intervalEndRadius - intervalStartRadius})
+      // console.log(intervalStartRadius, intervalEndRadius, { currentProbeDiameter, r: intervalEndRadius - intervalStartRadius})
       state.ctx.strokeStyle = levelColors[level]
 
       let cascadeRayCount = 0;
@@ -153,57 +153,6 @@ function ProbeRayDistributions2DBegin(rootEl) {
 
       state.ctx.fillText(`total rays:${totalRays}`, 20, 30 + cascadeRayCounts.length * 30)
     }
-
-    // let i = state.params.i;
-    // let startingProbeRadius = Math.pow(2, i);
-    // let baseAngularSteps = Math.max(4, Math.pow(2, i));
-    // let radianceIntervalStart = 0;
-    // let cascadeRayCounts = [];
-    // for (let level = 0; level <= state.params.levelSlider; level++) {
-    //   let angularSteps = baseAngularSteps << (level * state.params.branchingFactor)
-    //   let radius = startingProbeRadius << (level * state.params.branchingFactor)
-    //   let diameter = radius * 2
-    //   let prevRadius = level > 0
-    //     ? startingProbeRadius << ((level - 1) * state.params.branchingFactor)
-    //     : 0;
-
-    //   state.ctx.strokeStyle = levelColors[level]
-    //   state.ctx.fillStyle = '#f0f'
-    //   let cascadeRayCount = 0;
-    //   for (let x = 0; x < state.canvas.width; x += diameter) {
-    //     for (let y = 0; y < state.canvas.height; y += diameter) {
-    //       state.ctx.beginPath()
-    //       let centerX = x + radius
-    //       let centerY = y + radius
-    //       for (let step = 0; step < angularSteps; step++) {
-    //         let angle = TAU * (step + 0.5) / angularSteps;
-    //         let dirX = Math.sin(angle)
-    //         let dirY = Math.cos(angle)
-
-    //         state.ctx.moveTo(centerX + dirX * prevRadius, centerY + dirY * prevRadius);
-    //         state.ctx.lineTo(centerX + dirX * radius, centerY + dirY * radius)
-    //         cascadeRayCount++;
-    //       }
-    //       state.ctx.stroke();
-    //     }
-    //   }
-    //   cascadeRayCounts.push(cascadeRayCount);
-    //   radianceIntervalStart = radius;
-    // }
-    // state.ctx.restore()
-    // if (state.params.showCascadeRayCounts) {
-    //   let totalRays = 0;
-    //   state.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)'
-    //   state.ctx.fillRect(0, 0, 230, 20 + 30 * (cascadeRayCounts.length + 1))
-    //   state.ctx.fillStyle = 'white'
-    //   state.ctx.font = '20px monospace'
-    //   cascadeRayCounts.forEach((count, level) => {
-    //     state.ctx.fillText(`level:${level} rays:${count}`, 20, 30 + level * 30)
-    //     totalRays += count;
-    //   })
-
-    //   state.ctx.fillText(`total rays:${totalRays}`, 20, 30 + cascadeRayCounts.length * 30)
-    // }
   }
 
   DrawRayDistributions2D()

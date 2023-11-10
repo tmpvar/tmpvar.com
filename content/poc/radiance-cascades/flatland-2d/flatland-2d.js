@@ -1,3 +1,5 @@
+// License: MIT https://tmpvar.mit-license.org/
+
 import CreateParamReader from "./params.js"
 
 const DemoImage = document.createElement('img');
