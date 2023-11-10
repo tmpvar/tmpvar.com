@@ -52,7 +52,6 @@ function ProbeInterpolation2DBegin(rootEl) {
       return;
     }
     state.dirty = false
-    console.log("here")
 
     // clear the canvas
     state.ctx.fillStyle = '#111';
