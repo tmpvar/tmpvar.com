@@ -69,6 +69,12 @@ function IsosurfaceExtractionBegin(rootEl) {
     Param('debugDrawLooseEdgeVertices', 'bool')
     Param('debugDrawBoundaryCells', 'bool')
     Param('debugDrawGrid', 'bool')
+
+    Param('debugDrawDisambiguationDistanceValues', 'bool')
+    Param('debugDrawAsymptoteIntersection', 'bool')
+
+
+
     Param('debugLoopCollectionMaxSteps', 'i32')
     Param('debugDrawCellTextualInfo', 'bool')
 
@@ -685,7 +691,7 @@ function IsosurfaceExtractionBegin(rootEl) {
     corners[TopRightCornerIndex] = [+radius, +radius]
     corners[BottomRightCornerIndex] = [+radius, -radius]
     corners[BottomLeftCornerIndex] = [-radius, -radius]
-console.log(radius)
+
     // compute the distance to the upper left corner
     state.boundaryCells.forEach((cell, cellIndex) => {
       let cellOffset = cellIndex * CornersPerCell
@@ -884,12 +890,39 @@ console.log(radius)
         let tr = state.cellDistances[cellOffset + TopRightCornerIndex]
         let br = state.cellDistances[cellOffset + BottomRightCornerIndex]
 
-
-        let u = (bl - br) / (bl + tr - br - tl)
-        let v = (bl - tl) / (bl + tr - br - tl)
-
         let x = cell.center[0] - cell.radius
         let y = cell.center[1] - cell.radius
+
+        if (state.params.debugDrawDisambiguationDistanceValues) {
+          ctx.save()
+          ctx.fillStyle = 'white'
+          ctx.scale(1, -1)
+          ctx.translate(0, -canvas.height)
+
+          ctx.font = `${20 / state.camera.state.zoom}px Hack,monospace`
+          // ctx.fillText(code.toFixed(0), cell.center[0], canvas.height - cell.center[1])
+          ctx.fillText(SampleSDF(cell.center[0], cell.center[1]).toFixed(2), cell.center[0], canvas.height - cell.center[1])
+          ctx.fillText(bl.toFixed(2), x, canvas.height - y)
+          ctx.fillText(br.toFixed(2), x + cellDiameter, canvas.height - y)
+          ctx.fillText(tl.toFixed(2), x, canvas.height - y - cellDiameter)
+          ctx.fillText(tr.toFixed(2), x + cellDiameter, canvas.height - y - cellDiameter)
+          ctx.restore()
+        }
+
+        let den = (bl + tr - br - tl)
+        let t = (bl - br) / den
+        let s = (bl - tl) / den
+
+        if (state.params.debugDrawAsymptoteIntersection) {
+          ctx.beginPath()
+          ctx.moveTo(x + cellDiameter * s, y)
+          ctx.lineTo(x + cellDiameter * s, y + cellDiameter)
+
+          ctx.moveTo(x, y + cellDiameter * t)
+          ctx.lineTo(x + cellDiameter, y + cellDiameter * t)
+          ctx.strokeStyle = "#f0f"
+          ctx.stroke()
+        }
 
         switch (state.params.disambiguationApproach) {
           case 'average': {
@@ -905,23 +938,6 @@ console.log(radius)
             }
           }
           case 'asymptote-intersection': {
-
-
-
-            ctx.save()
-            ctx.fillStyle = 'white'
-            ctx.scale(1, -1)
-            ctx.translate(0, -canvas.height)
-
-            ctx.font = `${24 / state.camera.state.zoom}px Hack,monospace`
-            // ctx.fillText(code.toFixed(0), cell.center[0], canvas.height - cell.center[1])
-            ctx.fillText(SampleSDF(cell.center[0], cell.center[1]).toFixed(2), cell.center[0], canvas.height - cell.center[1])
-            ctx.fillText(bl.toFixed(2), x, canvas.height - y)
-            ctx.fillText(br.toFixed(2), x + cellDiameter, canvas.height - y)
-            ctx.fillText(tl.toFixed(2), x, canvas.height - y - cellDiameter)
-            ctx.fillText(tr.toFixed(2), x + cellDiameter, canvas.height - y - cellDiameter)
-            ctx.restore()
-
             const alpha = br * tl - bl * tr
             if (IsNegative(alpha)) {
               edges = edges[1]
@@ -931,9 +947,24 @@ console.log(radius)
 
             break;
           }
-          case 'sdf-sample': {
+          case 'sdf-sample-cell-center': {
             // let d = SampleSDF(x + cellDiameter * u, y + cellDiameter * v)
             let d = SampleSDF(cell.center[0], cell.center[1])
+
+            if (IsNegative(d)) {
+              edges = edges[1]
+            } else {
+              edges = edges[0]
+            }
+            break;
+          }
+
+          case 'sdf-sample-asymptote-intersection': {
+
+
+            let d = SampleSDF(x + cellDiameter * s, y + cellDiameter * t)
+
+
             if (IsNegative(d)) {
               edges = edges[1]
             } else {
