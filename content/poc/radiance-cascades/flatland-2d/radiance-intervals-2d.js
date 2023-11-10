@@ -1,3 +1,6 @@
+import CreateParamReader from "./params.js"
+
+
 RadianceIntervals2DBegin(
   document.getElementById('radiance-intervals-2d-content')
 )
@@ -5,25 +8,15 @@ RadianceIntervals2DBegin(
 function RadianceIntervals2DBegin(rootEl) {
   // Setup
   let controlEl = rootEl.querySelector('.controls')
+
   let canvas = rootEl.querySelector('canvas')
   let state = {
     canvas: canvas,
     ctx: canvas.getContext('2d'),
-    params: {
-      levelSlider: -1,
-      level0RayCountSlider: -1,
-      colorLowerLevels: -1,
-      showCascadeRayCounts: -1,
-    }
+    params: {}
   }
 
-  const Param = (name, value) => {
-    if (state.params[name] != value) {
-      state.params[name] = value;
-      return true;
-    }
-    return false;
-  }
+  const Param = CreateParamReader(state, controlEl)
 
   // clear the canvas
   state.ctx.fillStyle = '#111';
@@ -39,21 +32,16 @@ function RadianceIntervals2DBegin(rootEl) {
     '#de5d3a'
   ]
 
+  function ReadParams() {
+    Param('level0RayCount', 'f32')
+    Param('branchingFactor', 'i32')
+  }
+
   function DrawRadianceIntervals() {
+    ReadParams()
     window.requestAnimationFrame(DrawRadianceIntervals)
-    let dirty = false;
 
-
-    dirty = dirty || Param(
-      'level0RayCountSlider',
-      parseFloat(controlEl.querySelector('input[name="level-0-ray-count"]').value)
-    )
-    dirty = dirty || Param(
-      'branchingFactor',
-      parseFloat(controlEl.querySelector('input[name="branching-factor"]').value)
-    )
-
-    if (!dirty) {
+    if (!state.dirty) {
       return
     }
 
@@ -67,9 +55,8 @@ function RadianceIntervals2DBegin(rootEl) {
     let startingProbeRadius = 16
     let levelPadding = 0
     // the number of rays cast at level 0
-    let baseAngularSteps = state.params.level0RayCountSlider;
+    let baseAngularSteps = state.params.level0RayCount;
     let TAU = Math.PI * 2.0
-    let angleOffset = Math.PI * 0.25
 
     for (var level = 0; level <= levelCount; level++) {
       state.ctx.strokeStyle = levelColors[level];
