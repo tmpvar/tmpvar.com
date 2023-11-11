@@ -212,7 +212,7 @@ async function ShellTexturingBegin(rootEl) {
           let dFdyPos = -dpdy(fragData.worldPosition);
           let normal = normalize(cross(dFdxPos, dFdyPos));
           out.color = vec4(normal * 0.5 + 0.5, 1.0);
-          const divisions = 32.0;
+          let divisions = ubo.params.w;
 
           let hash = pcg2d(vec2<u32>(floor(fragData.uvw.xy * divisions)));
           let v = f32(hash.x) / f32(0xffffffff);

@@ -297,7 +297,7 @@ export default function CreateOrbitCamera() {
     EPS: 1e-5,
     yaw: -Math.PI * 0.5,
     pitch: Math.PI * 0.5,
-    distance: 4.0,
+    distance: 40.0,
 
     yawVelocity: 0.0,
     pitchVelocity: 0.0,
