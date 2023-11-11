@@ -329,7 +329,7 @@ async function ShellTexturingBegin(rootEl) {
         ]
       })
 
-      return function RenderMesh(pass, worldToScreen, eye, shellSpacing, instanceCount, now) {
+      return function RenderMesh(mesh, pass, worldToScreen, eye, shellSpacing, shellCount, shellSubdivisions, now) {
         // update the uniform buffer
         {
           let byteOffset = 0
@@ -384,10 +384,18 @@ async function ShellTexturingBegin(rootEl) {
     )
   }
 
+  const meshes = {
+    plane: primitives.CreatePlane(state.gpu),
+    cube: primitives.CreateCube(state.gpu),
+    sphere: primitives.CreateSphere(state.gpu, 3),
+  }
+
   const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
     Param('shellCount', 'i32')
     Param('shellSpacing', 'f32')
+    Param('shellSubdivisions', 'i32')
+    Param('mesh', 'string')
   }
 
   function RenderFrame() {
