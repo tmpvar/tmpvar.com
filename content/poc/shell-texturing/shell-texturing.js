@@ -135,7 +135,7 @@ async function ShellTexturingBegin(rootEl) {
       const device = gpu.device
       const uboFields = [
         ['eye', 'vec4f', 16],
-        // x = offset amount, yzw = unused
+        // x = shell offset, y = shell count, z = now in ms, w = unused
         ['params', 'vec4f', 16],
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
       ]
@@ -175,13 +175,14 @@ async function ShellTexturingBegin(rootEl) {
         ) -> VertexOut {
           var out: VertexOut;
 
+          let scale = 10.0;
           let shellSpacing = ubo.params.x;
-          let pos = inPosition - inNormal * shellSpacing * f32(instanceIndex);
+          let pos = inPosition * scale - inNormal * shellSpacing * f32(instanceIndex);
 
-          out.instanceOffset = shellSpacing * f32(instanceIndex);
+          out.instanceOffset = shellSpacing * f32(instanceIndex) / scale;
 
           out.worldPosition = pos;
-          out.uvw = pos * 0.5 + 0.5;
+          out.uvw = (pos / scale) * 0.5 + 0.5;
           out.position = ubo.worldToScreen * vec4(pos, 1.0);
 
           return out;
@@ -212,17 +213,24 @@ async function ShellTexturingBegin(rootEl) {
           let dFdyPos = -dpdy(fragData.worldPosition);
           let normal = normalize(cross(dFdxPos, dFdyPos));
           out.color = vec4(normal * 0.5 + 0.5, 1.0);
+          const divisions = 32.0;
 
-          // let hash = pcg3d(vec3<u32>(floor(fragData.uvw * 16.0)));
-          let hash = pcg2d(vec2<u32>(floor(fragData.uvw.xy * 64.0)));
-          // out.color = vec4(vec3f(hash) * (1.0/), 1.0);
+          let hash = pcg2d(vec2<u32>(floor(fragData.uvw.xy * divisions)));
           let v = f32(hash.x) / f32(0xffffffff);
-
+          let t = ubo.params.z;
           if (v > fragData.instanceOffset * 2.0) {
+            let uv = fract(fragData.uvw.xy * divisions) * 2.0 - 1.0;
+            let width = max(0.1, 1.0 - (fragData.instanceOffset * 3.0));
 
-            let color = vec3f(1.0) * pow(fragData.instanceOffset, 2.0);
+            let samplePos = uv + sin(t * 0.01 + v * fragData.instanceOffset * 50.0) * 0.5;
 
-            out.color = vec4(color, 1.0);
+            if (length(samplePos) - (0.5 * (1.0 - fragData.instanceOffset * 3.0)) < 0.0) {
+              var color = vec3f(1.0) * pow(fragData.instanceOffset * 3.0, 1);
+              out.color = vec4(color, 1.0);
+            } else {
+              discard;
+            }
+
           } else {
             out.color = vec4(vec3f(0.0), 1.0);
             discard;
@@ -244,7 +252,7 @@ async function ShellTexturingBegin(rootEl) {
         entries: [
           {
             binding: 0,
-            visibility: GPUShaderStage.VERTEX,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
             buffer: {
               type: 'uniform',
             }
@@ -317,7 +325,7 @@ async function ShellTexturingBegin(rootEl) {
         ]
       })
 
-      return function RenderMesh(pass, worldToScreen, eye, shellSpacing, instanceCount) {
+      return function RenderMesh(pass, worldToScreen, eye, shellSpacing, instanceCount, now) {
         // update the uniform buffer
         {
           let byteOffset = 0
@@ -328,10 +336,24 @@ async function ShellTexturingBegin(rootEl) {
           })
           byteOffset += 4
 
-          // params
-          uboData.setFloat32(byteOffset, shellSpacing, true)
-          byteOffset += 16
 
+          // params
+          {
+            //  shell offset
+            uboData.setFloat32(byteOffset, shellSpacing, true)
+            byteOffset += 4
+
+            //  shell count
+            uboData.setFloat32(byteOffset, instanceCount, true)
+            byteOffset += 4
+
+            //  time in ms
+            uboData.setFloat32(byteOffset, now, true)
+            byteOffset += 4
+
+            // w = unused
+            byteOffset += 4
+          }
           worldToScreen.forEach(v => {
             uboData.setFloat32(byteOffset, v, true)
             byteOffset += 4;
@@ -413,8 +435,9 @@ async function ShellTexturingBegin(rootEl) {
       pass,
       state.camera.computed.worldToScreen,
       state.camera.computed.eye,
-      0.01,
-      64
+      0.04,
+      64,
+      now
     )
 
     pass.end();
