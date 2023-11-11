@@ -156,8 +156,9 @@ async function ShellTexturingBegin(rootEl) {
           @builtin(position) position : vec4f,
           @location(0) color: vec3f,
           @location(1) worldPosition: vec3f,
-          @location(2) uvw: vec3f,
+          @location(2) uv: vec2f,
           @interpolate(flat) @location(3) instanceOffset: f32,
+          @location(4) normal: vec3f,
         }
 
         struct UBOParams {
@@ -170,6 +171,7 @@ async function ShellTexturingBegin(rootEl) {
         fn VertexMain(
           @location(0) inPosition: vec3f,
           @location(1) inNormal: vec3f,
+          @location(2) inUV: vec2f,
           @builtin(instance_index) instanceIndex: u32
         ) -> VertexOut {
           var out: VertexOut;
@@ -180,10 +182,12 @@ async function ShellTexturingBegin(rootEl) {
 
           out.instanceOffset = shellSpacing * f32(instanceIndex) / scale;
 
-          out.worldPosition = pos;
-          out.uvw = (pos / scale) * 0.5 + 0.5;
-          out.position = ubo.worldToScreen * vec4(pos, 1.0);
+          var n = 1.0 - inNormal * 0.5 + 0.5;
 
+          out.worldPosition = pos;
+          out.uv = inUV;
+          out.position = ubo.worldToScreen * vec4(pos, 1.0);
+          out.normal = inNormal;
           return out;
         }
 
@@ -192,17 +196,17 @@ async function ShellTexturingBegin(rootEl) {
         };
 
         fn pcg2d(_v: vec2<u32>) -> vec2<u32> {
-            var v = _v * 1664525u + 1013904223u;
+          var v = _v * 1664525u + 1013904223u;
 
-            v.x += v.y * 1664525u;
-            v.y += v.x * 1664525u;
+          v.x += v.y * 1664525u;
+          v.y += v.x * 1664525u;
 
-            v ^= v >> vec2<u32>(16u);
+          v ^= v >> vec2<u32>(16u);
 
-            v.x += v.y * 1664525u;
-            v.y += v.x * 1664525u;
+          v.x += v.y * 1664525u;
+          v.y += v.x * 1664525u;
 
-            return v ^ (v>>vec2<u32>(16u));
+          return v ^ (v>>vec2<u32>(16u));
         }
 
         @fragment
@@ -210,29 +214,31 @@ async function ShellTexturingBegin(rootEl) {
           var out: FragmentOut;
           let dFdxPos = dpdx(fragData.worldPosition);
           let dFdyPos = -dpdy(fragData.worldPosition);
-          let normal = normalize(cross(dFdxPos, dFdyPos));
+          let normal = fragData.normal;//normalize(cross(dFdxPos, dFdyPos));
           out.color = vec4(normal * 0.5 + 0.5, 1.0);
+          // return out;
           let divisions = ubo.params.w;
 
-          let hash = pcg2d(vec2<u32>(floor(fragData.uvw.xy * divisions)));
+          let hash = pcg2d(vec2<u32>(floor(fragData.uv * divisions)));
           let v = f32(hash.x) / f32(0xffffffff);
           let o = f32(hash.y) / f32(0xffffffff);
           let t = ubo.params.z;
           if (v > fragData.instanceOffset * 2.0) {
-            let uv = fract(fragData.uvw.xy * divisions) * 2.0 - 1.0;
-            let width = max(0.1, 1.0 - (fragData.instanceOffset * 3.0));
 
-            let samplePos = uv + vec2f(
-              sin(t * 0.01 + v * fragData.instanceOffset * 50.0) * 0.5,
-              sin(t * 0.01 * o + v * fragData.instanceOffset * 50.0) * 0.5
-            );
+            // let uv = fract(fragData.uvw.xy * divisions) * 2.0 - 1.0;
+            // let width = max(0.1, 1.0 - (fragData.instanceOffset * 3.0));
 
-            if (length(samplePos) - (0.5 * (1.0 - fragData.instanceOffset * 3.0)) < 0.0) {
+            // let samplePos = uv + vec2f(
+            //   sin(t * 0.01 + v * fragData.instanceOffset * 50.0) * 0.5,
+            //   sin(t * 0.01 * o + v * fragData.instanceOffset * 50.0) * 0.5
+            // );
+
+            // if (length(samplePos) - (0.5 * (1.0 - fragData.instanceOffset * 3.0)) < 0.0) {
               var color = vec3f(1.0) * pow(fragData.instanceOffset * 3.0, 1);
               out.color = vec4(color, 1.0);
-            } else {
-              discard;
-            }
+            // } else {
+            //   discard;
+            // }
 
           } else {
             out.color = vec4(vec3f(0.0), 1.0);
@@ -287,6 +293,16 @@ async function ShellTexturingBegin(rootEl) {
                 format: 'float32x3',
               }],
               arrayStride: 12,
+              stepMode: 'vertex'
+            },
+            // uv
+            {
+              attributes: [{
+                shaderLocation: 2,
+                offset: 0,
+                format: 'float32x2',
+              }],
+              arrayStride: 8,
               stepMode: 'vertex'
             },
           ]
@@ -370,6 +386,7 @@ async function ShellTexturingBegin(rootEl) {
         pass.setBindGroup(0, bindGroup)
         pass.setVertexBuffer(0, mesh.positionBuffer);
         pass.setVertexBuffer(1, mesh.normalBuffer);
+        pass.setVertexBuffer(2, mesh.uvBuffer);
         pass.draw(mesh.vertexCount, shellCount);
       }
     },
