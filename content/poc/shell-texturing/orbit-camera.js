@@ -295,7 +295,7 @@ export default function CreateOrbitCamera() {
 
   const state = {
     EPS: 1e-5,
-    yaw: Math.PI * 0.5,
+    yaw: -Math.PI * 0.5,
     pitch: Math.PI * 0.5,
     distance: 4.0,
 

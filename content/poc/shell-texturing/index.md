@@ -25,7 +25,7 @@ date = 2023-11-10
       mesh
       <select>
         <option value="plane" selected>Plane</option>
-        <option value="cube">Cube</option>
+        <option value="cube" selected>Cube</option>
         <option value="sphere">Sphere</option>
       </select>
     </div>

@@ -370,7 +370,7 @@ async function ShellTexturingBegin(rootEl) {
         pass.setBindGroup(0, bindGroup)
         pass.setVertexBuffer(0, mesh.positionBuffer);
         pass.setVertexBuffer(1, mesh.normalBuffer);
-        pass.draw(mesh.vertexCount, instanceCount);
+        pass.draw(mesh.vertexCount, shellCount);
       }
     },
   }
