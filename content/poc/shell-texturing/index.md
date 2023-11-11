@@ -5,7 +5,7 @@ date = 2023-11-10
 
 ## Inspiration
 
-[acerola](https://www.youtube.com/@Acerola_t)'s youtube video [How Are Games Rendering Fur?](https://www.youtube.com/watch?v=9dr-tRQzij4) piqued my interest and then I realized this would make a great proof of concept.
+[acerola](https://www.youtube.com/@Acerola_t)'s youtube video [How Are Games Rendering Fur?](https://www.youtube.com/watch?v=9dr-tRQzij4)
 
 <section id="shell-texturing-content" class="has-webgpu">
   <section class="controls">
@@ -16,6 +16,18 @@ date = 2023-11-10
     <div class="shellSpacing-control control">
       shell spacing <input type="range" min="0.001" max="1.0" value="0.04" step="0.001" />
       <output></output>
+    </div>
+    <div class="shellSubdivisions-control control">
+      shell subdivisions <input type="range" min="2" max="1024" value="64" step="1" />
+      <output></output>
+    </div>
+    <div class="mesh-control control">
+      mesh
+      <select>
+        <option value="plane" selected>Plane</option>
+        <option value="cube">Cube</option>
+        <option value="sphere">Sphere</option>
+      </select>
     </div>
   </section>
   <section class="center-align">
