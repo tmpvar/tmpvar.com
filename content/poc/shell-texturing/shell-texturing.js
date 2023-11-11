@@ -127,7 +127,6 @@ async function ShellTexturingBegin(rootEl) {
   const shaders = {
     RenderTriangleSoup(
       gpu,
-      mesh,
       depthTexture,
       presentationFormat
     ) {
@@ -135,7 +134,7 @@ async function ShellTexturingBegin(rootEl) {
       const device = gpu.device
       const uboFields = [
         ['eye', 'vec4f', 16],
-        // x = shell offset, y = shell count, z = now in ms, w = unused
+        // x = shell offset, y = shell count, z = now in ms, w = shell subidivisions
         ['params', 'vec4f', 16],
         ['worldToScreen', 'mat4x4<f32>', 16 * 4],
       ]
@@ -348,7 +347,7 @@ async function ShellTexturingBegin(rootEl) {
             byteOffset += 4
 
             //  shell count
-            uboData.setFloat32(byteOffset, instanceCount, true)
+            uboData.setFloat32(byteOffset, shellCount, true)
             byteOffset += 4
 
             //  time in ms
@@ -356,6 +355,7 @@ async function ShellTexturingBegin(rootEl) {
             byteOffset += 4
 
             // w = unused
+            uboData.setFloat32(byteOffset, shellSubdivisions, true)
             byteOffset += 4
           }
           worldToScreen.forEach(v => {
@@ -378,7 +378,6 @@ async function ShellTexturingBegin(rootEl) {
   const programs = {
     renderMesh: shaders.RenderTriangleSoup(
       state.gpu,
-      primitives.CreatePlane(state.gpu),
       textures.depth,
       state.gpu.presentationFormat
     )
@@ -446,11 +445,13 @@ async function ShellTexturingBegin(rootEl) {
     pass.setViewport(0, 0, width, height, 0, 1);
     pass.setScissorRect(0, 0, width, height);
     programs.renderMesh(
+      meshes[state.params.mesh],
       pass,
       state.camera.computed.worldToScreen,
       state.camera.computed.eye,
       state.params.shellSpacing,
       state.params.shellCount,
+      state.params.shellSubdivisions,
       now
     )
 
