@@ -114,61 +114,22 @@ export function CreateCube(gpu) {
   ])
 
 
-  let normals = new Float32Array([
-    // front
-    0, 0, -1,
-    0, 0, -1,
-    0, 0, -1,
+  let normals = new Float32Array(positions.length)
+  function Length(x, y, z) {
+    return Math.sqrt(x * x + y * y * z * z);
+  }
 
-    0, 0, -1,
-    0, 0, -1,
-    0, 0, -1,
+  for (let i=0; i<positions.length; i+=3) {
+    let x = positions[i + 0]
+    let y = positions[i + 1]
+    let z = positions[i + 2]
 
-    // back
-    0, 0, 1,
-    0, 0, 1,
-    0, 0, 1,
+    let l = Length(x, y, z)
 
-    0, 0, 1,
-    0, 0, 1,
-    0, 0, 1,
-
-    // top
-    0, 1, 0,
-    0, 1, 0,
-    0, 1, 0,
-
-    0, 1, 0,
-    0, 1, 0,
-    0, 1, 0,
-
-    // bottom
-    0, -1, 0,
-    0, -1, 0,
-    0, -1, 0,
-
-    0, -1, 0,
-    0, -1, 0,
-    0, -1, 0,
-
-    // left
-    -1, 0, 0,
-    -1, 0, 0,
-    -1, 0, 0,
-
-    -1, 0, 0,
-    -1, 0, 0,
-    -1, 0, 0,
-
-    // right
-    1, 0, 0,
-    1, 0, 0,
-    1, 0, 0,
-
-    1, 0, 0,
-    1, 0, 0,
-    1, 0, 0,
-  ])
+    normals[i + 0] = x / l;
+    normals[i + 1] = y / l;
+    normals[i + 2] = z / l;
+  }
 
   const mesh = {
     label: labelPrefix,
