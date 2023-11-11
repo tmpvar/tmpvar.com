@@ -217,12 +217,16 @@ async function ShellTexturingBegin(rootEl) {
 
           let hash = pcg2d(vec2<u32>(floor(fragData.uvw.xy * divisions)));
           let v = f32(hash.x) / f32(0xffffffff);
+          let o = f32(hash.y) / f32(0xffffffff);
           let t = ubo.params.z;
           if (v > fragData.instanceOffset * 2.0) {
             let uv = fract(fragData.uvw.xy * divisions) * 2.0 - 1.0;
             let width = max(0.1, 1.0 - (fragData.instanceOffset * 3.0));
 
-            let samplePos = uv + sin(t * 0.01 + v * fragData.instanceOffset * 50.0) * 0.5;
+            let samplePos = uv + vec2f(
+              sin(t * 0.01 + v * fragData.instanceOffset * 50.0) * 0.5,
+              sin(t * 0.01 * o + v * fragData.instanceOffset * 50.0) * 0.5
+            );
 
             if (length(samplePos) - (0.5 * (1.0 - fragData.instanceOffset * 3.0)) < 0.0) {
               var color = vec3f(1.0) * pow(fragData.instanceOffset * 3.0, 1);
