@@ -1280,7 +1280,6 @@ async function ProbeRayDDA2DBegin() {
       }
     })
 
-
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
     ctx.configure({
