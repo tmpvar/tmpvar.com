@@ -384,8 +384,10 @@ async function ShellTexturingBegin(rootEl) {
     )
   }
 
+  const Param = CreateParamReader(state, controlEl)
   function ReadParams() {
-
+    Param('shellCount', 'i32')
+    Param('shellSpacing', 'f32')
   }
 
   function RenderFrame() {
@@ -439,8 +441,8 @@ async function ShellTexturingBegin(rootEl) {
       pass,
       state.camera.computed.worldToScreen,
       state.camera.computed.eye,
-      0.04,
-      64,
+      state.params.shellSpacing,
+      state.params.shellCount,
       now
     )
 

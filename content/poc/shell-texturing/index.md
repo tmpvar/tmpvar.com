@@ -9,6 +9,14 @@ date = 2023-11-10
 
 <section id="shell-texturing-content" class="has-webgpu">
   <section class="controls">
+    <div class="shellCount-control control">
+      shell count <input type="range" min="16" max="512" value="64" />
+      <output></output>
+    </div>
+    <div class="shellSpacing-control control">
+      shell spacing <input type="range" min="0.001" max="1.0" value="0.04" step="0.001" />
+      <output></output>
+    </div>
   </section>
   <section class="center-align">
     <canvas width="1024" height="1024"></canvas>
