@@ -176,7 +176,7 @@ async function ShellTexturingBegin(rootEl) {
 
           let scale = 10.0;
           let shellSpacing = ubo.params.x;
-          let pos = inPosition * scale - inNormal * shellSpacing * f32(instanceIndex);
+          let pos = inPosition * scale + inNormal * shellSpacing * f32(instanceIndex);
 
           out.instanceOffset = shellSpacing * f32(instanceIndex) / scale;
 
