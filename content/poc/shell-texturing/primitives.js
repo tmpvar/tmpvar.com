@@ -1,9 +1,27 @@
 import GenerateIcosphere from "./icosphere-fast.js"
+
+function ComputeUVs(positions) {
+  let triangleCount = positions.length / 9;
+  let dims = Math.sqrt(triangleCount)
+
+  console.log(1.0 / (dims * 0.5), triangleCount);
+
+  let uvs = new Float32Array((positions.length / 3) * 2)
+  let triangle = 0
+  for (let i = 0; i < positions.length; i += 3) {
+    if ((i % 9) == 0) {
+      triangle++;
+    }
+
+    uvs[0]
+  }
+
+}
+
 export function CreatePlane(gpu) {
   const labelPrefix = `${gpu.labelPrefix}Primitive/Plane/`
 
   let positions = new Float32Array([
-    // front
     1, -1, 0,
     -1, -1, 0,
     -1, 1, 0,
@@ -15,7 +33,6 @@ export function CreatePlane(gpu) {
 
 
   let normals = new Float32Array([
-    // front
     0, 0, -1,
     0, 0, -1,
     0, 0, -1,
@@ -25,11 +42,22 @@ export function CreatePlane(gpu) {
     0, 0, -1,
   ])
 
+  let uvs = new Float32Array([
+    1, 0,
+    0, 0,
+    0, 1,
+
+    1, 1,
+    1, 0,
+    0, 1,
+  ])
+
   const mesh = {
     label: labelPrefix,
     vertexCount: positions.length / 3,
     positions: positions,
     normals: normals,
+    uvs: uvs,
   }
 
   mesh.positionBuffer = gpu.device.createBuffer({
@@ -44,13 +72,18 @@ export function CreatePlane(gpu) {
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   })
 
+  mesh.uvBuffer = gpu.device.createBuffer({
+    label: `${labelPrefix}UVBuffer`,
+    size: uvs.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  })
+
   gpu.device.queue.writeBuffer(mesh.positionBuffer, 0, mesh.positions)
   gpu.device.queue.writeBuffer(mesh.normalBuffer, 0, mesh.normals)
+  gpu.device.queue.writeBuffer(mesh.uvBuffer, 0, mesh.uvs)
 
   return mesh
 }
-
-
 
 export function CreateCube(gpu) {
   const labelPrefix = `${gpu.labelPrefix}Primitive/Cube/`
@@ -119,7 +152,7 @@ export function CreateCube(gpu) {
     return Math.sqrt(x * x + y * y * z * z);
   }
 
-  for (let i=0; i<positions.length; i+=3) {
+  for (let i = 0; i < positions.length; i += 3) {
     let x = positions[i + 0]
     let y = positions[i + 1]
     let z = positions[i + 2]
