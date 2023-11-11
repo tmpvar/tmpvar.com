@@ -173,8 +173,12 @@ async function ShellTexturingBegin(rootEl) {
         ) -> VertexOut {
           var out: VertexOut;
 
+          var pos = inPosition;
+          let shellSpacing = ubo.params.x;
+          pos -= inNormal * shellSpacing * f32(instanceIndex);
+
           out.worldPosition = inPosition - ubo.eye.xyz;
-          out.position = ubo.worldToScreen * vec4(inPosition, 1.0);
+          out.position = ubo.worldToScreen * vec4(pos, 1.0);
 
           return out;
         }
@@ -278,7 +282,7 @@ async function ShellTexturingBegin(rootEl) {
         ]
       })
 
-      return function RenderMesh(pass, worldToScreen, eye, shellOffset, instanceCount) {
+      return function RenderMesh(pass, worldToScreen, eye, shellSpacing, instanceCount) {
         // update the uniform buffer
         {
           let byteOffset = 0
@@ -290,7 +294,7 @@ async function ShellTexturingBegin(rootEl) {
           byteOffset += 4
 
           // params
-          uboData.setFloat32(byteOffset, shellOffset, true)
+          uboData.setFloat32(byteOffset, shellSpacing, true)
           byteOffset += 16
 
           worldToScreen.forEach(v => {
@@ -374,8 +378,8 @@ async function ShellTexturingBegin(rootEl) {
       pass,
       state.camera.computed.worldToScreen,
       state.camera.computed.eye,
-      1.0,
-      1
+      0.1,
+      16
     )
 
     pass.end();
