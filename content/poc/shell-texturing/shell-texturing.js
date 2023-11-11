@@ -157,6 +157,8 @@ async function ShellTexturingBegin(rootEl) {
           @builtin(position) position : vec4f,
           @location(0) color: vec3f,
           @location(1) worldPosition: vec3f,
+          @location(2) uvw: vec3f,
+          @interpolate(flat) @location(3) instanceOffset: f32,
         }
 
         struct UBOParams {
@@ -173,11 +175,13 @@ async function ShellTexturingBegin(rootEl) {
         ) -> VertexOut {
           var out: VertexOut;
 
-          var pos = inPosition;
           let shellSpacing = ubo.params.x;
-          pos -= inNormal * shellSpacing * f32(instanceIndex);
+          let pos = inPosition - inNormal * shellSpacing * f32(instanceIndex);
 
-          out.worldPosition = inPosition - ubo.eye.xyz;
+          out.instanceOffset = shellSpacing * f32(instanceIndex);
+
+          out.worldPosition = pos;
+          out.uvw = pos * 0.5 + 0.5;
           out.position = ubo.worldToScreen * vec4(pos, 1.0);
 
           return out;
@@ -187,6 +191,20 @@ async function ShellTexturingBegin(rootEl) {
           @location(0) color: vec4f,
         };
 
+        fn pcg2d(_v: vec2<u32>) -> vec2<u32> {
+            var v = _v * 1664525u + 1013904223u;
+
+            v.x += v.y * 1664525u;
+            v.y += v.x * 1664525u;
+
+            v ^= v >> vec2<u32>(16u);
+
+            v.x += v.y * 1664525u;
+            v.y += v.x * 1664525u;
+
+            return v ^ (v>>vec2<u32>(16u));
+        }
+
         @fragment
         fn FragmentMain(fragData: VertexOut) -> FragmentOut {
           var out: FragmentOut;
@@ -194,7 +212,24 @@ async function ShellTexturingBegin(rootEl) {
           let dFdyPos = -dpdy(fragData.worldPosition);
           let normal = normalize(cross(dFdxPos, dFdyPos));
           out.color = vec4(normal * 0.5 + 0.5, 1.0);
-          // out.color = vec4(fragData.worldPosition * 0.5 + 0.5, 1.0);
+
+          // let hash = pcg3d(vec3<u32>(floor(fragData.uvw * 16.0)));
+          let hash = pcg2d(vec2<u32>(floor(fragData.uvw.xy * 64.0)));
+          // out.color = vec4(vec3f(hash) * (1.0/), 1.0);
+          let v = f32(hash.x) / f32(0xffffffff);
+
+          if (v > fragData.instanceOffset * 2.0) {
+
+            let color = vec3f(1.0) * pow(fragData.instanceOffset, 2.0);
+
+            out.color = vec4(color, 1.0);
+          } else {
+            out.color = vec4(vec3f(0.0), 1.0);
+            discard;
+          }
+
+
+          // out.color = vec4(fragData.uvw, 1.0);
           return out;
         }
       `
@@ -378,8 +413,8 @@ async function ShellTexturingBegin(rootEl) {
       pass,
       state.camera.computed.worldToScreen,
       state.camera.computed.eye,
-      0.1,
-      16
+      0.01,
+      64
     )
 
     pass.end();

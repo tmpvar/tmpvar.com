@@ -308,11 +308,11 @@ export default function CreateOrbitCamera() {
 
     target: [0.0, 0.0, 0.0],
     up: [0.0, 1.0, 0.0],
-    minDistance: 3.0,
+    minDistance: 1.0,
     maxDistance: 50,
     sensitivity: 0.1,
     nearPlane: 0.01,
-    farPlane: null,
+    farPlane: 100.0,
     scrollSensitivity: 0.1,
     fov: 90 * DegreesToRadians,
   }
