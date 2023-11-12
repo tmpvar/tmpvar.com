@@ -270,12 +270,27 @@ async function ShellTexturingBegin(rootEl) {
           let hash = pcg3d(vec3<u32>(uvw * divisions));
           // // let hash = pcg2d(vec2<u32>(floor(fragData.uvw.xy * divisions)));
           let v = f32(hash.x) / f32(0xffffffff);
-          // let o = f32(hash.y) / f32(0xffffffff);
-          // let t = ubo.params.z;
-          if (v > fragData.shellPercent) {
+          let o = f32(hash.y) / f32(0xffffffff);
+          let t = ubo.params.z;
+          if (true || v * 0.25 > fragData.shellPercent) {
 
-            out.color = vec4(fract(uv) * 0.5 + 0.5, 0.0, 1.0);
-            if (length(fract(uv) - 0.5) < (1.0 - max(0.5, fragData.shellPercent))) {
+            // out.color = vec4(fract(uv) * 0.5 + 0.5, 0.0, 1.0);
+            let samplePos = uv + vec2f(
+              sin(t * 0.01 + v * fragData.shellPercent * 10.0) * 0.75 * fragData.shellPercent,
+              sin(t * 0.01 * o + v * fragData.shellPercent * 1.0) * 0.5 * fragData.shellPercent
+            ) * 0.5;
+
+            var width = max(0.1, v * (1.0 - fragData.shellPercent));
+
+            width = max(
+              0.025,
+              v * (1.0 - fragData.shellPercent)
+              // v * abs(sin(t * 0.001) * 0.1) * fragData.shellPercent
+              // v * abs(sin(t * 0.001 + fragData.shellPercent) * o * (1.0 - fragData.shellPercent))
+              // + max(0.01, abs(sin(o + v + uv.x * uv.y + fragData.shellPercent * t * 0.001 + fragData.shellPercent) * 0.001))
+            );
+
+            if (length(fract(samplePos) - 0.5) < width) {
               out.color = vec4(vec3f(fragData.shellPercent), 1.0);
             } else {
               discard;
