@@ -14,18 +14,18 @@ date = 2023-11-10
       <output></output>
     </div>
     <div class="shellSpacing-control control">
-      shell spacing <input type="range" min="0.001" max="1.0" value="0.04" step="0.001" />
+      shell spacing <input type="range" min="0.001" max="1.0" value="0.004" step="0.001" />
       <output></output>
     </div>
     <div class="shellSubdivisions-control control">
-      shell subdivisions <input type="range" min="2" max="1024" value="64" step="1" />
+      shell subdivisions <input type="range" min="2" max="1024" value="128" step="1" />
       <output></output>
     </div>
     <div class="mesh-control control">
       mesh
       <select>
         <option value="plane" selected>Plane</option>
-        <option value="cube">Cube</option>
+        <option value="cube" selected>Cube</option>
         <option value="sphere">Sphere</option>
       </select>
     </div>
