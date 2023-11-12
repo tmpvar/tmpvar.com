@@ -142,8 +142,6 @@ export function CreateCube(gpu) {
     1, 1, 1,
     1, 1, -1,
     1, -1, 1,
-
-
   ])
 
 
@@ -164,11 +162,75 @@ export function CreateCube(gpu) {
     normals[i + 2] = z / l;
   }
 
+  //   0  1  2  3  4
+  // 0    [^]
+  // 1 [F][R][B][L]
+  // 2    [v]
+  // 3
+
+  let uvs = new Float32Array(([
+    // front [0, 1] -> [1, 2]
+    0, 1,
+    1, 1,
+    0, 2,
+
+    1, 1,
+    1, 2,
+    0, 2,
+
+    // back [2, 1] -> [3, 2]
+    3, 1,
+    2, 1,
+    2, 2,
+
+    3, 2,
+    3, 1,
+    2, 2,
+
+    // top [1, 0] -> [2, 1]
+    1, 0,
+    2, 0,
+    1, 1,
+
+    2, 0,
+    2, 1,
+    1, 1,
+
+    // bottom [1, 2] -> [2, 3]
+    2, 2,
+    1, 2,
+    1, 3,
+
+    2, 3,
+    2, 2,
+    1, 3,
+
+    // left [3,1] -> [4,2]
+    3, 1,
+    4, 1,
+    3, 2,
+
+    4, 1,
+    4, 2,
+    3, 2,
+
+    // right [1,1] -> [2,2]
+    2, 1,
+    1, 1,
+    1, 2,
+
+    2, 2,
+    2, 1,
+    1, 2,
+
+  ]).map(v => v * 0.25))
+
   const mesh = {
     label: labelPrefix,
     vertexCount: positions.length / 3,
     positions: positions,
     normals: normals,
+    uvs,
   }
 
   mesh.positionBuffer = gpu.device.createBuffer({
@@ -183,8 +245,15 @@ export function CreateCube(gpu) {
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   })
 
+  mesh.uvBuffer = gpu.device.createBuffer({
+    label: `${labelPrefix}UVBuffer`,
+    size: uvs.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  })
+
   gpu.device.queue.writeBuffer(mesh.positionBuffer, 0, mesh.positions)
   gpu.device.queue.writeBuffer(mesh.normalBuffer, 0, mesh.normals)
+  gpu.device.queue.writeBuffer(mesh.uvBuffer, 0, mesh.uvs)
 
   return mesh
 }

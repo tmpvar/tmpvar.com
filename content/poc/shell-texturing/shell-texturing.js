@@ -156,9 +156,10 @@ async function ShellTexturingBegin(rootEl) {
           @builtin(position) position : vec4f,
           @location(0) color: vec3f,
           @location(1) worldPosition: vec3f,
-          @location(2) uv: vec2f,
+          @location(2) uvw: vec3f,
           @interpolate(flat) @location(3) instanceOffset: f32,
-          @location(4) normal: vec3f,
+          @interpolate(flat) @location(4) shellPercent: f32,
+          @location(5) normal: vec3f,
         }
 
         struct UBOParams {
@@ -171,21 +172,24 @@ async function ShellTexturingBegin(rootEl) {
         fn VertexMain(
           @location(0) inPosition: vec3f,
           @location(1) inNormal: vec3f,
-          @location(2) inUV: vec2f,
           @builtin(instance_index) instanceIndex: u32
         ) -> VertexOut {
           var out: VertexOut;
 
-          let scale = 10.0;
+          let scale = 1.0;
           let shellSpacing = ubo.params.x;
+          let shellCount = ubo.params.y;
           let pos = inPosition * scale + inNormal * shellSpacing * f32(instanceIndex);
 
           out.instanceOffset = shellSpacing * f32(instanceIndex) / scale;
+          out.shellPercent = f32(instanceIndex) / shellCount;
 
           var n = 1.0 - inNormal * 0.5 + 0.5;
 
           out.worldPosition = pos;
-          out.uv = inUV;
+
+          let divisions = ubo.params.w;
+          out.uvw = inPosition * 0.5 + 0.5;//(pos / scale) * 0.5 + 0.5;
           out.position = ubo.worldToScreen * vec4(pos, 1.0);
           out.normal = inNormal;
           return out;
@@ -209,36 +213,108 @@ async function ShellTexturingBegin(rootEl) {
           return v ^ (v>>vec2<u32>(16u));
         }
 
+        // http://www.jcgt.org/published/0009/03/02/
+        fn pcg3d(_v: vec3<u32>) -> vec3<u32> {
+          var v = _v * 1664525u + 1013904223u;
+          v.x += v.y*v.z;
+          v.y += v.z*v.x;
+          v.z += v.x*v.y;
+
+          v ^= v >> vec3<u32>(16u);
+
+          v.x += v.y*v.z;
+          v.y += v.z*v.x;
+          v.z += v.x*v.y;
+
+          return v;
+        }
+
         @fragment
         fn FragmentMain(fragData: VertexOut) -> FragmentOut {
+          let divisions = ubo.params.w;
           var out: FragmentOut;
+
+          let uvw = fragData.uvw - 0.0000001;
+
           let dFdxPos = dpdx(fragData.worldPosition);
           let dFdyPos = -dpdy(fragData.worldPosition);
-          let normal = fragData.normal;//normalize(cross(dFdxPos, dFdyPos));
-          out.color = vec4(normal * 0.5 + 0.5, 1.0);
+          let normal = normalize(cross(dFdxPos, dFdyPos));
+
+          // out.color = vec4f(floor(clamp(fragData.uvw - 0.0000001, vec3f(0.0), vec3f(1.0)) * divisions) /  divisions, 1.0);
           // return out;
-          let divisions = ubo.params.w;
+          let forward = normal;
 
-          let hash = pcg2d(vec2<u32>(floor(fragData.uv * divisions)));
+          var basisUp = vec3f(0.0, 1.0, 0.0);
+          if (abs(dot(normal, basisUp)) >= 0.999) {
+            basisUp = vec3f(1.0, 0.0, 0.0);
+          }
+
+          let right = cross(normal, basisUp);
+          let up = cross(forward, right);
+
+          // let uvw = fragData.uvw - 0.0001;
+          // var uv = vec2f(0, 0);
+          // if (uvw.x > uvw.y && uvw.x > uvw.z) {
+          //   uv = normalize(uvw.yz);
+          // }
+
+          out.color = vec4f(up * 0.5 + 0.5, 1.0);
+
+          let uv = vec2f(
+            dot(right, uvw),
+            dot(up, uvw),
+          ) * divisions;
+
+
+
+          let hash = pcg3d(vec3<u32>(uvw * divisions));
+          // // let hash = pcg2d(vec2<u32>(floor(fragData.uvw.xy * divisions)));
           let v = f32(hash.x) / f32(0xffffffff);
-          let o = f32(hash.y) / f32(0xffffffff);
-          let t = ubo.params.z;
-          if (v > fragData.instanceOffset * 2.0) {
+          // let o = f32(hash.y) / f32(0xffffffff);
+          // let t = ubo.params.z;
+          if (v > fragData.shellPercent) {
 
-            // let uv = fract(fragData.uvw.xy * divisions) * 2.0 - 1.0;
-            // let width = max(0.1, 1.0 - (fragData.instanceOffset * 3.0));
+            out.color = vec4(fract(uv) * 0.5 + 0.5, 0.0, 1.0);
+            if (length(fract(uv) - 0.5) < (1.0 - max(0.5, fragData.shellPercent))) {
+              out.color = vec4(vec3f(fragData.shellPercent), 1.0);
+            } else {
+              discard;
+            }
 
-            // let samplePos = uv + vec2f(
-            //   sin(t * 0.01 + v * fragData.instanceOffset * 50.0) * 0.5,
-            //   sin(t * 0.01 * o + v * fragData.instanceOffset * 50.0) * 0.5
-            // );
+          //   // let uv = fract(fragData.uvw.xy * divisions) * 2.0 - 1.0;
+          //   // let width = max(0.1, 1.0 - (fragData.instanceOffset * 3.0));
 
-            // if (length(samplePos) - (0.5 * (1.0 - fragData.instanceOffset * 3.0)) < 0.0) {
-              var color = vec3f(1.0) * pow(fragData.instanceOffset * 3.0, 1);
-              out.color = vec4(color, 1.0);
-            // } else {
-            //   discard;
-            // }
+
+          //   let uv = vec2f(
+          //     dot(right, uvw),
+          //     dot(up, uvw),
+          //   ) * divisions;
+          //   out.color = vec4(length(fract(uvw) - 0.5), 0.0,  0.0, 1.0);
+
+          //   if (length(fract(uv) - 0.5) < 0.5) {
+          //     out.color = vec4(1.0);
+          //   } else {
+          //     discard;
+          //   }
+
+          //   // let samplePos = uv + vec2f(
+          //   //   sin(t * 0.01 + v * fragData.instanceOffset * 50.0) * 0.5,
+          //   //   sin(t * 0.01 * o + v * fragData.instanceOffset * 50.0) * 0.5
+          //   // );
+
+          //   // let samplePos = fract(fragData.worldPosition * divisions);// * 2.0 - 1.0;
+          //   // out.color = vec4(vec3f(length(samplePos - 0.5)), 1.0);
+          //   // if (length(samplePos - 0.5) - 0.5 < 0.0) {
+          //   //   var color = vec3(fragData.shellPercent);
+          //   //   out.color = vec4(color, 1.0);
+          //   // } else {
+          //   //   discard;
+          //   // }
+          //   // if (length(samplePos) - (0.5 * (1.0 - fragData.instanceOffset * 3.0)) < 0.0) {
+          //     // var color = vec3f(1.0) * pow(fragData.instanceOffset * 3.0, 1);
+          //   // } else {
+          //   //   discard;
+          //   // }
 
           } else {
             out.color = vec4(vec3f(0.0), 1.0);
@@ -293,16 +369,6 @@ async function ShellTexturingBegin(rootEl) {
                 format: 'float32x3',
               }],
               arrayStride: 12,
-              stepMode: 'vertex'
-            },
-            // uv
-            {
-              attributes: [{
-                shaderLocation: 2,
-                offset: 0,
-                format: 'float32x2',
-              }],
-              arrayStride: 8,
               stepMode: 'vertex'
             },
           ]
@@ -386,7 +452,6 @@ async function ShellTexturingBegin(rootEl) {
         pass.setBindGroup(0, bindGroup)
         pass.setVertexBuffer(0, mesh.positionBuffer);
         pass.setVertexBuffer(1, mesh.normalBuffer);
-        pass.setVertexBuffer(2, mesh.uvBuffer);
         pass.draw(mesh.vertexCount, shellCount);
       }
     },
