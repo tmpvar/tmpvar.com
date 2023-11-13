@@ -259,6 +259,7 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
       <tr>
         <td>diameter</td>
         <td>megabytes</td>
+        <td>MB per slice</td>
       </tr>
     </thead>
     <tbody>
@@ -275,15 +276,24 @@ diameter<sup>3</sup> * rayCount * bytesPerRay * 2</pre></code>
     for (let d = 4; d<11; d++) {
       let diameter = Math.pow(2, d)
       let volume = Math.pow(diameter, 3)
+      let area = Math.pow(diameter, 2)
 
       const row = document.createElement('tr')
       const cellDiameter = document.createElement('td')
       cellDiameter.innerText = diameter
       row.appendChild(cellDiameter)
 
-      const cellMemory = document.createElement('td')
-      cellMemory.innerText = (volume * rayCount * bytesPerRay)/MB * 2
-      row.appendChild(cellMemory)
+      {
+        const cellMemory = document.createElement('td')
+        cellMemory.innerText = (volume * rayCount * bytesPerRay)/MB * 2
+        row.appendChild(cellMemory)
+      }
+
+      {
+        const cellMemory = document.createElement('td')
+        cellMemory.innerText = (area * rayCount * bytesPerRay)/MB * 2
+        row.appendChild(cellMemory)
+      }
 
       tbody.appendChild(row)
     }
