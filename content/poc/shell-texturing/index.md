@@ -9,7 +9,7 @@ date = 2023-11-10
 
 ## How it works
 
-<div class="center-align">
+<div class="center-align vmargin-1em">
   <img src="assets/schematic-sketch.png" alt="schematic sketch of shells" width="90%" />
 </div>
 
@@ -35,7 +35,7 @@ The basic idea behind shell texturing is:
    }
    ```
    which ends up looking like this:
-   <div class="center-align">
+   <div class="center-align vmargin-1em">
      <img src="assets/example-cones.png" alt="example cone output" >
    </div>
 
@@ -81,7 +81,7 @@ The basic idea behind shell texturing is:
 
 ## Downsides
 
-- Viewing the slices at the wrong angles cause major artifacting. This can be avoided on geometry likes planes, complex meshes might be hard to hide the artifacts without further effort.
+- Viewing the slices at the wrong angles cause major artifacting. This can be avoided on geometry likes planes, but complex meshes might be hard to hide the artifacts without further effort.
 - Mesh UVs can cause discontinuities at the seams for programatically generated textures. One potential solve for this is using the normal and computing the UV from that, depending on the mesh this might also contain artifacts: see the `sphere` mesh above when viewed from the top.
 
   ```glsl
