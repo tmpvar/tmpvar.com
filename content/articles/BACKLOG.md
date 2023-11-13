@@ -11,6 +11,7 @@ unlisted = true
   - https://github.com/sebbbi/OffsetAllocator
 - LBVH
 - Optimizing a 2d particle simulation
+  - add threading to practice/particle2d.cpp - hotcart didn't have a job queue at the time
 - 2D SDF Physics
 - 3D SDF Ball Packed Physics
 - seen set (seen-set.h)
@@ -24,3 +25,4 @@ unlisted = true
 - article: lbvh
 - article: hotcart & hotcart redux
 - article: pullstream
+  - isnt this just another name for an iterator??
