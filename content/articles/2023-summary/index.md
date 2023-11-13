@@ -17,8 +17,13 @@ A the start of the year I was working on the sdf-editor and not a ton of context
 
 [parse tree w/ grouping](https://discord.com/channels/354027975412416523/354027975412416524/1069771189226057759)
 
-![sdf-editor group based cut bug](assets/sdf-editor-1/cut-bug.png)
-![sdf-editor group based cut bug fixed](assets/sdf-editor-1/cut-bug-fixed.png)
+<div class="center-align">
+  <img width="90%" alt="sdf-editor group based cut bug" src="assets/sdf-editor-1/cut-bug.png" />
+</div>
+
+<div class="center-align">
+  <img width="90%" alt="sdf-editor group based cut bug fixed" src="assets/sdf-editor-1/cut-bug-fixed.png" />
+</div>
 
 - more register based musings
 
@@ -199,14 +204,14 @@ At level 0, the prims per cell is the highest, but this ratio quickly drops down
   Prefiltering primitive bounding boxes against the chunks</pre></code>
 </div>
 
-Initially I wrote the visualization side of the evaluator as just a way to debug what it was doing. As things progressed and I added more and more functionality to it, I realized that this thing was actually fast enough to use interactively. I added some incremental update code and started computing normals on a per leaf (voxel?) level.
+Initially I wrote the visualization side of the evaluator as just a way to debug what it was doing. As things progressed and I added more and more functionality to it, I realized that this thing was actually fast enough to use interactively.
 
 <div class="center-align">
   <img width="90%" src="assets/sdf-editor-2/g-buffer.png" />
   <code><pre>added g-buffer support</pre></code>
 </div>
 
-Now that I had a g-buffer, we turn once again to Sebbbi's twitter, this time for [Hi-Z Culling](https://twitter.com/SebAaltonen/status/1610302009692798979). The basic idea is that you use the previous frame's depth buffer to cull objects in the current frame that behind last frame's objects.
+Now that I had a g-buffer, we turn once again to Sebbbi's twitter, this time for [Hi-Z Culling](https://twitter.com/SebAaltonen/status/1610302009692798979). The basic idea is that you use the previous frame's depth buffer to cull objects in the current frame that would be behind last frame's objects.
 
 <div class="center-align">
   <img width="90%" src="assets/sdf-editor-2/hi-z.png" />
