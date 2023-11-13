@@ -252,11 +252,6 @@ async function ShellTexturingBegin(rootEl) {
           let right = cross(normal, basisUp);
           let up = cross(forward, right);
 
-          // let uvw = fragData.uvw - 0.0001;
-          // var uv = vec2f(0, 0);
-          // if (uvw.x > uvw.y && uvw.x > uvw.z) {
-          //   uv = normalize(uvw.yz);
-          // }
 
           out.color = vec4f(up * 0.5 + 0.5, 1.0);
 
