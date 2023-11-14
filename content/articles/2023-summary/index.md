@@ -443,6 +443,146 @@ I was having some trouble making things that looked really good by hand, and I k
   <code><pre>inside looking out</pre></code>
 </div>
 
+And of course we can't leave the `.las` exporter out. The above tree exports to ~6M points @ 170MB (<a href="https://media.tmpvar.com/evaluator-export-47371551.zip" target="_blank">download the 16MB zip here</a>). This really makes houdini struggle, maybe they should invest in some Hi-Z Culling haha.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/tree-space-colonization-las-export.png" />
+  <code><pre>houdini hates this pointcloud</pre></code>
+</div>
+
+The tree generator generates some really gnarly primitive lists which make for a wonderful benchmarking tool.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/tree-initial-timing.png" />
+  <code><pre>initial tree evaluator timings</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="60%" src="assets/sdf-editor-2/tree-after-level0-bounds-filtering.png" />
+  <code><pre>bounds filtering at chunk octree level 0 - huge (~4x) improvement!</pre></code>
+</div>
+
+The next performance problem is when modifying the tree we need to filter out all of the leaves that may have been affected. At this point it was a scan over every leaf which was quite slow!
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/leaf-filtering-performance.png" />
+  <code><pre>leaf filtering takes ~230x longer than the eval!</pre></code>
+</div>
+
+The solve for this was filtering at the chunk level instead of globally filtering every leaf.. seems obvious looking back!
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/chunk-based-leaf-filtering.png" />
+  <code><pre>chunk based leaf filtering - effectively free</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/first-pass-threading.png" />
+  <code><pre>add multi-threaded worker queue - 4x improvement @ 16 threads, not quite ideal.</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/rendering-perf-filter-list-instead-of-bitset.png" />
+  <code><pre>rendering perf 2-4x improvement by compressing the render list instead of bitmask + degenerate triangles</pre></code>
+</div>
+
+With that, it was time for some user testing...
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/fluffybutt.png" />
+  <code><pre>chicken head</pre></code>
+</div>
+
+Things were going pretty well, so I kept pushing. What is better than one monolithic object in the scene? Many instances of many objects. So I started thinking about how the indirections needed to work.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/object-instancing-design.png" />
+  <code><pre>object instancing design</pre></code>
+</div>
+
+With a loose goal in mind, I took the first step: add instances which are effectively ids that reference the head of a leaf cluster linked list.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/object-instancing-lines.png" />
+  <code><pre>first attempt at object instancing (no culling eeeeek!)</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/object-instancing-leaf-hiz-culling.png" />
+  <code><pre>object instancing with leaf cluster hi-z culling</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/object-instancing-rasterization-profile.png" />
+  <code><pre>30% SOL on PES+VPC throughput - EW!</pre></code>
+</div>
+
+Turns out, instancing large fields of points means that MANY triangles are being rendered at sub pixel sizes. To prove this I made boxes that are 1px or less output a constant material - I do better when I can see what is going on.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/single-pixel-leaf-output.png" />
+  <code><pre>you don't have to go very far to be 1px (silver shaded in the background) </pre></code>
+</div>
+
+
+[github/m-shuetz/compute_rasterizer](https://github.com/m-schuetz/compute_rasterizer) can splat 100M points in ~4ms on my machine - I think this approach will do nicely for rendering distant objects. This project is based on the paper: [Software Rasterization of 2 Billion Points in Real Time](https://web.archive.org/web/20220405012032/https://arxiv.org/pdf/2204.01287.pdf)
+
+The following picture is 10 copies of the tree, overlapped in space which is pretty much the worst case for this technique, as `atomicMin` starts getting contested.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/compute-rasterizer-tree-x10.png" />
+  <code><pre>splatting in compute is hella fast!</pre></code>
+</div>
+
+So, obviously I need to write my own compute based point splatter.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/compute-based-splatter.png" />
+  <code><pre>splatting in compute (0.37ms)</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/rasterize-cubes.png" />
+  <code><pre>rasterizing cubes (5.85ms)</pre></code>
+</div>
+
+Clearly there is a tradeoff between rasterization and splatting here.
+
+**splats**: better when the size of the leaf is <= 1px
+
+**raster**: better up close
+
+So let's make a hybrid renderer that plays to each rendering technique's strengths!
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/hybrid-splat-and-raster.png" />
+  <code><pre>raster (1.39ms) compute (0.20ms)</pre></code>
+</div>
+
+Wait a second, that is like reallly really fast!
+
+how fast??
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/line-object-instances-10x10.png" />
+  <code><pre>100 instances: raster (2.31ms) compute (2.19ms) or ~4.5ms total</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/line-object-instances-10x10x10.png" />
+  <code><pre>1000 instances: raster (6.3ms) compute (6.3ms) or ~12.6ms total</pre></code>
+</div>
+
+**Note**: this is without instance based Hi-Z culling!
+
+At this point I'm so stoked I threw 1000 trees into a scene.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/tree-instances-10x10x10.png" />
+  <code><pre>1000 instances: raster (4.6ms) compute (988.3ms) or ~992ms total</pre></code>
+</div>
+
+Ok good, we have a great baseline to try and improve.
 
 ## July
 
