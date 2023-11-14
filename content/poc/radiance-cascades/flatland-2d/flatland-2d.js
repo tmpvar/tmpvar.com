@@ -252,7 +252,8 @@ async function ProbeRayDDA2DBegin() {
         "debugRaymarchMipmaps",
         "intervalAccumulationDecay",
         "debugRaymarchWithDDA",
-        "debugRaymarchFixedSizeStepMultiplier"
+        "debugRaymarchFixedSizeStepMultiplier",
+        "debugAccumulateNonlinearly"
       ]
 
       // TODO: if we go over 256 bytes then this needs to be updated
@@ -298,7 +299,8 @@ async function ProbeRayDDA2DBegin() {
           debugRaymarchMipmaps: u32,
           intervalAccumulationDecay: u32,
           debugRaymarchWithDDA: u32,
-          debugRaymarchFixedSizeStepMultiplier: u32
+          debugRaymarchFixedSizeStepMultiplier: u32,
+          debugAccumulateNonlinearly: u32,
         };
 
         struct ProbeRayResult {
@@ -345,20 +347,12 @@ async function ProbeRayDDA2DBegin() {
         @group(0) @binding(2) var worldTexture: texture_2d<f32>;
         @group(0) @binding(3) var worldSampler: sampler;
 
-        fn AccumulateSample(acc: vec4f, sample: vec4f, decay: f32) -> vec4f {
-          if (false) {
-            // TODO: I haven't had any success with this
-            var opacity = exp(-sample.a * decay);
-            let ab = opacity * (1.0 - acc.a);
-            let a0 = acc.a + ab;
-
-            let pa = vec4(acc.rgb * acc.a, acc.a);
-            let pb = vec4(sample.rgb * opacity, opacity);
-
-            return vec4(
-              (pa.rgb * pa.a + pb.rgb * pb.a * (1.0 - pa.a)) / a0,
-              // acc.rgb * acc.a + sample.rgb * opacity * (1.0 - acc.a),
-              a0
+        fn AccumulateSample(acc: vec4f, sample: vec4f, stepSize: f32, decay: f32) -> vec4f {
+          if (ubo.debugAccumulateNonlinearly != 0) {
+            let sampleRadiance = vec4f(sample.rgb, exp(-sample.a * stepSize * decay));
+            return vec4f(
+              acc.rgb + sampleRadiance.rgb * acc.a,
+              acc.a * sampleRadiance.a
             );
           } else {
             let transparency = 1.0 - sample.a;
@@ -406,7 +400,7 @@ async function ProbeRayDDA2DBegin() {
               levelMip
             );
 
-            acc = AccumulateSample(acc, sample, decay);
+            acc = AccumulateSample(acc, sample, 1.0, decay);
 
             // Step the ray
             {
@@ -460,7 +454,7 @@ async function ProbeRayDDA2DBegin() {
               levelMip
             );
 
-            acc = AccumulateSample(acc, sample, decay);
+            acc = AccumulateSample(acc, sample, stepSize, decay);
 
             t += stepSize;
           }
@@ -715,7 +709,8 @@ async function ProbeRayDDA2DBegin() {
         debugRaymarchMipmaps,
         intervalAccumulationDecay,
         debugRaymarchWithDDA,
-        debugRaymarchFixedSizeStepMultiplier
+        debugRaymarchFixedSizeStepMultiplier,
+        debugAccumulateNonlinearly
       ) {
         let probeDiameter = probeRadius * 2.0
         let totalRays = (width / probeDiameter) * (height / probeDiameter) * probeRayCount
@@ -736,6 +731,7 @@ async function ProbeRayDDA2DBegin() {
         uboData[levelIndexOffset + 12] = intervalAccumulationDecay
         uboData[levelIndexOffset + 13] = debugRaymarchWithDDA
         uboData[levelIndexOffset + 14] = debugRaymarchFixedSizeStepMultiplier
+        uboData[levelIndexOffset + 15] = debugAccumulateNonlinearly
 
         const byteOffset = level * alignedSize
         queue.writeBuffer(ubo, byteOffset, uboData, levelIndexOffset, alignedIndices)
@@ -1757,6 +1753,8 @@ Example on Windows:
         }
         return value
       })
+
+      Param('debugAccumulateNonlinearly', 'bool')
     }
 
     if (state.dirty && !wasDirty) {
@@ -1884,7 +1882,8 @@ Example on Windows:
               state.params.debugRaymarchMipmaps,
               state.params.intervalAccumulationDecay,
               state.params.debugRaymarchWithDDA,
-              state.params.debugRaymarchFixedSizeStepMultiplier
+              state.params.debugRaymarchFixedSizeStepMultiplier,
+              state.params.debugAccumulateNonlinearly
             );
             pass.end()
           }
