@@ -177,7 +177,7 @@ Things are simpler in 2D so we'll start there.
     <div class="debugAccumulateNonlinearly-control control">
       accumulate non-linearly<input type="checkbox" value="1" />
     </div>
-      <div class="intervalAccumulationDecay-control control">
+    <div class="debugAccumulationDecay-control control">
       accumulation decay: <input type="range" min="1" max="400" value="100">
       <output></output>
     </div>
