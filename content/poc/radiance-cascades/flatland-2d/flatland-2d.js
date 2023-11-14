@@ -250,7 +250,7 @@ async function ProbeRayDDA2DBegin() {
         "intervalEndRadius",
         "branchingFactor",
         "debugRaymarchMipmaps",
-        "intervalAccumulationDecay",
+        "debugAccumulationDecay",
         "debugRaymarchWithDDA",
         "debugRaymarchFixedSizeStepMultiplier",
         "debugAccumulateNonlinearly"
@@ -297,7 +297,7 @@ async function ProbeRayDDA2DBegin() {
           // WGSL wants this to be unsigned because it is used as a shift
           branchingFactor: u32,
           debugRaymarchMipmaps: u32,
-          intervalAccumulationDecay: u32,
+          debugAccumulationDecay: u32,
           debugRaymarchWithDDA: u32,
           debugRaymarchFixedSizeStepMultiplier: u32,
           debugAccumulateNonlinearly: u32,
@@ -378,7 +378,7 @@ async function ProbeRayDDA2DBegin() {
           var acc = vec4f(0.0, 0.0, 0.0, 1.0);
           let dims = vec2f(f32(ubo.width), f32(ubo.height)) * levelDivisor;
 
-          let decay = f32(ubo.intervalAccumulationDecay) / 100.0;
+          let decay = f32(ubo.debugAccumulationDecay) / 100.0;
           while(true) {
             if (distance(cursor.mapPos, levelProbeCenter) > levelMaxDistance) {
               break;
@@ -427,7 +427,7 @@ async function ProbeRayDDA2DBegin() {
           var acc = vec4f(0.0, 0.0, 0.0, 1.0);
           let dims = vec2f(f32(ubo.width), f32(ubo.height));
 
-          let decay = f32(ubo.intervalAccumulationDecay) / 100.0;
+          let decay = f32(ubo.debugAccumulationDecay) / 100.0;
           var t = 0.0;
           let stepSizeMultiplier = max(0.1, f32(ubo.debugRaymarchFixedSizeStepMultiplier) / 100.0);
           let stepSize = pow(2.0, levelMip) * stepSizeMultiplier;
@@ -707,7 +707,7 @@ async function ProbeRayDDA2DBegin() {
         maxLevel0Rays,
         branchingFactor,
         debugRaymarchMipmaps,
-        intervalAccumulationDecay,
+        debugAccumulationDecay,
         debugRaymarchWithDDA,
         debugRaymarchFixedSizeStepMultiplier,
         debugAccumulateNonlinearly
@@ -728,7 +728,7 @@ async function ProbeRayDDA2DBegin() {
         uboData[levelIndexOffset + 9] = intervalEndRadius
         uboData[levelIndexOffset + 10] = branchingFactor
         uboData[levelIndexOffset + 11] = debugRaymarchMipmaps
-        uboData[levelIndexOffset + 12] = intervalAccumulationDecay
+        uboData[levelIndexOffset + 12] = debugAccumulationDecay
         uboData[levelIndexOffset + 13] = debugRaymarchWithDDA
         uboData[levelIndexOffset + 14] = debugRaymarchFixedSizeStepMultiplier
         uboData[levelIndexOffset + 15] = debugAccumulateNonlinearly
@@ -1682,12 +1682,6 @@ Example on Windows:
         return value
       })
 
-      Param('intervalAccumulationDecay', 'i32', (parentEl, value) => {
-        let displayValue = value / 100.0;
-        parentEl.querySelector('output').innerHTML = `${displayValue.toFixed(2)}`
-        return value
-      })
-
       Param('maxProbeLevel', 'i32', (parentEl, value) => {
         parentEl.querySelector('output').innerHTML = `${value}`
         return value
@@ -1754,7 +1748,24 @@ Example on Windows:
         return value
       })
 
-      Param('debugAccumulateNonlinearly', 'bool')
+      Param('debugAccumulateNonlinearly', 'bool', (parentEl, value) => {
+        let debugAccumulationDecayEl = controlEl.querySelector(
+          '.debugAccumulationDecay-control input'
+        )
+
+        if (!value) {
+          debugAccumulationDecayEl.disabled = true
+        } else {
+          debugAccumulationDecayEl.disabled = false
+        }
+        return value
+      })
+
+      Param('debugAccumulationDecay', 'i32', (parentEl, value) => {
+        let displayValue = value / 100.0;
+        parentEl.querySelector('output').innerHTML = `${displayValue.toFixed(2)}`
+        return value
+      })
     }
 
     if (state.dirty && !wasDirty) {
@@ -1880,7 +1891,7 @@ Example on Windows:
               state.maxLevel0Rays,
               state.params.branchingFactor,
               state.params.debugRaymarchMipmaps,
-              state.params.intervalAccumulationDecay,
+              state.params.debugAccumulationDecay,
               state.params.debugRaymarchWithDDA,
               state.params.debugRaymarchFixedSizeStepMultiplier,
               state.params.debugAccumulateNonlinearly

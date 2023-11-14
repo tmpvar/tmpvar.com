@@ -624,8 +624,6 @@ and the associated nsight snapshot
 </div>
 
 
-
-
 ## July
 
 ### Wave Function Collapse
