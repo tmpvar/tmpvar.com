@@ -174,6 +174,13 @@ Things are simpler in 2D so we'll start there.
       raymarch fixed size step multiplier: <input type="range" min="1" max="1000" value="100">
       <output></output>
     </div>
+    <div class="debugAccumulateNonlinearly-control control">
+      accumulate non-linearly<input type="checkbox" value="1" />
+    </div>
+      <div class="intervalAccumulationDecay-control control">
+      accumulation decay: <input type="range" min="1" max="400" value="100">
+      <output></output>
+    </div>
     </div>
     <h4>Radiance Cascade Parameters</h4>
     <div class="indent">
@@ -191,10 +198,6 @@ Things are simpler in 2D so we'll start there.
       </div>
       <div class="intervalRadius-control control">
         interval radius (level 0): <input type="range" min="0" max="32.0" value="2.6" step="0.1">
-        <output></output>
-      </div>
-      <div class="intervalAccumulationDecay-control control">
-        interval accumulation decay: <input type="range" min="1" max="400" value="100">
         <output></output>
       </div>
       <div class="maxProbeLevel-control control">
