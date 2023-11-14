@@ -527,7 +527,9 @@ Turns out, instancing large fields of points means that MANY triangles are being
 
 [github/m-shuetz/compute_rasterizer](https://github.com/m-schuetz/compute_rasterizer) can splat 100M points in ~4ms on my machine - I think this approach will do nicely for rendering distant objects. This project is based on the paper: [Software Rasterization of 2 Billion Points in Real Time](https://web.archive.org/web/20220405012032/https://arxiv.org/pdf/2204.01287.pdf)
 
-The following picture is 10 copies of the tree, overlapped in space which is pretty much the worst case for this technique, as `atomicMin` starts getting contested.
+The following picture is 10 copies of the tree, overlapped in space which is pretty much the worst case for this technique, as `atomicMin` is under higher contention.
+
+The `.las` exporter comes in clutch again as `compute_rasterizer` is built to load LIDAR files, yay!
 
 <div class="center-align vmargin-1em">
   <img width="90%" src="assets/sdf-editor-2/compute-rasterizer-tree-x10.png" />
@@ -579,7 +581,7 @@ At this point I'm so stoked I threw 1000 trees into a scene.
 
 <div class="center-align vmargin-1em">
   <img width="90%" src="assets/sdf-editor-2/tree-instances-10x10x10.png" />
-  <code><pre>1000 instances: raster (4.6ms) compute (988.3ms) or ~992ms total</pre></code>
+  <code><pre>160 instances: raster (4.6ms) compute (988.3ms) or ~992ms total</pre></code>
 </div>
 
 Ok good, we have a great baseline to try and improve.
