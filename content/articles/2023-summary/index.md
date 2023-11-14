@@ -584,7 +584,47 @@ At this point I'm so stoked I threw 1000 trees into a scene.
   <code><pre>160 instances: raster (4.6ms) compute (988.3ms) or ~992ms total</pre></code>
 </div>
 
-Ok good, we have a great baseline to try and improve.
+Ok good, we have a great baseline to improve on. Hi-Z culling at the object level should help quite a bit.
+
+However, there is still more work to be done before jumping into optimizations. At this point I could only instance a single object at a time and I wanted to move to a viz-buffer to reduce the texture bandwidth.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/multiple-instanced-objects.png" />
+  <code><pre>instancing multiple objects into a viz buffer</pre></code>
+</div>
+
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/multiple-instanced-objects-with-normals.png" />
+  <code><pre>instancing multiple objects into a viz buffer with normals</pre></code>
+</div>
+
+After reading through the Nanite paper one of the takeaways for me was that cluster lods were of huge importance to reduce the number of primitives that need to be rendered. So the first step is to get it working, which I did using a simple roulette style sampling
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/leaf-cluster-lod-40k-wiffle-cubes.png" />
+  <code><pre>40k wiffle cube instances at fixed lod=3 all splats</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/leaf-cluster-lod-40k-wiffle-cubes-too-close.png" />
+  <code><pre>moving too close results in a cloud of dust</pre></code>
+</div>
+
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/cluster-lod-automatic-lod-picking.png" />
+  <code><pre>first round automatic lod picking</pre></code>
+</div>
+
+and the associated nsight snapshot
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/cluster-lod-automatic-lod-picking-nsight.png" />
+</div>
+
+
+
 
 ## July
 
