@@ -786,6 +786,14 @@ async function ProbeRayDDA2DBegin() {
           radiance: f32,
         };
 
+        // from: https://www.shadertoy.com/view/3tdSDj, MIT Licenced
+        fn sdSegment(p: vec2f, b: vec2f ) -> f32 {
+          let pa = p;
+          let ba = b;
+          let h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+          return length( pa - ba*h );
+        }
+
         @group(0) @binding(0) var fluenceTexture: texture_storage_2d<rgba8unorm, write>;
         @group(0) @binding(1) var<storage,read_write> probes: array<vec4f>;
         @group(0) @binding(2) var<uniform> ubo: UBOParams;
@@ -795,41 +803,41 @@ async function ProbeRayDDA2DBegin() {
             return;
           }
           textureStore(fluenceTexture, id.xy, vec4f(0.0));
-
-          let uv = vec2f(id.xy) / f32(ubo.width);
-          let Index = uv * f32(ubo.cascadeWidth);
-          let StartIndex = i32(Index.x) * ubo.probeRayCount + i32(Index.y) * ubo.probeRayCount * ubo.cascadeWidth;
-
+          let pixelCenter = (vec2f(id.xy) + 0.5);
+          let probeDiameter = f32(ubo.probeRadius) * 2.0;
+          let screenUV = pixelCenter / f32(ubo.width);
+          let Index = vec2<i32>(screenUV * f32(ubo.cascadeWidth));
+          let StartIndex = Index.x * ubo.probeRayCount + Index.y * ubo.probeRayCount * ubo.cascadeWidth;
 
           if (ubo.debugProbeDirections != 0) {
-            let probePixelDiameter = f32(ubo.width) / f32(ubo.cascadeWidth);
-            let probeUV = fract(vec2f(id.xy) / probePixelDiameter) - 0.5;
+            let invProbeDiameter = 1.0 / probeDiameter;
+            let probeUV = fract(pixelCenter / probeDiameter) * 2.0 - 1.0;
+            let probeBounds = length(vec2f(probeDiameter));
+            let pixelBounds = length(vec2f(1.0 / probeDiameter));
 
-            var angle = atan2(probeUV.y, probeUV.x);
-            angle += TAU / f32(ubo.probeRayCount) * 0.5;
-            if (angle < 0.0) {
-              angle += TAU;
-            }
-            var rayIndex = i32(fract(angle / TAU) * f32(ubo.probeRayCount));
+            var acc = vec4f(0.0);
 
-            // color based on the angle
             // {
-            //   var col = i32(rayIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
+            //   var col = i32(StartIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
             //   col = col % vec3<i32>(255, 253, 127);
-            //   textureStore(fluenceTexture, id.xy, vec4(vec3f(col) / 255.0, 1.0));
+            //   // textureStore(fluenceTexture, id.xy, vec4(vec3f(col) / 255.0, 1.0));
+            //   // return;
+            //   acc = vec4(vec3f(col) / 1024.0, 1.0);
             // }
+            var count = 0.0;
+            let td = length(probeUV);
+            for (var probeRayIndex=0; probeRayIndex<ubo.probeRayCount; probeRayIndex++) {
+              let angle = TAU * (f32(probeRayIndex) + 0.5) /  f32(ubo.probeRayCount);
 
-            {
-              let d = distance(probeUV, vec2f(0.0));
-              if (d < f32(ubo.probeRadius) / probePixelDiameter * 0.5) {
-                return;
+              let segmentEnd = vec2f(cos(angle), sin(angle)) * probeBounds * 10.0;
+              let d = sdSegment(probeUV, segmentEnd) - pixelBounds;
+              if (d <= 0.0) {
+                acc += probes[StartIndex + probeRayIndex];
+                count += 1.0;
               }
-              if (d > f32(ubo.probeRadius << 1) / probePixelDiameter) {
-                return;
-              }
-
-              textureStore(fluenceTexture, id.xy, probes[StartIndex + rayIndex]);
             }
+
+            textureStore(fluenceTexture, id.xy, acc / count);
             return;
           }
 
@@ -1609,6 +1617,26 @@ async function ProbeRayDDA2DBegin() {
       30,
       30,
       1024 * 10,
+      0xFFFFFFFF,
+      canvas.width,
+      canvas.height
+    )
+    state.gpu.device.queue.submit([commandEncoder.finish()])
+  }
+
+  // Draw a 1px light in the center
+  if (false) {
+    let commandEncoder = state.gpu.device.createCommandEncoder()
+    let center = canvas.width / 2
+    state.gpu.programs.worldPaint(
+      commandEncoder,
+      state.gpu.device.queue,
+      center,
+      center,
+      center,
+      center,
+      1,
+      1024,
       0xFFFFFFFF,
       canvas.width,
       canvas.height
