@@ -306,7 +306,7 @@ export default function CreateOrbitCamera() {
     up: [0.0, 1.0, 0.0],
     distance: 80.0,
     targetDistance: 80.0,
-    minDistance: 1,
+    minDistance: 0.1,
     maxDistance: 500,
     projection: new Float32Array(16),
     view: new Float32Array(16),
@@ -354,15 +354,7 @@ export default function CreateOrbitCamera() {
       LookAt(state.view, state.eye, state.target, state.up)
       PerspectiveZO(state.projection, state.fov, width / height, state.minDistance, state.maxDistance)
       Multiply(state.worldToScreen, state.projection, state.view)
-
-      let invView = new Float32Array(16)
-      let invProj = new Float32Array(16)
-      Invert(invProj, state.projection)
-      Invert(invView, state.view)
-
-      Multiply(state.screenToWorld, state.view, invProj);
-
-      // Invert(state.screenToWorld, state.worldToScreen)
+      Invert(state.screenToWorld, state.worldToScreen)
       return ret
     }
   }
