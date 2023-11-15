@@ -803,14 +803,15 @@ async function ProbeRayDDA2DBegin() {
 
           if (ubo.debugProbeDirections != 0) {
             let probePixelDiameter = f32(ubo.width) / f32(ubo.cascadeWidth);
-            let probeUV = fract(vec2f(id.xy) / probePixelDiameter) * 2.0 - 1.0;
+            let probeUV = fract(vec2f(id.xy) / probePixelDiameter) - 0.5;
 
             var angle = atan2(probeUV.y, probeUV.x);
+            angle += TAU / f32(ubo.probeRayCount) * 0.5;
             if (angle < 0.0) {
               angle += TAU;
             }
+            var rayIndex = i32(fract(angle / TAU) * f32(ubo.probeRayCount));
 
-            let rayIndex = i32(angle / TAU * f32(ubo.probeRayCount) - 0.5);
             // color based on the angle
             // {
             //   var col = i32(rayIndex + 1) * vec3<i32>(158, 2 * 156, 3 * 159);
