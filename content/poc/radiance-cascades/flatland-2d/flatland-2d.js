@@ -1059,7 +1059,7 @@ async function ProbeRayDDA2DBegin() {
             textureStore(
               texture,
               id.xy,
-              vec4(color.rgb * radianceMultiplier, color.a)
+              vec4(color.rgb * radianceMultiplier * color.a, color.a)
             );
           }
         }
