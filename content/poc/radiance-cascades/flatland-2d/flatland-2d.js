@@ -349,7 +349,7 @@ async function ProbeRayDDA2DBegin() {
 
         fn AccumulateSample(acc: vec4f, sample: vec4f, stepSize: f32, decay: f32) -> vec4f {
           if (ubo.debugAccumulateNonlinearly != 0) {
-            let sampleRadiance = vec4f(sample.rgb, exp(-sample.a * stepSize * decay));
+            let sampleRadiance = vec4f(sample.rgb, exp(-sample.a * decay));
             return vec4f(
               acc.rgb + sampleRadiance.rgb * acc.a,
               acc.a * sampleRadiance.a
