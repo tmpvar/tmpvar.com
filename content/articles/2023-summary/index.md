@@ -7,15 +7,14 @@ unlisted = true
 enableSampleImage = false
 +++
 
-I spent a large portion of this year digging deeper into graphics programming concepts.
+I spent a large portion of this year digging deeper into graphics programming concepts. I mainly focused on SDF evaluation and splat rendering, but there were some other side projects in there.
 
-- sdf-editor
 
 ## January
 
 A the start of the year I was working on the sdf-editor and not a ton of context was saved because I didn't have this website and I wanted the results to be a surprise. This was a huge mistake, I need to get better at showing progress externally.
 
-[parse tree w/ grouping](https://discord.com/channels/354027975412416523/354027975412416524/1069771189226057759)
+<!-- [parse tree w/ grouping](https://discord.com/channels/354027975412416523/354027975412416524/1069771189226057759) -->
 
 <div class="center-align vmargin-1em">
   <img width="90%" alt="sdf-editor group based cut bug" src="assets/sdf-editor-1/cut-bug.png" />
@@ -31,7 +30,13 @@ A the start of the year I was working on the sdf-editor and not a ton of context
   <img alt="sdf-editor group register machine thinking" width="90%" src="assets/sdf-editor-1/register-machine-thinking.png" />
 </div>
 
-Suffered from a simple [change](https://discord.com/channels/354027975412416523/354027975412416524/1073131427874488330) (adding a couple properties) that ballooned into larger refactor. The problem was that there is no easy way to find all of the places a property needs to be referenced or copied. This refactor moved me towards using non-optional `switch()` statements that force every `enum` to be present. This adds more code, but atleast adding a propery that needs to be plumbed through the system will cause compile time errors instead of having to find all of the issues at runtime.
+Suffered from a _simple_ change (adding a couple properties) that ballooned into larger refactor. The problem was that there is no easy way to find all of the places a property needs to be referenced or copied. This refactor moved me towards using non-optional `switch()` statements that force every `enum` to be present. This adds more code, but atleast adding a propery that needs to be plumbed through the system will cause compile time errors instead of having to find all of the issues at runtime.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/i-just-want-to-add-a-single-brush-property-man.png" />
+  <br />
+  <code><pre>the issue and the resulting madness</pre></code>
+</div>
 
 ## Februrary
 
@@ -699,7 +704,9 @@ After this there were a few more cluster generation related bugs, some tuning of
 </div>
 
 
-<!-->
+This is a WIP, if you found this and want more, let <a href="https://twitter.com/tmpvar">@tmpvar</a> know!
+
+<!--
 ## July
 
 ### Wave Function Collapse
