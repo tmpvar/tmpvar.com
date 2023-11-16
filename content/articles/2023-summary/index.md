@@ -623,7 +623,83 @@ and the associated nsight snapshot
   <img width="90%" src="assets/sdf-editor-2/cluster-lod-automatic-lod-picking-nsight.png" />
 </div>
 
+After adding the normals back I got really excited about how many instances I could render!
 
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/cluster-lod-automatic-lod-picking-normals.png" />
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/100k-wiffle-cubes.png" />
+  <code><pre>100k undulating wiffle cube instances @ ~2ms. Clearly there are issues with lod selection!</pre></code>
+</div>
+
+<div class="video-embed" style="position: relative; padding-top: 53.70177267987487%;">
+  <iframe
+    src="https://customer-vv39d21derhw1phl.cloudflarestream.com/c8e32445dec6912f6b943ea3bde93313/iframe?preload=true&poster=https%3A%2F%2Fcustomer-vv39d21derhw1phl.cloudflarestream.com%2Fc8e32445dec6912f6b943ea3bde93313%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+    allowfullscreen="true"
+  ></iframe>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/better-hi-z-and-splat-size.png" />
+  <code><pre>better hiz culling (single sample from HZB) and better splat size</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/better-hi-z-and-splat-size-hzb-locked.png" />
+  <code><pre>a view from a different perspective with the hzb viewport locked</pre></code>
+</div>
+
+Unfortunately there are still a ton of holes in the splat renderer. I spent quite a while trying to patch these holes.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/fixing-splat-holes.png" />
+  <code><pre>when splats are too small it creates holes</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/fixing-splat-holes-perfect-at-130ms.png" />
+  <code><pre>perfect splat sizes at the cost of 130ms per frame!</pre></code>
+</div>
+
+Why is the optimal splat size so innefficient?
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/fixing-splat-holes-perfect-at-130ms-nsight.png" />
+  <code><pre>nsight capture says: you're memory bound.</pre></code>
+</div>
+
+Here's nsight capture if you are curious: <a href="https://media.tmpvar.com/fixing-splat-holes-perfect-at-130ms.zip" target="_blank">fixing-splat-holes-perfect-at-130ms.zip</a>.
+
+So instead of getting sucked down an optimization rabbit hole, I decided to try and fix the original problem with holes and quickly realized that the leaf clusters were also a source of holes.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/fixing-leafcluster-holes.png" />
+  <code><pre>cluster shaped holes</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/fixing-leafcluster-holes-cluster-coloring.png" />
+  <code><pre>cluster shaped holes (cluster coloring)</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/fixing-leafcluster-holes-fixed.png" />
+  <code><pre>avoid enqueing empty octree nodes while building clusters!</pre></code>
+</div>
+
+After this there were a few more cluster generation related bugs, some tuning of splat size and raster cut-off, and of course some more Hi-Z tweaks.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/hiz-depth-complexity-testing.png" />
+  <code><pre>1000 trees to debug Hi-Z occlusion culling</pre></code>
+</div>
+
+
+<!-->
 ## July
 
 ### Wave Function Collapse
@@ -648,3 +724,4 @@ and the associated nsight snapshot
 ## October
 
 ## November
+-->
