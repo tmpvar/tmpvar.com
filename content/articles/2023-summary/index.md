@@ -770,13 +770,140 @@ This debug texture came in clutch so many times, I also used it as X-Ray vision 
   <code><pre>drawing rectangles around culled instances</pre></code>
 </div>
 
-
-This is a WIP, if you found this and want more, let <a href="https://twitter.com/tmpvar">@tmpvar</a> know!
-
-<!--
 ## July
 
-### Wave Function Collapse
+Insipired by <a href="https://www.unrealengine.com/marketplace/en-US/product/modular-ruins-c" target="_blank">the Modular Ruins C</a> Unreal Engine asset pack, I decided to start procedurally generating some stone/brick tilesets.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/procgen-ruins-first.png" />
+  <code><pre>building some re-usable tiles</pre></code>
+</div>
+
+Now with all of these tile sets I can start building some primitive things, by manually instancing objects and positioning them in the scene.
+
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ramparts-normals.png" />
+  <code><pre>an attempt at ramparts</pre></code>
+</div>
+
+The staircase in the back right of the scene was quite a pain to layout in code so I started to consider the possibility of procedurally placing tiles. Since I was just working on a staircase, why not make a spiral?
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/procgen-instances-spiral.png" />
+  <code><pre>a simple spiral - no local orientation changes</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/procgen-instances-spiral-tree.png" />
+  <code><pre>a spiral of trees</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/procgen-instances-spiral-stairs-local-transform.png" />
+  <code><pre>add in local transforms</pre></code>
+</div>
+
+Why not linear instancing?
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/procgen-instances-linear-twist.png" />
+  <code><pre>linear instancing with a twist</pre></code>
+</div>
+
+Procedural generation at the instance level is actually a ton of fun! I got to thinking about the tree and how it had no leaves. The original spheres as leaves was not great and I'd like to instance clusters of leaves and attach them to the ends of the branches. Hrm, how do I do that if the object is already done generating? A list of locations need to be stored along with the object that can denote where things can be attached... I think other engines call this a socket system, so I'll go with that!
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/tree-sockets-wiffle-cube-leaves-1.png" />
+  <code><pre>tree sockets</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/tree-sockets-wiffle-cube-leaves-2.png" />
+  <code><pre>tree sockets with a different seed</pre></code>
+</div>
+
+
+Proud of myself, I set my next goal to bring the materials and image based lighting back.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ramparts-bringing-the-materials-back.png" />
+  <code><pre>IBL with global roughness/metalness and cluster coloring</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ramparts-bringing-the-materials-back-3.png" />
+  <code><pre>add materials to the tree and attach wiffle boxes</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ramparts-bringing-the-materials-back-2.png" />
+  <code><pre>add materials to the tree and attach spheres</pre></code>
+</div>
+
+Things are starting to look better, but the tile materials are so boring!
+
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ruins-tiles-improvement-1.png" />
+  <code><pre>procgen more tiles</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ruins-tiles-improvement-2.png" />
+  <code><pre>I love these randomly jittered orientations!</pre></code>
+</div>
+
+I have a goal of being able to perform CSG on object instances, but noticed that a cut would propagate its material instead of what I'd expect in some cases which is: show the inside of the object.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ruins-tiles-improvement-cut-without-material.png" />
+  <code><pre>allow cuts without applying material</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/person-reference-2m.png" />
+  <code><pre>add a 2 meter tall person at 500 splats per meter</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/noises-add-stb-noise.png" />
+  <code><pre>add stb to the noises app</pre></code>
+</div>
+
+I had recently watched [Wave Function Collapse in Bad North](https://www.youtube.com/watch?v=0bcZb-SsnrA) and was inspired to give WFC a try.
+
+<div class="center-align vmargin-1em">
+  <img width="70%" src="assets/sdf-editor-2/wfc-demo.png" />
+  <code><pre></pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="70%" src="assets/sdf-editor-2/wfc-demo-preview-uncertainty.png" />
+  <code><pre>visualize uncertainty</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="70%" src="assets/sdf-editor-2/wfc-demo-bugged.png" />
+  <code><pre>doing something.. just not the right thing</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="70%" src="assets/sdf-editor-2/wfc-demo-bugged-but-closer.png" />
+  <code><pre>closer</pre></code>
+</div>
+
+
+After making this interactive, it was hard not to play with!
+
+<div class="video-embed" style="position: relative; padding-top: 68.52791878172589%;">
+  <iframe
+    src="https://customer-vv39d21derhw1phl.cloudflarestream.com/67d6d5069ac3807b798be13c02b8655f/iframe?preload=true&poster=https%3A%2F%2Fcustomer-vv39d21derhw1phl.cloudflarestream.com%2F67d6d5069ac3807b798be13c02b8655f%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+    allowfullscreen="true"
+  ></iframe>
+</div>
 
 <div class="center-align vmargin-1em">
   <img width="90%" src="assets/wave-function-collapse/spice-weasel-first.png" />
@@ -789,6 +916,7 @@ This is a WIP, if you found this and want more, let <a href="https://twitter.com
   <img width="90%" src="assets/wave-function-collapse/tmpvar-forest-beach-land.png" />
 </div>
 
+This is a WIP, if you found this and want more, let <a href="https://twitter.com/tmpvar">@tmpvar</a> know!
 
 
 ## August
