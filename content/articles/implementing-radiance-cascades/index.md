@@ -29,6 +29,15 @@ Guesses about how rays are cast
 - screen space: march the depth buffer
 - world space: move the probe to the surface under the pixel
 
+
+#### Volume transfer function
+
+https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-39-volume-rendering-techniques
+
+Opacity Correction
+
+`A = 1 - (1 - A_0) ^ (s_0 / s)`
+
 ### World Space (3D)
 
 - the memory requirements are very high
