@@ -12,7 +12,7 @@ I spent a large portion of this year digging deeper into graphics programming co
 
 ## January
 
-A the start of the year I was working on the sdf-editor and not a ton of context was saved because I didn't have this website and I wanted the results to be a surprise. This was a huge mistake, I need to get better at showing progress externally.
+At the start of the year I was working on the sdf-editor and not a ton of context was saved because I didn't have this website and I wanted the results to be a surprise. This was a huge mistake, I need to get better at showing progress externally.
 
 <!-- [parse tree w/ grouping](https://discord.com/channels/354027975412416523/354027975412416524/1069771189226057759) -->
 
@@ -24,10 +24,10 @@ A the start of the year I was working on the sdf-editor and not a ton of context
   <img width="90%" alt="sdf-editor group based cut bug fixed" src="assets/sdf-editor-1/cut-bug-fixed.png" />
 </div>
 
-- more register based musings
 
 <div class="center-align vmargin-1em">
   <img alt="sdf-editor group register machine thinking" width="90%" src="assets/sdf-editor-1/register-machine-thinking.png" />
+  <code><pre>more register based musings</pre></code>
 </div>
 
 Suffered from a _simple_ change (adding a couple properties) that ballooned into larger refactor. The problem was that there is no easy way to find all of the places a property needs to be referenced or copied. This refactor moved me towards using non-optional `switch()` statements that force every `enum` to be present. This adds more code, but atleast adding a propery that needs to be plumbed through the system will cause compile time errors instead of having to find all of the issues at runtime.
@@ -304,8 +304,6 @@ Results:
 </div>
 
 So at this point, the brush preview was functional and the brush itself was locked to the surface under the mouse. So it was time to try and actually use the thing to make something other than squiggles.
-
-
 
 <div class="center-align vmargin-1em">
   <img width="90%" src="assets/sdf-editor-2/sculpt-first-real-try.png" />
@@ -701,6 +699,75 @@ After this there were a few more cluster generation related bugs, some tuning of
 <div class="center-align vmargin-1em">
   <img width="90%" src="assets/sdf-editor-2/hiz-depth-complexity-testing.png" />
   <code><pre>1000 trees to debug Hi-Z occlusion culling</pre></code>
+</div>
+
+
+At this point things are working pretty well, but instead of adding materials back I decided to go on a tangent of actually using this system to do some procedural generation.
+
+Starting with a leaf with the form designed using this [Ovate Leaf Form](https://www.desmos.com/calculator/fxgqwxt7ax) desmos calculator
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ovate-leaf-single.png" />
+  <code><pre>a single ovate leaf built by spamming cylinders</pre></code>
+</div>
+
+Since I've been working so hard on implementing instancing, I made a little bush of these leaves.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ovate-leaf-bush.png" />
+  <code><pre>a bunch of ovate leaf instances</pre></code>
+</div>
+
+You may have noticed that there were some artifacts in the above image and I bet you couldn't of guessed that they were cluster lod related. So that got fixed next.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/wiggly-vine-ovate-leaf.png" />
+</div>
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/wiggly-vine-space-colonization-tree.png" />
+</div>
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/ovate-leaf-plane.png" />
+</div>
+
+At this point, things appear to be working pretty well. On larger scenes the thing that computes what clusters at what lod (e.g., the `viz: generate cluster instances` profiler line) dominates the time spent and prompted me to to atleast consider a different approach.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/optimization-design-lod-tree-slicing.png" />
+</div>
+
+Back to procgen, I decided to spend a bit of time exploring continuous noises.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/collecting-noises.png" />
+  <code><pre>collecting / implementing noises</pre></code>
+</div>
+
+Bah, I found some issues with my Hi-Z implementation, so I added a seeing tool in the form of a top-down view. The idea is pretty simple, for every potentially rendered cluster draw a rect at a certain location on the screen which acts like an orthographic perspective. The trick is getting the scale / bounds correct but it is a very low effort way of inline debugging. This happens in the `filter-cluster-instances` compute shader which has been passed a debug texture that gets rendered over the scene as a final pass.
+
+```
+left: cluster culling info
+  yellow = frustum culled
+  red = depth culled
+  green = passing
+
+middle: jet colored linear depth
+right: random colored hiz mip level
+```
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/hi-z-top-down-debug-view.png" />
+  <code><pre>Hi-Z debug view</pre></code>
+</div>
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/hi-z-top-down-debug-view-2.png" />
+  <code><pre>another example of Hi-Z debug view</pre></code>
+</div>
+
+This debug texture came in clutch so many times, I also used it as X-Ray vision to see things that were being culled by Hi-Z. It also gave me an easy way to overlay the Hi-z texture and all of it's mips.
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/hi-z-culled-instance-debug.png" />
+  <code><pre>drawing rectangles around culled instances</pre></code>
 </div>
 
 
