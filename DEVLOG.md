@@ -35,10 +35,6 @@
 - radiance-cascades/2d: consider adding a dumb FPS counter when the "run continuously" without
                      timer queries
 - radiance-cascades/3d: add touch events when webgpu works on any mobile device
-- radiance-cascades/3d: texture wrapper that tracks version
-                        will be used for resizing the
-                        volume via a slider, and we'll want to rebuild the bindGroup when
-                        that happens
 - radiance-cascades/2d: collect all of the images and bugs into the radiance cascades 'lessons learned' section
 - radiance-cascades/2d: when computing fluence, how does the alpha channel affect the result?
 - radiance-cascades/2d: 'proper' transparency accumulation

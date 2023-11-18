@@ -893,7 +893,6 @@ I had recently watched [Wave Function Collapse in Bad North](https://www.youtube
   <code><pre>closer</pre></code>
 </div>
 
-
 After making this interactive, it was hard not to play with!
 
 <div class="video-embed" style="position: relative; padding-top: 68.52791878172589%;">
@@ -915,6 +914,105 @@ After making this interactive, it was hard not to play with!
   <img width="90%" src="assets/wave-function-collapse/spice-weasel-red-roofed-village.png" />
   <img width="90%" src="assets/wave-function-collapse/tmpvar-forest-beach-land.png" />
 </div>
+
+
+So that was a nice distraction, but the result doesn't _really_ have immdeiate applicability into the main project, so I moved on to material blending.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/material-deduping.png" />
+  <code><pre>replace primitive ids with material hash</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/material-blending-before.png" />
+  <code><pre>before</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/material-blending-graph-coloring.png" />
+  <code><pre>graph colored material hashes</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/material-blending-degenerate-case.png" />
+  <code><pre>degenerate case - fully smooth + metalic red blended with rough green</pre></code>
+</div>
+
+### Objects Made of Objects
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/objects-made-of-objects-box-cut-cyl.png" />
+  <code><pre>modifying an existing object</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="70%" src="assets/sdf-editor-2/objects-made-of-objects-box-cut-cyl-code.png" />
+  <code><pre>modifying an existing object</pre></code>
+</div>
+
+
+### Instances of Instances
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/instances-of-instances.png" />
+  <code><pre>instances of instances (graph)</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="70%" src="assets/sdf-editor-2/instances-of-instances-code.png" />
+</div>
+
+Turns out instances of instances implemented via `*AddChild` has some really annoying properties, the biggest one is that you can form graphs. So I took a page out of Valve's hand book and limited entities to having a single parent.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/instances-of-instances-tree.png" />
+  <code><pre>instances of instances (tree)</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="70%" src="assets/sdf-editor-2/instances-of-instances-tree-code.png" />
+</div>
+
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/sdf-ops-shell-elongation.png" />
+  <code><pre>SDF Operations: shell and elongation</pre></code>
+</div>
+
+
+### Debug Rendering
+
+I had been adding a bunch of common code to Dust when I realized that I barely had any sort of debugging primitives (e.g, sphere, cone, box, etc..)
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/debugging-primitives-lines-circles-points.png" />
+  <code><pre>debugging lines / circles / points</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/debugging-primitives-sphere-cylinder-box.png" />
+  <code><pre>debugging spheres / cylinders / boxes</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/debugging-primitives-box-dimmed-backface.png" />
+  <code><pre>debugging box w/ dimmed backfaces</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/debugging-primitives-other-dimmed-backfaces.png" />
+  <code><pre>debugging sphere / cylinder / capsule dimmed backfaces</pre></code>
+</div>
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/debugging-text-labels.png" />
+  <code><pre>debug text labels</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/dust-event-model.png" />
+  <code><pre>eliminating bogus event models for Dust</pre></code>
+</div>
+
 
 This is a WIP, if you found this and want more, let <a href="https://twitter.com/tmpvar">@tmpvar</a> know!
 
