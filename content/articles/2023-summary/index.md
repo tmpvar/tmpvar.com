@@ -7,8 +7,7 @@ unlisted = true
 enableSampleImage = false
 +++
 
-I spent a large portion of this year digging deeper into graphics programming concepts. I mainly focused on SDF evaluation and splat rendering, but there were some other side projects in there.
-
+My graphics programming focus this year was mostly on SDF evaluation and splat rendering but I did have some fun side projects!
 
 ## January
 
@@ -1016,7 +1015,7 @@ I had been adding a bunch of common code to Dust when I realized that I barely h
 
 This is a WIP, if you found this and want more, let <a href="https://twitter.com/tmpvar">@tmpvar</a> know!
 
-
+<!--
 ## August
 
 ## September
