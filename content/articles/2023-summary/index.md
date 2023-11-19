@@ -1013,13 +1013,130 @@ I had been adding a bunch of common code to Dust when I realized that I barely h
 </div>
 
 
+To prove this system out, I built a little top down shooter game over ~2 weeks using the debug geometry for  and an entity system inspired by the source engine (via the [wiki](https://developer.valvesoftware.com/wiki/Brush_entity))
+
+<div class="video-embed" style="position: relative; padding-top: 56.25%;">
+  <iframe
+    src="https://customer-vv39d21derhw1phl.cloudflarestream.com/64ba46913392ff3181edf3c815e6ee48/iframe?preload=true&poster=https%3A%2F%2Fcustomer-vv39d21derhw1phl.cloudflarestream.com%2F64ba46913392ff3181edf3c815e6ee48%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+    allowfullscreen="true"
+  ></iframe>
+</div>
+
+
 This is a WIP, if you found this and want more, let <a href="https://twitter.com/tmpvar">@tmpvar</a> know!
 
-<!--
 ## August
+
+I started thinking about all of this stuff I've been doing from the past couple years and realized that from an external perspective it looks like I just vanished. I've grown very tired of social media websites and the psychological issues that it causes.
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/tmpvar-com-first-post.png" />
+  <code><pre>first post on the new tmpvar.com!</pre></code>
+</div>
+
+I also spent some time designing and cutting out some mechanical bits for a proof of concept human input device that works like a pen but has force feedback.
+
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/machining/encoder-wheel.png" />
+  <code><pre>designing an encoder wheel</pre></code>
+</div>
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/machining/arm.png" />
+  <code><pre>designing a modular arm segment</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/machining/tumbled-parts.png" />
+  <code><pre>tumbled parts</pre></code>
+</div>
+
+<div class="video-embed" style="position: relative; padding-top: 56.25%;">
+  <iframe
+    src="https://customer-vv39d21derhw1phl.cloudflarestream.com/0f4328c7a135e0df920b1c661aca5efe/iframe?preload=true&poster=https%3A%2F%2Fcustomer-vv39d21derhw1phl.cloudflarestream.com%2F0f4328c7a135e0df920b1c661aca5efe%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+    allowfullscreen="true"
+  ></iframe>
+</div>
+
 
 ## September
 
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/cnc-desk-new-light.png" />
+  <code><pre>added an overhead light to the cnc desk!</pre></code>
+</div>
+
+<a href="https://mastodon.gamedev.place/@sjb3d/110957635606866131">Simon Brown posted a tip</a> about using the signed bit to differentiate between -0 and +0 which makes isosurface extraction more robust.
+
+As soon as I saw it I knew it was the source of some issues that I had been seeing but hadn't been able to identify.
+
+```js
+const IsNegative = (function () {
+  let isNegativeScratch = new DataView(new ArrayBuffer(8))
+  return function IsNegative(value) {
+    isNegativeScratch.setFloat64(0, value, true)
+    let uints = isNegativeScratch.getUint32(4, true)
+    return (uints & 1 << 31) != 0
+  }
+})();
+```
+
+```c
+static inline bool
+IsNegative(f32 a) {
+  u32 *p = (u32 *)&a;
+  return (*p >> 31) != 0;
+}
+```
+
+```rust
+fn IsNegative(v: f32) -> bool {
+  let bits = bitcast<u32>(v);
+  return (bits & (1<<31)) != 0;
+}
+```
+
+Applying this to the chunker almost cut the number of collected leaves in half (1.7M -> 900K) making evaluation ~2x faster. What a huge win from such a simple concept! Thanks SJB!
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/negative-bit-trick.png" />
+  <code><pre>negative bit trick for much win</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/negative-bit-grab-bag.png" />
+  <code><pre>negative bit trick grab bag testing</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/perlin-weird-shapes-1.png" />
+  <code><pre>weird landscape made of spheres and perlin noise</pre></code>
+</div>
+
+<div class="center-align vmargin-1em">
+  <img width="90%" src="assets/sdf-editor-2/perlin-weird-shapes-2.png" />
+  <code><pre>weird landscape made of spheres and perlin noise</pre></code>
+</div>
+
+<div class="video-embed" style="position: relative; padding-top: 56.25%;">
+  <iframe
+    src="https://customer-vv39d21derhw1phl.cloudflarestream.com/c67aa97e7e5b23db9f8280d732145bd2/iframe?preload=true&poster=https%3A%2F%2Fcustomer-vv39d21derhw1phl.cloudflarestream.com%2Fc67aa97e7e5b23db9f8280d732145bd2%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+    allowfullscreen="true"
+  ></iframe>
+</div>
+
+### Radiance Cascades
+
+On August 8th, <a href="https://www.jendrikillner.com/post/graphics-programming-weekly-issue-299/">Graphics Programming weekly - Issue 299 - August 6th, 2023</a> popped into my inbox and and the first item is a talk by [Alexander Sannikov](https://www.youtube.com/@Alexander_Sannikov) at Exilecon. Mixed in with a bunch of other techniques that I really want to try was this notion of radiance cascades - a constant time GI implementation. Given that I've been stuck using <a href="https://ict.usc.edu/pubs/Image-Based%20Lighting.pdf" target="_blank">Image Based Lighting</a>
+
+
+<!--
 ## October
 
 ## November
