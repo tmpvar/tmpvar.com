@@ -1133,8 +1133,7 @@ Applying this to the chunker almost cut the number of collected leaves in half (
 
 ### Radiance Cascades
 
-On August 8th, <a href="https://www.jendrikillner.com/post/graphics-programming-weekly-issue-299/">Graphics Programming weekly - Issue 299 - August 6th, 2023</a> popped into my inbox and and the first item is a talk by [Alexander Sannikov](https://www.youtube.com/@Alexander_Sannikov) at Exilecon. Mixed in with a bunch of other techniques that I really want to try was this notion of radiance cascades - a constant time GI implementation. Given that I've been stuck using <a href="https://ict.usc.edu/pubs/Image-Based%20Lighting.pdf" target="_blank">Image Based Lighting</a>
-
+On August 8th, <a href="https://www.jendrikillner.com/post/graphics-programming-weekly-issue-299/">Graphics Programming weekly - Issue 299 - August 6th, 2023</a> popped into my inbox and and the first item is a talk by [Alexander Sannikov](https://www.youtube.com/@Alexander_Sannikov) at Exilecon. Mixed in with a bunch of other techniques that I really want to try was this notion of radiance cascades - a constant time GI implementation. Given that I've been stuck using <a href="https://ict.usc.edu/pubs/Image-Based%20Lighting.pdf" target="_blank">Image Based Lighting</a> for the splat renderer, this was really interesting. I'd really like to add dynamic lighting.
 
 <!--
 ## October
