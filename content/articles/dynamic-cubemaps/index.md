@@ -2,7 +2,7 @@
 title = "Dynamic Cubemaps"
 date = 2023-10-19
 [extra]
-unlisted = false
+unlisted = true
 enableSampleImage = true
 +++
 
@@ -18,7 +18,6 @@ While watching <a href="https://twitter.com/johnee_b" target="_blank">John Beech
     allowfullscreen="true"
   ></iframe>
 </div>
-
 
 ## Inspiration
 
@@ -37,7 +36,6 @@ It occurred to me that they are just accumulating splats on the background, so I
     Manually spamming circles in Krita
   </p>
 </div>
-
 
 ## Approach
 
@@ -61,7 +59,7 @@ This could probably be rectified with billboarded quads, but I had a wild idea a
   </p>
 </div>
 
-If you look really close you can still see a seam, but it turns out those artifacts were created while rendering the cubemap to the screen.
+If you look really close you can still see some seams, but it turns out those artifacts were created while rendering the cubemap to the screen and fixed by computing a more accurate direction vector.
 
 ## Implementation
 
@@ -70,15 +68,31 @@ If you look really close you can still see a seam, but it turns out those artifa
   2. pre-compute VP matrices
 - frame
   1. render N boxes to each face of the cubemap
+      - generate random box positions in vertex shader
+      - render procedural / volumetric data in fragment shader
   2. render the cubemap
+
+<section id="dynamic-cubemaps-content">
+  <section class="center-align">
+    <canvas width="1024" height="512"></canvas>
+  </section>
+  <p>
+      source (webgl2): <a href="dynamic-cubemaps.js" target="_blank">dynamic-cubemaps.js</a>
+  </p>
+  <script type="module" src="dynamic-cubemaps.js"></script>
+</section>
+
 
 ## Conclusion
 
-So there you have it, a simple way to render painterly backgrounds using ~100 cubes rendered 6 times. The hardest part about this whole thing was setting up the framebuffers.
+So there you have it, a simple way to render painterly backgrounds using ~100 cubes rendered 6 times per frame. The hardest part about this whole thing was setting up the framebuffers.
+
+TODO: talk about the extensibility
 
 ## References
 
 - <a href="https://mbroecker.com/project_dynamic_cubemapping.html" target="_blank">Dynamic cubemaps with OpenGL 2</a>
 - <a href="https://learnopengl.com/Advanced-OpenGL/Cubemaps" target="_blank">LearnOpengL Cubemaps</a>
 - <a href="https://www.khronos.org/opengl/wiki/Cubemap_Textures" target="_blank">OpenGL Wiki Cubemap Texture</a>
+- <a href="https://webgl2fundamentals.org/webgl/lessons/webgl-cube-maps.html">WebGL2 Fundamentals - Cubemaps</a>
 
