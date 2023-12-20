@@ -116,7 +116,8 @@ function CreateCubemapFaceProgram(gl) {
       main() {
         int vertexIndex = gl_VertexID;
         boxIndex = (vertexIndex >> 3) + offset;
-
+        // vertex pulling of cubes via Sebbbi's trick
+        // https://twitter.com/SebAaltonen/status/1315982782439591938
         ivec3 vertPosition = ivec3((gl_VertexID & 0x1) >> 0,
                                    (gl_VertexID & 0x2) >> 1,
                                    (gl_VertexID & 0x4) >> 2);
@@ -207,6 +208,8 @@ function CreateCubemapFaceProgram(gl) {
 }
 
 function DynamicCubemapsInit(rootEl) {
+  // TODO: this could be a slider - requires an upper bound for the index buffer
+  //       pre-allocation
   const CubesPerFrame = 100;
 
   const canvas = rootEl.querySelector("canvas")
@@ -313,8 +316,6 @@ function DynamicCubemapsInit(rootEl) {
 
 
   function RenderFrame() {
-    // TODO: make this a slider
-
     const time = Date.now() / 1000.0
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, cubemapFramebuffer)
     gl.viewport(0, 0, CubemapFaceDiameter, CubemapFaceDiameter)
@@ -337,7 +338,6 @@ function DynamicCubemapsInit(rootEl) {
       )
 
       gl.uniformMatrix4fv(cubemapFaceUniformLocations.worldToScreen, false, worldToCubeFace[faceIndex]);
-      // gl.drawArrays(gl.GL_TRIANGLES, 0, BoxIndexCount * CubesPerFrame);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
       gl.drawElements(gl.TRIANGLES, BoxIndexCount * CubesPerFrame, gl.UNSIGNED_INT, 0);
     }
@@ -349,16 +349,13 @@ function DynamicCubemapsInit(rootEl) {
     mat4.lookAt(worldView, Eye, dir, Up)
     mat4.multiply(worldToScreen, worldProjection, worldView)
     mat4.invert(screenToWorld, worldToScreen)
-    // Render the Cubemap
-    if (1) {
 
+    // Render the Cubemap
+    {
       gl.useProgram(fullscreenProgram);
       gl.enable(gl.CULL_FACE);
       gl.disable(gl.DEPTH_TEST)
-      gl.depthMask(false);
       gl.disable(gl.BLEND)
-      // gl.clearColor(1.0, 0.0, 1.0, 1.0)
-      // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubemapTexture);
@@ -368,24 +365,6 @@ function DynamicCubemapsInit(rootEl) {
       gl.uniformMatrix4fv(fullscreenUniformLocations.screenToWorld, false, screenToWorld);
 
       gl.drawArrays(gl.TRIANGLES, 0, 3)
-    }
-
-    // debug render the cubes
-    if (0) {
-
-      // gl.clearColor(1.0, 0.0, 1.0, 1.0)
-      // gl.clearDepth(0.0)
-      // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      gl.useProgram(cubemapFaceProgram)
-      gl.disable(gl.CULL_FACE)
-      gl.enable(gl.DEPTH_TEST)
-
-      gl.uniformMatrix4fv(cubemapFaceUniformLocations.worldToScreen, false, worldToScreen);
-      gl.uniform1i(cubemapFaceUniformLocations.offset, cubeOffset);
-      // console.log(cubeOffset);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
-      gl.drawElements(gl.TRIANGLES, BoxIndexCount * CubesPerFrame, gl.UNSIGNED_INT, 0);
-      // gl.drawArrays(gl.TRIANGLES, 0, BoxIndexCount * CubesPerFrame);
     }
 
     cubeOffset += CubesPerFrame;
