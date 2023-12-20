@@ -55,8 +55,23 @@ function CreateFullscreenProgram(gl) {
       precision highp float;
       in vec2 uv;
       out vec4 outColor;
+
+      uniform mat4 screenToWorld;
+      uniform samplerCube cubemap;
+
+      vec3
+      ComputeRayDirection(vec2 uv, mat4 inv) {
+        uv = uv * 2.0 - 1.0;
+        vec4 farPlane = inv * vec4(uv.x, uv.y, 10.0, 1.0);
+        vec4 nearPlane = inv * vec4(uv.x, uv.y, 0.1, 1.0);
+        return normalize(farPlane.xyz / farPlane.w - nearPlane.xyz / nearPlane.w);
+      }
+
       void main() {
         outColor = vec4(uv, 0.0, 1.0);
+        vec3 dir = ComputeRayDirection(uv, screenToWorld);
+        outColor = vec4(dir * 0.5 + 0.5, 1.0);
+        outColor = texture(cubemap, dir);
       }
   `
   })
@@ -68,7 +83,6 @@ function CreateCubemapFaceProgram(gl) {
       precision highp float;
 
       uniform mat4 worldToScreen;
-      uniform float time;
       uniform int offset;
 
       flat out int boxIndex;
@@ -77,7 +91,6 @@ function CreateCubemapFaceProgram(gl) {
       flat out vec3 center;
 
       const vec3 eye = vec3(0.0);
-
 
       // http://www.jcgt.org/published/0009/03/02/
       uvec4
@@ -102,17 +115,17 @@ function CreateCubemapFaceProgram(gl) {
       void
       main() {
         int vertexIndex = gl_VertexID;
-        boxIndex = (vertexIndex >> 3);
+        boxIndex = (vertexIndex >> 3) + offset;
 
         ivec3 vertPosition = ivec3((gl_VertexID & 0x1) >> 0,
-                                  (gl_VertexID & 0x2) >> 1,
-                                  (gl_VertexID & 0x4) >> 2);
+                                   (gl_VertexID & 0x2) >> 1,
+                                   (gl_VertexID & 0x4) >> 2);
 
         vec4 random = vec4(pcg4d(uvec4(boxIndex + offset, offset + 10, offset * 20, offset * 40))) /
                       float(0xffffffffu);
         random.xyz = random.xyz * 2.0 - 1.0;
         vec3 dir = normalize(random.xyz);
-        center = dir * 500.0;
+        center = dir * 100.0;
 
         vec3 localCameraPosition = eye - center;
         if (localCameraPosition.x > 0.0) {
@@ -128,7 +141,7 @@ function CreateCubemapFaceProgram(gl) {
         }
 
         uvw = vec3(vertPosition);
-        radius = vec3(random.w * 30.0);
+        radius = vec3(random.w * 10.0);
         vec3 pos = center + (uvw * 2.0 - 1.0) * radius;
         gl_Position = worldToScreen * vec4(pos, 1.0);
       }
@@ -143,25 +156,73 @@ function CreateCubemapFaceProgram(gl) {
       flat in vec3 center;
 
       out vec4 outColor;
+
+      // https://www.pcg-random.org/
+      uint
+      pcg(uint v) {
+        uint state = v * 747796405u + 2891336453u;
+        uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+        return (word >> 22u) ^ word;
+      }
+
+      vec2
+      sphIntersect(in vec3 ro, in vec3 rd, in vec3 ce, float ra) {
+        vec3 oc = ro - ce;
+        float b = dot(oc, rd);
+        float c = dot(oc, oc) - ra * ra;
+        float h = b * b - c;
+        if (h < 0.0) {
+          return vec2(-1.0); // no intersection
+        }
+        h = sqrt(h);
+        return vec2(-b - h, -b + h);
+      }
+
       void main() {
-        outColor = vec4(uvw, 1.0);
+        outColor = vec4(uvw, 0.5);
+
+        vec3 origin = -center;
+        vec3 dir = normalize(origin - (uvw * 2.0 - 1.0) * radius);
+
+        vec2 hit = sphIntersect(origin, dir, vec3(0.0), radius.x);
+        if (hit.x == -1.0) {
+          outColor = vec4(0.0);
+          return;
+        }
+
+        float colorOffset = float(pcg(uint(boxIndex))) / float(0xffffffffu) * 2.0 - 1.0;
+
+        vec3 color = mix(
+          vec3(0.1, 0.2, 0.3),
+          vec3(0.3, 0.1, 0.3),
+          dot(normalize(center.xy), vec2(0.2, 0.7)) + colorOffset
+        );
+
+        float opacity = float(pcg(uint(boxIndex))) / float(0xffffffffu);
+        outColor = vec4(color, opacity * 0.125);
+
       }
   `
   })
 }
 
 function DynamicCubemapsInit(rootEl) {
+  const CubesPerFrame = 100;
+
   const canvas = rootEl.querySelector("canvas")
   const gl = canvas.getContext("webgl2")
 
   const fullscreenProgram = CreateFullscreenProgram(gl)
+  const fullscreenUniformLocations = {
+    screenToWorld: gl.getUniformLocation(fullscreenProgram, "screenToWorld"),
+    cubemap: gl.getUniformLocation(fullscreenProgram, "cubemap"),
+  }
 
   const cubemapFramebuffer = gl.createFramebuffer()
   const cubemapTexture = gl.createTexture()
   const cubemapFaceProgram = CreateCubemapFaceProgram(gl);
   const cubemapFaceUniformLocations = {
     worldToScreen: gl.getUniformLocation(cubemapFaceProgram, "worldToScreen"),
-    time: gl.getUniformLocation(cubemapFaceProgram, "time"),
     offset: gl.getUniformLocation(cubemapFaceProgram, "offset"),
   }
 
@@ -172,6 +233,30 @@ function DynamicCubemapsInit(rootEl) {
   gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 
   const CubemapFaceDiameter = 512
+  const BoxIndexCount = 18
+  const TotalIndexCount = CubesPerFrame * BoxIndexCount
+
+  const cubeIndexBuffer = gl.createBuffer()
+  {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer)
+
+    const CubeIndicesLUT = [
+      0, 2, 1, 2, 3, 1,
+      5, 4, 1, 1, 4, 0,
+      0, 4, 6, 0, 6, 2,
+      6, 5, 7, 6, 4, 5,
+      2, 6, 3, 6, 7, 3,
+      7, 1, 3, 7, 5, 1,
+    ]
+    let indices = [];
+    for (let index = 0; index < TotalIndexCount; index++) {
+      let cube = Math.floor(index / BoxIndexCount);
+      let lutIndex = index % BoxIndexCount;
+      indices[index] = CubeIndicesLUT[lutIndex] + cube * 8;
+    }
+
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(indices), gl.STATIC_DRAW);
+  }
 
   const cubemapFaceDirs = [
     [+1.0, +0.0, +0.0], // GL_TEXTURE_CUBE_MAP_POSITIVE_X
@@ -183,16 +268,18 @@ function DynamicCubemapsInit(rootEl) {
   ];
 
   const cubemapFaceUpDirs = [
-    [+0.0, +1.0, +0.0],
-    [+0.0, +1.0, +0.0],
-    [+0.0, +0.0, -1.0],
+    [+0.0, -1.0, +0.0],
+    [+0.0, -1.0, +0.0],
     [+0.0, +0.0, +1.0],
-    [+0.0, +1.0, +0.0],
-    [+0.0, +1.0, -0.0],
+    [+0.0, +0.0, -1.0],
+    [+0.0, -1.0, +0.0],
+    [+0.0, -1.0, -0.0],
   ];
 
+  const Eye = [0, 0, 0]
+  const Up = [0, 1, 0]
+
   let worldToCubeFace = []
-  let cubeProj = mat4.create()
   for (let faceIndex = 0; faceIndex < 6; faceIndex++) {
     gl.texImage2D(
       gl.TEXTURE_CUBE_MAP_POSITIVE_X + faceIndex,
@@ -205,63 +292,105 @@ function DynamicCubemapsInit(rootEl) {
       gl.UNSIGNED_BYTE,
       null);
 
-    const proj = mat4.perspectiveNO(mat4.create(), Math.PI / 2.0, 1.0, 0.01, 100.0);
-    const view = mat4.lookAt(mat4.create(), [0, 0, 0], cubemapFaceDirs[faceIndex], cubemapFaceUpDirs[faceIndex])
+    const proj = mat4.perspectiveNO(mat4.create(), Math.PI / 2.0, 1.0, 0.01, null);
+    const view = mat4.lookAt(
+      mat4.create(),
+      Eye,
+      cubemapFaceDirs[faceIndex],
+      cubemapFaceUpDirs[faceIndex]
+    )
     const vp = mat4.multiply(mat4.create(), proj, view);
     worldToCubeFace.push(vp);
   }
 
-
-  gl.disable(gl.DEPTH_TEST)
-  gl.clearColor(1.0, 0.0, 1.0, 1.0)
-
-
   let cubeOffset = 0;
+
+  let worldProjection = mat4.create()
+  let worldView = mat4.create()
+  let worldToScreen = mat4.create()
+  let screenToWorld = mat4.create()
+
 
 
   function RenderFrame() {
     // TODO: make this a slider
-    const CubesPerFrame = 100;
 
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, cubemapFramebuffer);
+    const time = Date.now() / 1000.0
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, cubemapFramebuffer)
     gl.viewport(0, 0, CubemapFaceDiameter, CubemapFaceDiameter)
-    gl.useProgram(cubemapFaceProgram);
-    gl.disable(gl.CULL_FACE);
-    gl.uniform1f(cubemapFaceUniformLocations.time, Date.now() / 1000.0)
+    gl.useProgram(cubemapFaceProgram)
+    gl.disable(gl.CULL_FACE)
+    gl.enable(gl.DEPTH_TEST)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    gl.uniform1f(cubemapFaceUniformLocations.time, time)
     gl.uniform1i(cubemapFaceUniformLocations.offset, cubeOffset);
 
     for (let faceIndex = 0; faceIndex < 6; faceIndex++) {
       gl.framebufferTexture2D(
         gl.FRAMEBUFFER,
-        gl.COLOR_ATTACHMENT2,
+        gl.COLOR_ATTACHMENT0,
         gl.TEXTURE_CUBE_MAP_POSITIVE_X + faceIndex,
         cubemapTexture,
         0
       )
 
       gl.uniformMatrix4fv(cubemapFaceUniformLocations.worldToScreen, false, worldToCubeFace[faceIndex]);
-      gl.drawArrays(gl.GL_TRIANGLES, 0, 18 * CubesPerFrame);
+      // gl.drawArrays(gl.GL_TRIANGLES, 0, BoxIndexCount * CubesPerFrame);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
+      gl.drawElements(gl.TRIANGLES, BoxIndexCount * CubesPerFrame, gl.UNSIGNED_INT, 0);
     }
 
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, cubemapFramebuffer);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
 
-    gl.useProgram(fullscreenProgram);
-    gl.enable(gl.CULL_FACE);
+    mat4.perspectiveNO(worldProjection, Math.PI / 2.0, canvas.width / canvas.height, 0.1, 100.0);
+    let dir = [Math.sin(time * 0.1), Math.sin(time * 0.1) * 0.1, Math.cos(time * 0.1)];
+    mat4.lookAt(worldView, Eye, dir, Up)
+    mat4.multiply(worldToScreen, worldProjection, worldView)
+    mat4.invert(screenToWorld, worldToScreen)
+    // Render the Cubemap
+    if (1) {
 
-    gl.viewport(0, 0, canvas.width, canvas.height)
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+      gl.useProgram(fullscreenProgram);
+      gl.enable(gl.CULL_FACE);
+      gl.disable(gl.DEPTH_TEST)
+      gl.depthMask(false);
+      gl.disable(gl.BLEND)
+      // gl.clearColor(1.0, 0.0, 1.0, 1.0)
+      // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-    // Set up position stream
-    // gl.vertexAttribPointer(fullscreenProgram.positionAttr, 3, gl.FLOAT, false, stride, 0)
-    gl.drawArrays(gl.TRIANGLES, 0, 3)
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubemapTexture);
+      gl.uniform1i(fullscreenUniformLocations.cubemap, 0);
+
+      gl.viewport(0, 0, canvas.width, canvas.height)
+      gl.uniformMatrix4fv(fullscreenUniformLocations.screenToWorld, false, screenToWorld);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+
+    // debug render the cubes
+    if (0) {
+
+      // gl.clearColor(1.0, 0.0, 1.0, 1.0)
+      // gl.clearDepth(0.0)
+      // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.useProgram(cubemapFaceProgram)
+      gl.disable(gl.CULL_FACE)
+      gl.enable(gl.DEPTH_TEST)
+
+      gl.uniformMatrix4fv(cubemapFaceUniformLocations.worldToScreen, false, worldToScreen);
+      gl.uniform1i(cubemapFaceUniformLocations.offset, cubeOffset);
+      // console.log(cubeOffset);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
+      gl.drawElements(gl.TRIANGLES, BoxIndexCount * CubesPerFrame, gl.UNSIGNED_INT, 0);
+      // gl.drawArrays(gl.TRIANGLES, 0, BoxIndexCount * CubesPerFrame);
+    }
 
     cubeOffset += CubesPerFrame;
-
     requestAnimationFrame(RenderFrame)
   }
 
-  RenderFrame()
-
-
+  requestAnimationFrame(RenderFrame)
 }
