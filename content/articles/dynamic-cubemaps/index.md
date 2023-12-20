@@ -87,8 +87,6 @@ If you look really close you can still see some seams, but it turns out those ar
 
 So there you have it, a simple way to render painterly backgrounds using ~100 cubes rendered 6 times per frame. The hardest part about this whole thing was setting up the framebuffers.
 
-TODO: talk about the extensibility
-
 ## References
 
 - <a href="https://mbroecker.com/project_dynamic_cubemapping.html" target="_blank">Dynamic cubemaps with OpenGL 2</a>
