@@ -6,7 +6,7 @@ unlisted = false
 enableSampleImage = true
 +++
 
-While watching <a href="https://twitter.com/johnee_b" target="_blank">John Beech</a> work in MM Dreams, I noticed the background and had to try and replicate it. This effort resulted in a easy method of rendering painterly / cloudy looking backgrounds, with the added benefit of being very flexibly while remaining cheap.
+While watching <a href="https://twitter.com/johnee_b" target="_blank">John Beech</a> work in MM Dreams, I noticed the background and had to try and replicate it. This effort resulted in a easy method of rendering painterly / cloudy looking backgrounds, with the added benefit of being very flexible while remaining cheap.
 
 <!-- more -->
 
