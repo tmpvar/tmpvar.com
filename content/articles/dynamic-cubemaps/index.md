@@ -2,7 +2,7 @@
 title = "Dynamic Cubemaps"
 date = 2023-10-19
 [extra]
-unlisted = true
+unlisted = false
 enableSampleImage = true
 +++
 
