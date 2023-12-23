@@ -2,6 +2,14 @@ import * as mat4 from "./gl-matrix/mat4.js"
 
 DynamicCubemapsInit(document.getElementById("dynamic-cubemaps-content"))
 
+function ToggleFullScreen(el) {
+  if (!document.fullscreenElement) {
+    el.requestFullscreen();
+  } else if (document.exitFullscreen) {
+    document.exitFullscreen();
+  }
+}
+
 function CreateShader(gl, source, type) {
   var shader = gl.createShader(type)
   gl.shaderSource(shader, source)
@@ -214,6 +222,9 @@ function DynamicCubemapsInit(rootEl) {
 
   const canvas = rootEl.querySelector("canvas")
   const gl = canvas.getContext("webgl2")
+
+  rootEl.querySelector(".go-fullscreen").addEventListener('click', _ => ToggleFullScreen(canvas))
+
 
   const fullscreenProgram = CreateFullscreenProgram(gl)
   const fullscreenUniformLocations = {

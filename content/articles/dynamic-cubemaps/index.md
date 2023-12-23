@@ -72,9 +72,10 @@ If you look really close you can still see some seams, but it turns out those ar
       - render procedural / volumetric data in fragment shader
   2. render the cubemap
 
-<section id="dynamic-cubemaps-content">
-  <section class="center-align">
+<section id="dynamic-cubemaps-content" class="content">
+  <section class="center-align relative">
     <canvas width="1024" height="512"></canvas>
+    <a class="go-fullscreen"></a>
   </section>
   <p>
       source (webgl2): <a href="dynamic-cubemaps.js" target="_blank">dynamic-cubemaps.js</a>
