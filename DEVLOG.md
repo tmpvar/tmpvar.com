@@ -42,6 +42,13 @@
 - radiance-cascades/2d: how to fix the ringing artifacts?
 
 ## Next
+- isosurface-extraction: 2d add disambiguation based on the C00*C11 > C10*C01
+- isosurface-extraction: output corner state in a copy-able list of values
+- isosurface-extraction: add a demo that shows all of the 33 cases in one view
+                         the goal is to collect all of the cases into a list
+- isosurface-extraction: mesh a single cube using the lookup table and disambiguation cases
+- isosurface-extraction: add general "how to test if a mesh is maniford" testing section
+- isosurface-extraction: add randomized tester for manifold over a 5x5 grid
 - isosurface-extraction: draw a second box controlled by the same camera
                          this is done simply by changing the viewport, but it messes up the 2d overlay
 - isosurface-extraction: port a single triangle from the mc code
@@ -52,13 +59,9 @@
 - isosurface-extraction: render the marching cubes 33 output for the current scene
 
 ## Pending
-- isosurface-extraction: 2d add disambiguation based on the C00*C11 > C10*C01
-- isosurface-extraction: output corner state in a copy-able list of values
-- isosurface-extraction: add a demo that shows all of the 33 cases in one view
-                         the goal is to collect all of the cases into a list
-- isosurface-extraction: mesh a single cube using the lookup table and disambiguation cases
-- isosurface-extraction: add general "how to test if a mesh is maniford" testing section
-- isosurface-extraction: add randomized tester for manifold over a 5x5 grid
+- article: two textures for graphics programming debugging:
+  + the debug texture w/ helpers for drawing lines, boxes, etc..
+  + the counter texture/buffer
 
 ## 2023-11-08
 - isosurface-extraction/root-finding-2d: reduce the iso lines to 1px and improve the visual a bit
