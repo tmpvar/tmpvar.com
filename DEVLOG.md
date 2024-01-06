@@ -62,6 +62,22 @@
 - article: two textures for graphics programming debugging:
   + the debug texture w/ helpers for drawing lines, boxes, etc..
   + the counter texture/buffer
+- pocs:
+  https://discord.com/channels/318590007881236480/1142751596858593372/1192264007185346691
+  + radiance probes
+  + depth aware upscaling
+    ~ https://gist.github.com/pixelmager/a4364ea18305ed5ca707d89ddc5f8743
+    ~ https://developer.download.nvidia.com/assets/gamedev/files/sdk/11/OpacityMappingSDKWhitePaper.pdf
+    ~ https://eleni.mutantstargoat.com/hikiko/on-depth-aware-upsampling/
+  + bilateral filtering / interpolation
+    ~ [Bilateral Filtering for Gray and Color Images](https://users.cs.duke.edu/~tomasi/papers/tomasi/tomasiIccv98.pdf)
+    ~ [Image-Based Proxy Accumulation for Real-Time Soft Global Illumination](https://www.cim.mcgill.ca/~derek/files/ProxyPG.pdf)
+    ~ [Mixed Resolution Rendering](https://web.archive.org/web/20201106022028/https://developer.amd.com/wordpress/media/2012/10/ShopfMixedResolutionRendering.pdf)
+      - weight by bilinear weight, normal simularity weight, depth simularity weight
+      - https://web.archive.org/web/20090803073317/http://www.jshopf.com/blog/?p=180
+    ~ Realtime Rendering Fourth Edition - 12.1.1 Bilinear Filtering (page 518)
+
+  + volume rendering
 
 ## 2023-11-08
 - isosurface-extraction/root-finding-2d: reduce the iso lines to 1px and improve the visual a bit
