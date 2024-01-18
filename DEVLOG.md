@@ -59,6 +59,8 @@
 - isosurface-extraction: render the marching cubes 33 output for the current scene
 
 ## Pending
+- radiance-cascades: fix timestamp queries on Chrome Beta
+  + https://developer.chrome.com/blog/new-in-webgpu-121#chrome121
 - article: two textures for graphics programming debugging:
   + the debug texture w/ helpers for drawing lines, boxes, etc..
   + the counter texture/buffer
