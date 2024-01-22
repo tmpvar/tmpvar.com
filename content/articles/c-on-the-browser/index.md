@@ -6,6 +6,11 @@ date = 2023-10-29
 unlisted = true
 +++
 
+<!--
+TODO:
+- add another example of passing a buffer through to c++
+-->
+
 Over the past couple years, all of my hobby programming has been done in C with light usage of C++. To be more precise, I only use C++ features where it would be more painful in C. Things like operator overloading, function overloading, `constexpr`, and very limited template usage where macros would do more harm than good.
 
 Recently, I've been working up proof of concepts and publishing them under the [/poc](/poc) directory. Each of these POCs have multiple demos, which are all built to be self contained to avoid bitrot, written in Javascript. Javscript is a fine language, but sometimes I want the demo to serve a dual purpose:
@@ -48,11 +53,6 @@ Thankfully the LLVM project has supported wasm for some time now - let's see how
 
 ### Building
 
-refs:
- - [depth-first.com](https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/)
- - [surma.dev](https://surma.dev/things/c-to-webassembly/)
- - [https://aransentin.github.io/cwasm/](https://aransentin.github.io/cwasm/)
-
 ```bash
 clang \
   --target=wasm32 \
@@ -80,6 +80,8 @@ $ clang -x c++ examples/add.h -DAdd_TEST -o add-test && ./add-test
 result: 13
 ```
 
+### References
 
-
-
+ - [depth-first.com](https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/)
+ - [surma.dev](https://surma.dev/things/c-to-webassembly/)
+ - [https://aransentin.github.io/cwasm/](https://aransentin.github.io/cwasm/)
