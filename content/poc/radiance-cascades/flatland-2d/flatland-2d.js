@@ -1261,10 +1261,14 @@ async function ProbeRayDDA2DBegin() {
   }
 
   const InitGPU = async (ctx, probeBufferByteSize) => {
-    let adapter = await navigator.gpu.requestAdapter({
-      powerPreference: 'high-performance'
-    })
-
+    try {
+      let adapter = await navigator.gpu.requestAdapter({
+        powerPreference: 'high-performance'
+      })
+    } catch (e) {
+      console.log("asdfasdf");
+      throw e
+    }
     let requiredFeatures = []
 
     let hasTimestampQueryFeature = adapter.features.has('timestamp-query')
@@ -1398,19 +1402,6 @@ async function ProbeRayDDA2DBegin() {
       }, desc)
     }
     return commandEncoder.beginRenderPass(desc)
-  }
-
-  function GPUTimedBlock(encoder, label, fn) {
-    // if (state.gpu.hasTimestampQueryFeature && state.params.debugPerformance) {
-    //   const startIndex = state.gpu.timestampQueryCount++
-    //   encoder.writeTimestamp(state.gpu.timestampQuerySet, startIndex)
-    //   fn && fn()
-    //   const endIndex = state.gpu.timestampQueryCount++
-    //   encoder.writeTimestamp(state.gpu.timestampQuerySet, endIndex)
-    //   state.gpu.timestampQueries.push({ label, startIndex, endIndex })
-    // } else {
-    fn && fn()
-    // }
   }
 
   // Create the probe atlas

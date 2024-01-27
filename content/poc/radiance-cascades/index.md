@@ -230,8 +230,8 @@ Things are simpler in 2D so we'll start there.
       </div>
     </div>
   </section>
-  <section class="center-align webgpu-required">
-    <canvas id="flatland-2d-canvas" width="1024" height="1024"></canvas>
+  <section class="center-align">
+    <canvas id="flatland-2d-canvas" class="webgpu-required" width="1024" height="1024"></canvas>
     <section class="center-align webgpu-missing error-border">
       <img src="/img/webgpu-responsive.svg" width="768" height="768" />
       <p class="error">
