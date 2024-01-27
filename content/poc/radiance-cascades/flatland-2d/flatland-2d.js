@@ -194,6 +194,7 @@ async function ProbeRayDDA2DBegin() {
       })
 
       return async function DebugWorldBlit(
+        label,
         commandEncoder,
         queue,
         ctx,
@@ -225,7 +226,7 @@ async function ProbeRayDDA2DBegin() {
         };
 
 
-        let pass = commandEncoder.beginRenderPass(renderPassDesc);
+        let pass = GPUBeginRenderPass(commandEncoder, label, renderPassDesc);
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, bindGroup)
         pass.setViewport(0, 0, width, height, 0, 1);
@@ -1005,7 +1006,7 @@ async function ProbeRayDDA2DBegin() {
       }
     },
 
-    WorldPaint(device, texture, workgroupSize) {
+    WorldPaint(device, texture, workgroupSize, label) {
       const uboFields = [
         "segment.start.x",
         "segment.start.y",
@@ -1144,7 +1145,7 @@ async function ProbeRayDDA2DBegin() {
         uboData[6] = color
         queue.writeBuffer(ubo, 0, uboData)
 
-        let computePass = commandEncoder.beginComputePass()
+        let computePass = GPUBeginComputePass(commandEncoder, label)
 
         computePass.setPipeline(pipeline)
         computePass.setBindGroup(0, bindGroup)
@@ -1245,20 +1246,15 @@ async function ProbeRayDDA2DBegin() {
 
       return function GenerateMipmapsBoxFilter(commandEncoder, width, height) {
         for (var level = 1; level < texture.mipLevelCount; level++) {
-          GPUTimedBlock(
-            commandEncoder,
-            `GenerateMipmapsBoxFilter level(${level})`, () => {
-              let computePass = commandEncoder.beginComputePass();
-              computePass.setPipeline(pipeline)
-              computePass.setBindGroup(0, levelBindGroups[level])
-              computePass.dispatchWorkgroups(
-                Math.floor((width >> level) / workgroupSize[0] + 1),
-                Math.floor((height >> level) / workgroupSize[1] + 1),
-                1
-              )
-              computePass.end()
-            }
+          let computePass = GPUBeginComputePass(commandEncoder, `GenerateMipmapsBoxFilter level(${level})`)
+          computePass.setPipeline(pipeline)
+          computePass.setBindGroup(0, levelBindGroups[level])
+          computePass.dispatchWorkgroups(
+            Math.floor((width >> level) / workgroupSize[0] + 1),
+            Math.floor((height >> level) / workgroupSize[1] + 1),
+            1
           )
+          computePass.end()
         }
       }
     },
@@ -1370,17 +1366,51 @@ async function ProbeRayDDA2DBegin() {
     state.gpu.timestampQueries.length = 0;
   }
 
-  function GPUTimedBlock(encoder, label, fn) {
+  function GPUBeginComputePass(commandEncoder, label) {
     if (state.gpu.hasTimestampQueryFeature && state.params.debugPerformance) {
       const startIndex = state.gpu.timestampQueryCount++
-      encoder.writeTimestamp(state.gpu.timestampQuerySet, startIndex)
-      fn && fn()
       const endIndex = state.gpu.timestampQueryCount++
-      encoder.writeTimestamp(state.gpu.timestampQuerySet, endIndex)
       state.gpu.timestampQueries.push({ label, startIndex, endIndex })
+      return commandEncoder.beginComputePass({
+        timestampWrites: {
+          querySet: state.gpu.timestampQuerySet,
+          beginningOfPassWriteIndex: startIndex,
+          endOfPassWriteIndex: endIndex,
+        }
+      })
     } else {
-      fn && fn()
+      return commandEncoder.beginComputePass()
     }
+  }
+
+  function GPUBeginRenderPass(commandEncoder, label, desc) {
+    if (state.gpu.hasTimestampQueryFeature && state.params.debugPerformance) {
+      const startIndex = state.gpu.timestampQueryCount++
+      const endIndex = state.gpu.timestampQueryCount++
+      state.gpu.timestampQueries.push({ label, startIndex, endIndex })
+
+      desc = Object.assign({
+        timestampWrites: {
+          querySet: state.gpu.timestampQuerySet,
+          beginningOfPassWriteIndex: startIndex,
+          endOfPassWriteIndex: endIndex,
+        }
+      }, desc)
+    }
+    return commandEncoder.beginRenderPass(desc)
+  }
+
+  function GPUTimedBlock(encoder, label, fn) {
+    // if (state.gpu.hasTimestampQueryFeature && state.params.debugPerformance) {
+    //   const startIndex = state.gpu.timestampQueryCount++
+    //   encoder.writeTimestamp(state.gpu.timestampQuerySet, startIndex)
+    //   fn && fn()
+    //   const endIndex = state.gpu.timestampQueryCount++
+    //   encoder.writeTimestamp(state.gpu.timestampQuerySet, endIndex)
+    //   state.gpu.timestampQueries.push({ label, startIndex, endIndex })
+    // } else {
+    fn && fn()
+    // }
   }
 
   // Create the probe atlas
@@ -1556,12 +1586,14 @@ async function ProbeRayDDA2DBegin() {
       worldPaint: shaders.WorldPaint(
         state.gpu.device,
         state.worldTexture,
-        [WorldPaintWorkgroupSize, WorldPaintWorkgroupSize, 1]
+        [WorldPaintWorkgroupSize, WorldPaintWorkgroupSize, 1],
+        `world paint`
       ),
       worldPaintBrushPreview: shaders.WorldPaint(
         state.gpu.device,
         state.worldAndBrushPreviewTexture,
-        [WorldPaintWorkgroupSize, WorldPaintWorkgroupSize, 1]
+        [WorldPaintWorkgroupSize, WorldPaintWorkgroupSize, 1],
+        `preview brush`
       ),
 
       generateWorldMips: shaders.GenerateMipmapsBoxFilter(
@@ -1820,23 +1852,18 @@ Example on Windows:
 
     // Paint Into World
     if (state.mouse.down) {
-      GPUTimedBlock(
+      state.gpu.programs.worldPaint(
         commandEncoder,
-        `world paint`, () => {
-          state.gpu.programs.worldPaint(
-            commandEncoder,
-            state.gpu.device.queue,
-            state.mouse.lastPos[0],
-            canvas.height - state.mouse.lastPos[1],
-            state.mouse.pos[0],
-            canvas.height - state.mouse.pos[1],
-            state.params.brushRadius,
-            state.params.brushEraseMode ? 0 : state.params.brushRadiance,
-            state.params.brushEraseMode ? 0 : state.params.brushColor,
-            canvas.width,
-            canvas.height
-          )
-        }
+        state.gpu.device.queue,
+        state.mouse.lastPos[0],
+        canvas.height - state.mouse.lastPos[1],
+        state.mouse.pos[0],
+        canvas.height - state.mouse.pos[1],
+        state.params.brushRadius,
+        state.params.brushEraseMode ? 0 : state.params.brushRadiance,
+        state.params.brushEraseMode ? 0 : state.params.brushColor,
+        canvas.width,
+        canvas.height
       )
       state.mouse.lastPos[0] = state.mouse.pos[0]
       state.mouse.lastPos[1] = state.mouse.pos[1]
@@ -1844,36 +1871,32 @@ Example on Windows:
 
     // Paint the preview brush
     {
-      GPUTimedBlock(
-        commandEncoder,
-        `preview brush`, () => {
-          commandEncoder.copyTextureToTexture(
-            { texture: state.worldTexture },
-            { texture: state.worldAndBrushPreviewTexture },
-            [
-              canvas.width,
-              canvas.height,
-              1
-            ]
-          );
 
-          if (!state.params.debugDisbleBrushPreview) {
-            state.gpu.programs.worldPaintBrushPreview(
-              commandEncoder,
-              state.gpu.device.queue,
-              state.mouse.pos[0],
-              canvas.height - state.mouse.pos[1],
-              state.mouse.pos[0],
-              canvas.height - state.mouse.pos[1],
-              state.params.brushRadius,
-              state.params.brushEraseMode ? 0 : state.params.brushRadiance,
-              state.params.brushEraseMode ? 0 : state.params.brushColor,
-              canvas.width,
-              canvas.height
-            );
-          }
-        }
-      )
+      commandEncoder.copyTextureToTexture(
+        { texture: state.worldTexture },
+        { texture: state.worldAndBrushPreviewTexture },
+        [
+          canvas.width,
+          canvas.height,
+          1
+        ]
+      );
+
+      if (!state.params.debugDisbleBrushPreview) {
+        state.gpu.programs.worldPaintBrushPreview(
+          commandEncoder,
+          state.gpu.device.queue,
+          state.mouse.pos[0],
+          canvas.height - state.mouse.pos[1],
+          state.mouse.pos[0],
+          canvas.height - state.mouse.pos[1],
+          state.params.brushRadius,
+          state.params.brushEraseMode ? 0 : state.params.brushRadiance,
+          state.params.brushEraseMode ? 0 : state.params.brushColor,
+          canvas.width,
+          canvas.height
+        );
+      }
     }
 
     // Generate mipmaps
@@ -1902,73 +1925,59 @@ Example on Windows:
           : state.params.intervalRadius << ((level - 1) * state.params.branchingFactor)
         let intervalEndRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
 
-        GPUTimedBlock(
-          commandEncoder,
-          `ProbeAtlasRaymarch level(${level})`, () => {
-            let pass = commandEncoder.beginComputePass()
-            state.gpu.programs.probeAtlasRaymarch(
-              state.gpu.device.queue,
-              pass,
-              canvas.width,
-              canvas.height,
-              currentProbeDiameter * 0.5,
-              currentProbeRayCount,
-              intervalStartRadius,
-              intervalEndRadius,
-              level,
-              levelCount,
-              state.maxLevel0Rays,
-              state.params.branchingFactor,
-              state.params.debugRaymarchMipmaps,
-              state.params.debugAccumulationDecay,
-              state.params.debugRaymarchWithDDA,
-              state.params.debugRaymarchFixedSizeStepMultiplier,
-              state.params.debugAccumulateNonlinearly
-            );
-            pass.end()
-          }
-        )
-      }
+        let pass = GPUBeginComputePass(commandEncoder, `ProbeAtlasRaymarch level(${level})`);
 
+        state.gpu.programs.probeAtlasRaymarch(
+          state.gpu.device.queue,
+          pass,
+          canvas.width,
+          canvas.height,
+          currentProbeDiameter * 0.5,
+          currentProbeRayCount,
+          intervalStartRadius,
+          intervalEndRadius,
+          level,
+          levelCount,
+          state.maxLevel0Rays,
+          state.params.branchingFactor,
+          state.params.debugRaymarchMipmaps,
+          state.params.debugAccumulationDecay,
+          state.params.debugRaymarchWithDDA,
+          state.params.debugRaymarchFixedSizeStepMultiplier,
+          state.params.debugAccumulateNonlinearly
+        );
+        pass.end()
+      }
     }
 
     // Populate the fluence texture
     {
-      GPUTimedBlock(
-        commandEncoder,
-        `populate fluence texture`, () => {
-          let pass = commandEncoder.beginComputePass()
-          state.gpu.programs.buildFluenceTexture(
-            state.gpu.device.queue,
-            pass,
-            state.params.probeRayCount,
-            canvas.width,
-            canvas.height,
-            state.params.probeRadius,
-            state.params.debugProbeDirections,
-            state.params.branchingFactor
-          )
-          pass.end();
-        }
-      );
+      let pass = GPUBeginComputePass(commandEncoder, `populate fluence texture`);
+      state.gpu.programs.buildFluenceTexture(
+        state.gpu.device.queue,
+        pass,
+        state.params.probeRayCount,
+        canvas.width,
+        canvas.height,
+        state.params.probeRadius,
+        state.params.debugProbeDirections,
+        state.params.branchingFactor
+      )
+      pass.end();
     }
 
     // Debug Render World Texture
     {
       let probeRadius = Math.pow(2, state.params.probeRadius)
-      GPUTimedBlock(
+      state.gpu.programs.debugWorldBlit(
+        `final blit`,
         commandEncoder,
-        `final blit`, () => {
-          state.gpu.programs.debugWorldBlit(
-            commandEncoder,
-            state.gpu.device.queue,
-            state.ctx,
-            canvas.width,
-            canvas.height,
-            probeRadius,
-            state.params.debugWorldMipmapLevelRender
-          )
-        }
+        state.gpu.device.queue,
+        state.ctx,
+        canvas.width,
+        canvas.height,
+        probeRadius,
+        state.params.debugWorldMipmapLevelRender
       )
     }
 
