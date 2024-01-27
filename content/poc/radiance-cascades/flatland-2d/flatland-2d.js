@@ -1261,14 +1261,10 @@ async function ProbeRayDDA2DBegin() {
   }
 
   const InitGPU = async (ctx, probeBufferByteSize) => {
-    try {
-      let adapter = await navigator.gpu.requestAdapter({
-        powerPreference: 'high-performance'
-      })
-    } catch (e) {
-      console.log("asdfasdf");
-      throw e
-    }
+    let adapter = await navigator.gpu.requestAdapter({
+      powerPreference: 'high-performance'
+    })
+
     let requiredFeatures = []
 
     let hasTimestampQueryFeature = adapter.features.has('timestamp-query')
