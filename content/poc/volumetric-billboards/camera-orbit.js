@@ -308,14 +308,14 @@ export default function CreateOrbitCamera(canvas) {
     up: [0.0, 1.0, 0.0],
     distance: 8.0,
     targetDistance: 8.0,
-    minDistance: 0.1,
-    maxDistance: 500,
+    minDistance: 0.0001,
+    maxDistance: 50,
     projection: new Float32Array(16),
     view: new Float32Array(16),
     worldToScreen: new Float32Array(16),
     screenToWorld: new Float32Array(16),
     sensitivity: 0.01,
-    scrollSensitivity: 0.05,
+    scrollSensitivity: 0.001,
     fov: 90 * DegreesToRadians,
 
     mouse: {

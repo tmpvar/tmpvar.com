@@ -28,4 +28,6 @@ Alex Evan's [Learning From Failure](https://www.youtube.com/watch?v=u9KNtnCZDMI)
 
 ## Downsides
 
-## Further Reading
+## References
+
+- https://nehe.gamedev.net/article/billboarding_how_to/18011/
