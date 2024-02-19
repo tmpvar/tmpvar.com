@@ -69,7 +69,13 @@ function LoadVox(name, arrayBuffer, onModelLoad) {
       case 'SIZE': {
         ReadI32()
         ReadI32()
-        const dims = [ReadI32(), ReadI32(), ReadI32()]
+
+        const x = ReadI32()
+        // flip z/y
+        const z = ReadI32()
+        const y = ReadI32()
+
+        const dims = [x, y, z]
         console.log(dims)
         currentModel = {
           name,
@@ -251,13 +257,14 @@ async function Init(rootEl) {
   })
 
   const quadProgram = GLCreateRasterProgram(gl, {
-    uniforms: ['projection', 'view', 'eye', 'occupancy', 'material']
+    uniforms: ['projection', 'view', 'eye', 'occupancy', 'material', 'dims']
   },
     /* glsl */`#version 300 es
 
       uniform mat4 projection;
       uniform mat4 view;
       uniform vec3 eye;
+      uniform vec3 dims;
 
       out vec3 uvw;
       flat out int quadIndex;
@@ -324,21 +331,20 @@ async function Init(rootEl) {
         vec2 vert = verts[vertexIndex] * 2.0 - 1.0;
         float sliceDir = sign(orthogonal[closestIndex]);
         float sliceStart = -sliceDir;
-        float SliceCount = 40.0;
+        float SliceCount = max(dims.x, max(dims.y, dims.z)) * 256.0 * 2.0;
         float InvSliceCount = 1.0 / SliceCount;
 
         float sliceOffset = sliceStart + sliceDir * (float(quadIndex) + 0.5) * InvSliceCount * 2.0;
 
         if (closestIndex == 0) {
           vertPosition = vec3(sliceOffset, vert.x, vert.y);
-          uvw = vertPosition;
         } else if (closestIndex == 1) {
           vertPosition = vec3(vert.x, sliceOffset, vert.y);
-          uvw = vertPosition;
         } else {
           vertPosition = vec3(vert.x, vert.y, sliceOffset);
-          uvw = vertPosition;
         }
+
+        uvw = vertPosition / dims;
 
         #if 0
           // actual billboards
@@ -351,7 +357,7 @@ async function Init(rootEl) {
         #else
           // orthogonal slices
           uvw = vertPosition * 0.5 + 0.5;
-          gl_Position = (projection * view) * vec4(vertPosition * 0.5, 1.0);
+          gl_Position = (projection * view) * vec4(vertPosition * 0.5 * dims, 1.0);
         #endif
 
         // quadIndex = closestIndex;
@@ -432,6 +438,16 @@ async function Init(rootEl) {
         state.orbitCamera.state.eye[2]
       )
 
+      gl.uniform3f(quadProgram.uniforms.dims,
+        volume.dims[0] / 256.0,
+        volume.dims[1] / 256.0,
+        volume.dims[2] / 256.0
+      )
+
+      console.log(volume.dims[0] / 256.0,
+      volume.dims[1] / 256.0,
+      volume.dims[2] / 256.0)
+
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_3D, volume.occupancy)
       gl.uniform1i(quadProgram.uniforms.occupancy, 0)
@@ -439,8 +455,8 @@ async function Init(rootEl) {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, volume.material)
       gl.uniform1i(quadProgram.uniforms.material, 1)
-      // gl.drawArrays(gl.TRIANGLES, 0, 6 * volume.dims[0])
-      gl.drawArrays(gl.TRIANGLES, 0, 6 * 40)
+      const slices = Math.max(volume.dims[0], Math.max(volume.dims[1], volume.dims[2])) * 2.0
+      gl.drawArrays(gl.TRIANGLES, 0, 6 * slices)
     }
 
     requestAnimationFrame(Render)
