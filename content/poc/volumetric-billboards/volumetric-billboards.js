@@ -197,7 +197,7 @@ async function Init(rootEl) {
     store.put(model, model.name)
 
     const volume = {
-      dims: model.dims.slice(),
+      dims: new Float32Array([model.dims[0], model.dims[1], model.dims[2]]),
       occupancy: gl.createTexture(),
       material: gl.createTexture()
     }
@@ -235,48 +235,63 @@ async function Init(rootEl) {
   })
 
   const quadProgram = GLCreateRasterProgram(gl, {
-    uniforms: ['projection', 'view', 'worldToScreen']
+    uniforms: ['projection', 'view', 'eye']
   },
     /* glsl */`#version 300 es
 
       uniform mat4 projection;
       uniform mat4 view;
-      uniform mat4 worldToScreen;
+      uniform vec3 eye;
 
       out vec2 uv;
+      flat out int quadIndex;
 
       // vertex pulling approach inspired by
       // https://github.com/superdump/bevy-vertex-pulling/blob/main/examples/quads/quads.wgsl
       // MIT/Apache license
 
       const vec2 verts[6] = vec2[6](
-        vec2(0.0, 0.0),
-        vec2(1.0, 1.0),
-        vec2(0.0, 1.0),
-        vec2(0.0, 0.0),
-        vec2(1.0, 0.0),
-        vec2(1.0, 1.0)
+        vec2(0.0, 0.0), // b00
+        vec2(1.0, 1.0), // b11
+        vec2(0.0, 1.0), // b10
+
+        vec2(0.0, 0.0), // b00
+        vec2(1.0, 0.0), // b01
+        vec2(1.0, 1.0)  // b11
       );
 
       void main() {
-        uv = verts[gl_VertexID];
-        gl_Position = worldToScreen * vec4(uv * 2.0 - 1.0, 0.0, 1.0);
+        quadIndex = gl_VertexID / 6;
+        int vertexIndex = gl_VertexID % 6;
+
+        vec3 vertPosition = vec3(verts[vertexIndex], 0);
+        uv = vertPosition.xy;
+
+        vec3 quadCenter = vec3(0.5);
+        vec3 right = normalize(vec3(view[0].x, view[1].x, view[2].x));
+        vec3 up = normalize(vec3(view[0].y, view[1].y, view[2].y));
+        vec3 pos = (vertPosition.x * 2.0 - 1.0) * right + (vertPosition.y * 2.0 - 1.0) * up;
+        pos.x += float(quadIndex) * 1.0 / 32.0 - 0.5;
+        gl_Position = (projection * view) * vec4(pos, 1.0);
       }
     `,
     /* glsl */ `#version 300 es
       precision highp float;
 
       in vec2 uv;
+      flat in int quadIndex;
 
       out vec4 outColor;
 
       void main() {
         outColor = vec4(uv, 0.0, 1.0);
-        outColor = vec4(1.0);
+
+        ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
+        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
       }
     `
   )
-console.log(quadProgram)
+  console.log(quadProgram)
 
   const screenDims = new Float32Array(2)
   function Render() {
@@ -288,16 +303,22 @@ console.log(quadProgram)
 
     state.orbitCamera.tick(screenDims[0], screenDims[1], deltaTime)
     gl.viewport(0, 0, screenDims[0], screenDims[1]);
+    gl.enable(gl.DEPTH_TEST)
     gl.clearColor(0.2, 0.2, .2, 1)
+
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     if (quadProgram) {
       gl.useProgram(quadProgram.handle)
 
       gl.uniformMatrix4fv(quadProgram.uniforms.projection, false, state.orbitCamera.state.projection);
       gl.uniformMatrix4fv(quadProgram.uniforms.view, false, state.orbitCamera.state.view);
-      gl.uniformMatrix4fv(quadProgram.uniforms.worldToScreen, false, state.orbitCamera.state.worldToScreen);
 
-      gl.drawArrays(gl.TRIANGLES, 0, 6)
+      gl.uniform3f(quadProgram.uniforms.eye,
+        state.orbitCamera.state.eye[0],
+        state.orbitCamera.state.eye[1],
+        state.orbitCamera.state.eye[2]
+      )
+      gl.drawArrays(gl.TRIANGLES, 0, 6 * 32)
     }
 
     requestAnimationFrame(Render)
