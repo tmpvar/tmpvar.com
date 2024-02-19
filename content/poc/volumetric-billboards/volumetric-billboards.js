@@ -243,7 +243,7 @@ async function Init(rootEl) {
       uniform mat4 view;
       uniform vec3 eye;
 
-      out vec2 uv;
+      out vec3 uvw;
       flat out int quadIndex;
 
       // vertex pulling approach inspired by
@@ -264,30 +264,38 @@ async function Init(rootEl) {
         quadIndex = gl_VertexID / 6;
         int vertexIndex = gl_VertexID % 6;
 
+        float w = float(quadIndex) * 1.0 / 32.0;
         vec3 vertPosition = vec3(verts[vertexIndex], 0);
-        uv = vertPosition.xy;
+        uvw = vec3(vertPosition.xy, w );
 
         vec3 quadCenter = vec3(0.5);
         vec3 right = normalize(vec3(view[0].x, view[1].x, view[2].x));
         vec3 up = normalize(vec3(view[0].y, view[1].y, view[2].y));
+        vec3 forward = normalize(vec3(view[0].z, view[1].z, view[2].z));
         vec3 pos = (vertPosition.x * 2.0 - 1.0) * right + (vertPosition.y * 2.0 - 1.0) * up;
-        pos.x += float(quadIndex) * 1.0 / 32.0 - 0.5;
+
+        // TODO: this needs to be the major axis
+        // pos.x += w - 0.5;
+        pos += forward * (w - 0.5);
+
+        uvw = vertPosition.x * right + vertPosition.y * up + vertPosition.z * forward;
+
         gl_Position = (projection * view) * vec4(pos, 1.0);
       }
     `,
     /* glsl */ `#version 300 es
       precision highp float;
 
-      in vec2 uv;
+      in vec3 uvw;
       flat in int quadIndex;
 
       out vec4 outColor;
 
       void main() {
-        outColor = vec4(uv, 0.0, 1.0);
+        outColor = vec4(uvw, 1.0);
 
-        ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
-        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
+        // ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
+        // outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
       }
     `
   )
@@ -303,7 +311,7 @@ async function Init(rootEl) {
 
     state.orbitCamera.tick(screenDims[0], screenDims[1], deltaTime)
     gl.viewport(0, 0, screenDims[0], screenDims[1]);
-    gl.enable(gl.DEPTH_TEST)
+    // gl.enable(gl.DEPTH_TEST)
     gl.clearColor(0.2, 0.2, .2, 1)
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
