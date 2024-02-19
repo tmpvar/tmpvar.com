@@ -89,8 +89,9 @@ function LoadVox(name, arrayBuffer, onModelLoad) {
         const DimsXTimesY = DimsX * currentModel.dims[1]
         for (let i = 0; i < TotalVoxels; i++) {
           let x = ReadU8()
-          let y = ReadU8()
+          // flip y / z
           let z = ReadU8()
+          let y = ReadU8()
           let colorIndex = ReadU8()
           currentModel.data[x + y * DimsX + z * DimsXTimesY] = colorIndex
         }
@@ -188,6 +189,7 @@ async function Init(rootEl) {
 
   // Load default model
   const filename = "./assets/default.vox"
+  // const filename = "./assets/monu2.vox"
   const request = await fetch(filename)
   const blob = await request.blob()
   const arrayBuffer = await blob.arrayBuffer()
@@ -217,6 +219,15 @@ async function Init(rootEl) {
       model.data
     )
 
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_BASE_LEVEL, 0);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+    // TODO: add mips
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAX_LEVEL, 0);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
     // setup material
     gl.bindTexture(gl.TEXTURE_2D, volume.material)
     gl.texImage2D(
@@ -230,12 +241,17 @@ async function Init(rootEl) {
       gl.UNSIGNED_BYTE,
       model.palette
     )
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, 0);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
 
     state.volumes.push(volume)
   })
 
   const quadProgram = GLCreateRasterProgram(gl, {
-    uniforms: ['projection', 'view', 'eye']
+    uniforms: ['projection', 'view', 'eye', 'occupancy', 'material']
   },
     /* glsl */`#version 300 es
 
@@ -246,7 +262,7 @@ async function Init(rootEl) {
       out vec3 uvw;
       flat out int quadIndex;
 
-      // vertex pulling approach inspired by
+      // billboard approach inspired by
       // https://github.com/superdump/bevy-vertex-pulling/blob/main/examples/quads/quads.wgsl
       // MIT/Apache license
 
@@ -264,27 +280,29 @@ async function Init(rootEl) {
         quadIndex = gl_VertexID / 6;
         int vertexIndex = gl_VertexID % 6;
 
-        float w = float(quadIndex) * 1.0 / 32.0;
-        vec3 vertPosition = vec3(verts[vertexIndex], 0);
+        float w = float(quadIndex) * 1.0 / 40.0;
+        vec3 vertPosition = vec3(verts[vertexIndex], w);
         uvw = vec3(vertPosition.xy, w );
 
         vec3 quadCenter = vec3(0.5);
         vec3 right = normalize(vec3(view[0].x, view[1].x, view[2].x));
         vec3 up = normalize(vec3(view[0].y, view[1].y, view[2].y));
         vec3 forward = normalize(vec3(view[0].z, view[1].z, view[2].z));
-        vec3 pos = (vertPosition.x * 2.0 - 1.0) * right + (vertPosition.y * 2.0 - 1.0) * up;
+        vec3 pos = (vertPosition.x * 2.0 - 1.0) * right + (vertPosition.y * 2.0 - 1.0) * up + vertPosition.z * forward;
 
-        // TODO: this needs to be the major axis
-        // pos.x += w - 0.5;
-        pos += forward * (w - 0.5);
-
-        uvw = vertPosition.x * right + vertPosition.y * up + vertPosition.z * forward;
-
+        uvw = pos * 0.5 + 0.5;
+        uvw.z = 1.0 - uvw.z;
+        uvw = uvw * 2.0 - 0.5;
         gl_Position = (projection * view) * vec4(pos, 1.0);
       }
     `,
     /* glsl */ `#version 300 es
       precision highp float;
+      precision highp int;
+      precision highp sampler3D;
+
+      uniform sampler3D occupancy;
+      uniform sampler2D material;
 
       in vec3 uvw;
       flat in int quadIndex;
@@ -296,10 +314,28 @@ async function Init(rootEl) {
 
         // ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
         // outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
+
+        if (any(lessThan(uvw, vec3(0.0))) || any(greaterThanEqual(uvw, vec3(1.0)))) {
+          //outColor = vec4(0.0)
+          discard;
+          return;
+        }
+
+        int materialIndex = int(texture(occupancy, uvw).r * 255.0);
+        if (materialIndex != 0) {
+          // ivec3 col = (materialIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
+          // outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
+
+          outColor = texelFetch(material, ivec2(materialIndex, 0), 0) * vec4(1.0, 1.0, 1.0, 0.25);
+        } else {
+          discard;
+          // ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
+          // outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
+        }
+
       }
     `
   )
-  console.log(quadProgram)
 
   const screenDims = new Float32Array(2)
   function Render() {
@@ -311,12 +347,14 @@ async function Init(rootEl) {
 
     state.orbitCamera.tick(screenDims[0], screenDims[1], deltaTime)
     gl.viewport(0, 0, screenDims[0], screenDims[1]);
-    // gl.enable(gl.DEPTH_TEST)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.clearColor(0.2, 0.2, .2, 1)
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     if (quadProgram) {
-      gl.useProgram(quadProgram.handle)
+      gl.useProgram(quadProgram.handle);
+      const volume = state.volumes[0]
 
       gl.uniformMatrix4fv(quadProgram.uniforms.projection, false, state.orbitCamera.state.projection);
       gl.uniformMatrix4fv(quadProgram.uniforms.view, false, state.orbitCamera.state.view);
@@ -326,7 +364,15 @@ async function Init(rootEl) {
         state.orbitCamera.state.eye[1],
         state.orbitCamera.state.eye[2]
       )
-      gl.drawArrays(gl.TRIANGLES, 0, 6 * 32)
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_3D, volume.occupancy)
+      gl.uniform1i(quadProgram.uniforms.occupancy, 0)
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, volume.material)
+      gl.uniform1i(quadProgram.uniforms.material, 1)
+      gl.drawArrays(gl.TRIANGLES, 0, 6 * volume.dims[0])
     }
 
     requestAnimationFrame(Render)
