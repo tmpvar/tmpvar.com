@@ -5,18 +5,18 @@ function CreateDataStore(name) {
     const request = indexedDB.open(name, 3);
     request.onupgradeneeded = function (e) {
       const db = e.target.result
-      db.createObjectStore("models", { keyPath: "vox" });
+      const store = db.createObjectStore("models");
       resolve(db)
     }
     request.onsuccess = function (e) {
-      console.log(e)
-      resolve(e.target.result)
+      const db = e.target.result
+      resolve(db)
     }
     request.onerror = reject
   })
 }
 
-function LoadVox(arrayBuffer) {
+function LoadVox(name, arrayBuffer, onModelLoad) {
   const view = new DataView(arrayBuffer)
   let offset = 0
   function ReadHeader() {
@@ -59,8 +59,9 @@ function LoadVox(arrayBuffer) {
         const dims = [ReadI32(), ReadI32(), ReadI32()]
         console.log(dims)
         currentModel = {
+          name,
           dims,
-          volume: new Uint8Array(dims[0] * dims[1] * dims[2]),
+          data: new Uint8Array(dims[0] * dims[1] * dims[2]),
           palette: new Uint8Array(4 * 256)
         }
 
@@ -78,7 +79,7 @@ function LoadVox(arrayBuffer) {
           let y = ReadU8()
           let z = ReadU8()
           let colorIndex = ReadU8()
-          currentModel.volume[x + y * DimsX + z * DimsXTimesY] = colorIndex
+          currentModel.data[x + y * DimsX + z * DimsXTimesY] = colorIndex
         }
 
         break;
@@ -108,9 +109,9 @@ function LoadVox(arrayBuffer) {
     }
   }
 
-
-
-
+  if (currentModel && onModelLoad) {
+    onModelLoad(currentModel)
+  }
 }
 
 async function Init(rootEl) {
@@ -122,17 +123,17 @@ async function Init(rootEl) {
   }
 
   // Load default model
-  const request = await fetch("./assets/default.vox")
+  const filename = "./assets/default.vox"
+  const request = await fetch(filename)
   const blob = await request.blob()
   const arrayBuffer = await blob.arrayBuffer()
-  LoadVox(arrayBuffer)
+  LoadVox(filename, arrayBuffer, (model) => {
+    const transaction = state.db.transaction("models", "readwrite")
+    const store = transaction.objectStore("models")
+    store.put(model, model.name)
 
-
-
-  // create a volume texture
-  {
     const volume = {
-      dims: [128, 128, 128],
+      dims: model.dims.slice(),
       occupancy: gl.createTexture(),
       material: gl.createTexture()
     }
@@ -142,14 +143,14 @@ async function Init(rootEl) {
     gl.texImage3D(
       gl.TEXTURE_3D,
       0,
-      gl.RED,
+      gl.R8,
       volume.dims[0],
       volume.dims[1],
       volume.dims[2],
       0,
       gl.RED,
       gl.UNSIGNED_BYTE,
-      0
+      model.data
     )
 
     // setup material
@@ -159,13 +160,44 @@ async function Init(rootEl) {
       0,
       gl.RGBA,
       256, // width
-      4,   // height
+      1,   // height
       0,
       gl.RGBA,
       gl.UNSIGNED_BYTE,
-      0
+      model.palette
     )
 
     state.volumes.push(volume)
+  })
+
+  const shaders = {
+    quatVert: /* glsl */ `
+      #version 300 es
+      void main() {
+
+      }
+    `,
+    quatFrag: /* glsl */ `
+      #version 300 es
+      precision highp float;
+
+      in vec2 uv;
+
+      out vec4 outColor;
+
+      void main() {
+        outColor = vec4(uv, 0.0, 1.0);
+      }
+    `
   }
+
+
+  function Render() {
+
+
+
+    requestAnimationFrame(Render)
+  }
+
+  requestAnimationFrame(Render)
 }

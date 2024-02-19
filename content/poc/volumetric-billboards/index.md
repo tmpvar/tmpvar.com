@@ -5,7 +5,7 @@ date = 2024-02-18
 
 ## Inspiration
 
-Alex Evan's [Learning From Failure](https://www.youtube.com/watch?v=u9KNtnCZDMI) talk [slides](http://media.lolrus.mediamolecule.com/AlexEvans_SIGGRAPH-2015.pdf)
+Alex Evan's [Learning From Failure](https://www.youtube.com/watch?v=u9KNtnCZDMI) talk and [slides](http://media.lolrus.mediamolecule.com/AlexEvans_SIGGRAPH-2015.pdf)
 
 [Original Paper](https://hal.inria.fr/inria-00402067)
 
