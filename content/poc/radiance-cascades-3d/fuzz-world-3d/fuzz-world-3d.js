@@ -25,7 +25,7 @@ async function FuzzWorld3dBegin() {
     if (window.performance && window.performance.now) {
       return window.performance.now()
     } else {
-      return Time.now()
+      return Date.now()
     }
   }
 

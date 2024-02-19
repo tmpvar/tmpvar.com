@@ -1,3 +1,16 @@
+/*
+Pending
+- draw quads
+- add orbit camera
+- draw billboard quads
+- vertex pulling of quads
+
+2024-02-19
+
+*/
+
+import CreateOrbitCamera from './camera-orbit.js'
+
 Init(document.getElementById('volumetric-billboards-content'))
 
 function CreateDataStore(name) {
@@ -114,12 +127,63 @@ function LoadVox(name, arrayBuffer, onModelLoad) {
   }
 }
 
+function CompileShader(gl, type, source) {
+  const shader = gl.createShader(type)
+  gl.shaderSource(shader, source)
+  gl.compileShader(shader)
+  if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    return shader
+  }
+
+  console.warn(gl.getShaderInfoLog(shader))
+  gl.deleteShader(shader)
+}
+
+// props: { uniforms: [.. names ..] }
+function GLCreateRasterProgram(gl, props, vertSource, fragSource) {
+  const vertShader = CompileShader(gl, gl.VERTEX_SHADER, vertSource)
+  const fragShader = CompileShader(gl, gl.FRAGMENT_SHADER, fragSource)
+
+  if (!vertShader || !fragShader) {
+    return
+  }
+  const program = {
+    handle: gl.createProgram(),
+    uniforms: {}
+  }
+  gl.attachShader(program.handle, vertShader)
+  gl.attachShader(program.handle, fragShader)
+
+  gl.linkProgram(program.handle)
+  if (!gl.getProgramParameter(program.handle, gl.LINK_STATUS)) {
+    console.log(gl.getPRogramInfoLog(program.handle))
+    return
+  }
+
+  if (Array.isArray(props.uniforms)) {
+    for (let uniform of props.uniforms) {
+      program.uniforms[uniform] = gl.getUniformLocation(program.handle, uniform)
+    }
+  }
+  return program
+}
+
+function Now() {
+  if (window.performance && window.performance.now) {
+    return window.performance.now()
+  } else {
+    return Date.now()
+  }
+}
+
 async function Init(rootEl) {
   const canvas = rootEl.querySelector("canvas")
   const gl = canvas.getContext('webgl2')
   const state = {
     volumes: [],
-    db: await CreateDataStore(rootEl.id)
+    db: await CreateDataStore(rootEl.id),
+    orbitCamera: CreateOrbitCamera(canvas),
+    lastFrameTime: Now(),
   }
 
   // Load default model
@@ -170,15 +234,36 @@ async function Init(rootEl) {
     state.volumes.push(volume)
   })
 
-  const shaders = {
-    quatVert: /* glsl */ `
-      #version 300 es
-      void main() {
+  const quadProgram = GLCreateRasterProgram(gl, {
+    uniforms: ['projection', 'view', 'worldToScreen']
+  },
+    /* glsl */`#version 300 es
 
+      uniform mat4 projection;
+      uniform mat4 view;
+      uniform mat4 worldToScreen;
+
+      out vec2 uv;
+
+      // vertex pulling approach inspired by
+      // https://github.com/superdump/bevy-vertex-pulling/blob/main/examples/quads/quads.wgsl
+      // MIT/Apache license
+
+      const vec2 verts[6] = vec2[6](
+        vec2(0.0, 0.0),
+        vec2(1.0, 1.0),
+        vec2(0.0, 1.0),
+        vec2(0.0, 0.0),
+        vec2(1.0, 0.0),
+        vec2(1.0, 1.0)
+      );
+
+      void main() {
+        uv = verts[gl_VertexID];
+        gl_Position = worldToScreen * vec4(uv * 2.0 - 1.0, 0.0, 1.0);
       }
     `,
-    quatFrag: /* glsl */ `
-      #version 300 es
+    /* glsl */ `#version 300 es
       precision highp float;
 
       in vec2 uv;
@@ -187,14 +272,33 @@ async function Init(rootEl) {
 
       void main() {
         outColor = vec4(uv, 0.0, 1.0);
+        outColor = vec4(1.0);
       }
     `
-  }
+  )
+console.log(quadProgram)
 
-
+  const screenDims = new Float32Array(2)
   function Render() {
+    screenDims[0] = gl.canvas.width
+    screenDims[1] = gl.canvas.height
+    const now = Now()
+    const deltaTime = (now - state.lastFrameTime) / 1000.0
+    state.lastFrameTime = now
 
+    state.orbitCamera.tick(screenDims[0], screenDims[1], deltaTime)
+    gl.viewport(0, 0, screenDims[0], screenDims[1]);
+    gl.clearColor(0.2, 0.2, .2, 1)
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    if (quadProgram) {
+      gl.useProgram(quadProgram.handle)
 
+      gl.uniformMatrix4fv(quadProgram.uniforms.projection, false, state.orbitCamera.state.projection);
+      gl.uniformMatrix4fv(quadProgram.uniforms.view, false, state.orbitCamera.state.view);
+      gl.uniformMatrix4fv(quadProgram.uniforms.worldToScreen, false, state.orbitCamera.state.worldToScreen);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6)
+    }
 
     requestAnimationFrame(Render)
   }
