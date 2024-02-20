@@ -315,52 +315,65 @@ async function Init(rootEl) {
         vec3 up = normalize(vec3(view[0].y, view[1].y, view[2].y));
         vec3 forward = normalize(vec3(view[0].z, view[1].z, view[2].z));
 
-        vec3 objectCenter = vec3(0.0);
-        vec3 diff = normalize(objectCenter - eye);
-
         vec3 orthogonal = vec3(
           dot(forward, vec3(1.0, 0.0, 0.0)),
           dot(forward, vec3(0.0, 1.0, 0.0)),
           dot(forward, vec3(0.0, 0.0, 1.0))
         );
 
-        int closestIndex = MaxIndex(abs(orthogonal));
+        int maxIndex = MaxIndex(abs(orthogonal));
+        int orthogonalIndex = MinIndex(abs(orthogonal));
 
         vec3 vertPosition;
 
         vec2 vert = verts[vertexIndex] * 2.0 - 1.0;
-        float sliceDir = sign(orthogonal[closestIndex]);
-        float sliceStart = -sliceDir;
-        float SliceCount = max(dims.x, max(dims.y, dims.z)) * 256.0 * 2.0;
+        float SliceCount = 128.0; //ceil(max(dims.x, max(dims.y, dims.z)) * 256.0);
         float InvSliceCount = 1.0 / SliceCount;
 
-        float sliceOffset = sliceStart + sliceDir * (float(quadIndex) + 0.5) * InvSliceCount * 2.0;
-
-        if (closestIndex == 0) {
-          vertPosition = vec3(sliceOffset, vert.x, vert.y);
-        } else if (closestIndex == 1) {
-          vertPosition = vec3(vert.x, sliceOffset, vert.y);
-        } else {
-          vertPosition = vec3(vert.x, vert.y, sliceOffset);
-        }
-
-        uvw = vertPosition / dims;
-
         #if 0
+          float sliceDir = sign(orthogonal[orthogonalIndex]);
+          float sliceStart = -sliceDir;
+          float sliceOffset = sliceStart + sliceDir * (float(quadIndex) + 0.5) * InvSliceCount * 2.0;
+
+          vec3 offset = vec3(0.0);
+          if (orthogonalIndex == 0) {
+            offset = vec3(sliceOffset, 0.0, 0.0);
+          } else if (orthogonalIndex == 1) {
+            offset = vec3(0.0, sliceOffset, 0.0);
+          } else {
+            offset = vec3(0.0, 0.0, sliceOffset);
+          }
+
+
+          vertPosition = vec3(vert.x, vert.y, 0.0);
+
           // actual billboards
-          vec3 vpos = vec3(vert.x, vert.y, sliceOffset);
-          vec3 pos = vpos.x * right + vpos.y * up + vpos.z * forward;
-          uvw = pos * 0.5 + 0.5;
+          vec3 vpos = vertPosition;
+          vec3 pos = vpos.x * right + vpos.y * up + vpos.z * forward + offset;
+          uvw = pos;
           uvw.z = 1.0 - uvw.z;
-          // uvw = uvw * 2.0 - 0.5;
-          gl_Position = (projection * view) * vec4(pos * 0.5, 1.0);
+          gl_Position = (projection * view) * vec4(pos, 1.0);
         #else
+          float sliceDir = sign(orthogonal[maxIndex]);
+          float sliceStart = -sliceDir;
+          float sliceOffset = sliceStart + sliceDir * (float(quadIndex) + 0.5) * InvSliceCount * 2.0;
+
+          if (maxIndex == 0) {
+            vertPosition = vec3(sliceOffset, vert.x, vert.y);
+          } else if (maxIndex == 1) {
+            vertPosition = vec3(vert.x, sliceOffset, vert.y);
+          } else {
+            vertPosition = vec3(vert.x, vert.y, sliceOffset);
+          }
+
+          uvw = vertPosition;
           // orthogonal slices
           uvw = vertPosition * 0.5 + 0.5;
-          gl_Position = (projection * view) * vec4(vertPosition * 0.5 * dims, 1.0);
+          uvw.z = 1.0 - uvw.z;
+          gl_Position = (projection * view) * vec4(vertPosition * dims, 1.0);
         #endif
 
-        // quadIndex = closestIndex;
+        // quadIndex = maxIndex;
       }
     `,
     /* glsl */ `#version 300 es
@@ -380,11 +393,7 @@ async function Init(rootEl) {
         outColor = vec4(uvw, 1.0);
 
         ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
-        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
-        // return;
-        vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
-        color[quadIndex] = 1.0;
-        outColor = color;
+        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 0.1);
         // return;
 
         if (any(lessThan(uvw, vec3(0.0))) || any(greaterThanEqual(uvw, vec3(1.0)))) {
@@ -444,10 +453,6 @@ async function Init(rootEl) {
         volume.dims[2] / 256.0
       )
 
-      console.log(volume.dims[0] / 256.0,
-      volume.dims[1] / 256.0,
-      volume.dims[2] / 256.0)
-
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_3D, volume.occupancy)
       gl.uniform1i(quadProgram.uniforms.occupancy, 0)
@@ -455,7 +460,7 @@ async function Init(rootEl) {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, volume.material)
       gl.uniform1i(quadProgram.uniforms.material, 1)
-      const slices = Math.max(volume.dims[0], Math.max(volume.dims[1], volume.dims[2])) * 2.0
+      const slices = 128.0 //Math.max(volume.dims[0], Math.max(volume.dims[1], volume.dims[2])) * 2.0
       gl.drawArrays(gl.TRIANGLES, 0, 6 * slices)
     }
 
