@@ -29,6 +29,10 @@ function CreateDataStore(name) {
   })
 }
 
+function Length(x, y, z) {
+  return Math.sqrt(x * x + y * y + z * z)
+}
+
 function LoadVox(name, arrayBuffer, onModelLoad) {
   const view = new DataView(arrayBuffer)
   let offset = 0
@@ -319,9 +323,11 @@ async function Init(rootEl) {
         quadIndex = gl_VertexID / 6;
         int vertexIndex = gl_VertexID % 6;
 
-        vec3 right = normalize(vec3(view[0].x, view[1].x, view[2].x));
-        vec3 up = normalize(vec3(view[0].y, view[1].y, view[2].y));
-        vec3 forward = normalize(vec3(view[0].z, view[1].z, view[2].z));
+        mat4 invView = view;//inverse(view);
+
+        vec3 right = normalize(vec3(invView[0].x, invView[1].x, invView[2].x));
+        vec3 up = normalize(vec3(invView[0].y, invView[1].y, invView[2].y));
+        vec3 forward = normalize(vec3(invView[0].z, invView[1].z, invView[2].z));
 
         vec3 orthogonal = vec3(
           dot(forward, vec3(1.0, 0.0, 0.0)),
@@ -338,15 +344,13 @@ async function Init(rootEl) {
 
         float InvSliceCount = 1.0 / sliceCount;
 
-        #if 0
-          float sliceDir = sign(orthogonal[parallelIndex]);
+        #if 1
+          float sliceDir = sign(orthogonal[orthogonalIndex]);
           float sliceStart = -sliceDir;
-          float z = float(quadIndex) * InvSliceCount;
-          // if (sliceDir < 0.0) {
-          //   z = 1.0 - z;
-          // }
-          float sliceOffset = sliceStart + sliceDir * z;
-          vec3 v;
+          float sliceOffset = sliceStart + sliceDir * float(quadIndex) * InvSliceCount * 2.0;
+
+
+          vec3 v = vec3(vert.x, vert.y, sliceOffset);
           if (parallelIndex == 0) {
             v = vec3(sliceOffset, vert.x, vert.y);
           } else if (parallelIndex == 1) {
@@ -355,11 +359,12 @@ async function Init(rootEl) {
             v = vec3(vert.x, vert.y, sliceOffset);
           }
 
-          uvw = vec3(vert.x, vert.y, z);
+          // uvw = vec3(vert.x, vert.y, sliceOffset) * 0.5 + 0.5;
 
           // actual billboards
-          vec3 pos = v.x * right + v.y * up + sliceOffset;
-          gl_Position = (projection * view) * vec4(pos, 1.0);
+          v = v.x * right + v.y * up + v.z * forward;
+          uvw = v * 0.5 + 0.5;
+          gl_Position = (projection * view) * vec4(v * dims, 1.0);
         #else
           float sliceDir = sign(orthogonal[parallelIndex]);
           float sliceStart = -sliceDir;
@@ -398,10 +403,10 @@ async function Init(rootEl) {
 
       void main() {
         outColor = vec4(uvw, 1.0);
-        // return;
+        return;
 
         ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
-        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 0.7);
+        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 0.27);
         // return;
 
         if (any(lessThan(uvw, vec3(0.0))) || any(greaterThanEqual(uvw, vec3(1.0)))) {
@@ -426,7 +431,7 @@ async function Init(rootEl) {
     `
   )
 
-  const boxWireframeProgram = GLCreateRasterProgram(gl,
+  const boxProgram = GLCreateRasterProgram(gl,
     /* glsl */`#version 300 es
        precision highp float;
 
@@ -465,7 +470,7 @@ async function Init(rootEl) {
 
     out vec4 outColor;
     void main() {
-      outColor = vec4(1.0, 0.0, 1.0, 0.25);
+      outColor = vec4(1.0, 1.0, 1.0, 0.25);
     }
 
     `
@@ -483,8 +488,125 @@ async function Init(rootEl) {
   ]), gl.STATIC_DRAW)
 
 
+  const pointProgram = GLCreateRasterProgram(gl,
+    /* glsl */`#version 300 es
+       precision highp float;
+
+      in vec4 aPosition;
+
+      uniform mat4 projection;
+      uniform mat4 view;
+
+      uniform vec3 dims;
+
+      out vec4 color;
+      void main() {
+        vec3 col = (aPosition.w) * vec3(158, 2 * 156, 3 * 159);
+        color = vec4(mod(col, vec3(255, 253, 127)) / 255.0, 0.7);
+
+        gl_Position = (projection * view) * vec4(aPosition.xyz * dims, 1.0);
+        gl_PointSize = 10.0;
+      }
+    `,
+    `#version 300 es
+    precision highp float;
+    in vec4 color;
+    out vec4 outColor;
+    void main() {
+      outColor = color;
+    }
+    `
+  )
+  const pointBuffer = gl.createBuffer()
+  gl.bindBuffer(gl.ARRAY_BUFFER, pointBuffer)
+  const pointData = new Float32Array([
+    -1.0, -1.0, -1.0, 1.0,
+    +1.0, -1.0, -1.0, 1.0,
+    -1.0, +1.0, -1.0, 1.0,
+    +1.0, +1.0, -1.0, 1.0,
+
+    -1.0, -1.0, +1.0, 1.0,
+    +1.0, -1.0, +1.0, 1.0,
+    -1.0, +1.0, +1.0, 1.0,
+    +1.0, +1.0, +1.0, 1.0,
+
+
+    0.0, 0.0, 0.0, 2.0
+  ])
+
+  gl.bufferData(gl.ARRAY_BUFFER, pointData, gl.DYNAMIC_DRAW)
+
+  gl.useProgram(pointProgram.handle)
+  const pointCount = 9
+  const pointVAO = gl.createVertexArray()
+  gl.bindVertexArray(pointVAO)
+  gl.enableVertexAttribArray(pointProgram.attributeLocation('aPosition'))
+  gl.vertexAttribPointer(pointProgram.attributeLocation('aPosition'), 4, gl.FLOAT, false, 0, 0)
+  gl.bindVertexArray(null)
+
+
+  const lineProgram = GLCreateRasterProgram(gl,
+    /* glsl */`#version 300 es
+       precision highp float;
+
+      in vec4 aPosition;
+
+      uniform mat4 projection;
+      uniform mat4 view;
+
+      uniform vec3 dims;
+
+      out vec4 color;
+      void main() {
+        color = vec4(1.0);
+        gl_Position = (projection * view) * vec4(aPosition.xyz * dims, 1.0);
+      }
+    `,
+    `#version 300 es
+    precision highp float;
+    in vec4 color;
+    out vec4 outColor;
+    void main() {
+      outColor = vec4(1.0);
+    }
+    `
+  )
+
+  const maxLines = 1 << 8
+  let lineCount = 0
+  const lineBuffer = gl.createBuffer()
+  const lineData = new Float32Array(maxLines * 2 * 4 * 4)
+  gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer)
+  gl.bufferData(gl.ARRAY_BUFFER, lineData, gl.DYNAMIC_DRAW)
+
+  gl.useProgram(lineProgram.handle)
+  const lineVAO = gl.createVertexArray()
+  gl.bindVertexArray(lineVAO)
+  gl.enableVertexAttribArray(lineProgram.attributeLocation('aPosition'))
+  gl.vertexAttribPointer(lineProgram.attributeLocation('aPosition'), 4, gl.FLOAT, false, 0, 0)
+  gl.bindVertexArray(null)
+
+  function AddLine(ax, ay, az, bx, by, bz) {
+    const lineIndex = lineCount++
+    const offset = lineIndex * 8
+
+    lineData[offset + 0] = ax
+    lineData[offset + 1] = ay
+    lineData[offset + 2] = az
+    lineData[offset + 3] = 0.0
+
+    lineData[offset + 4] = bx
+    lineData[offset + 5] = by
+    lineData[offset + 6] = bz
+    lineData[offset + 7] = 0.0
+  }
+
   const screenDims = new Float32Array(2)
+  const furthestPoint = new Float32Array(3)
+  const sliceDir = new Float32Array(3)
   function Render() {
+    lineCount = 0;
+
     screenDims[0] = gl.canvas.width
     screenDims[1] = gl.canvas.height
     const now = Now()
@@ -498,7 +620,73 @@ async function Init(rootEl) {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.clearColor(0.2, 0.2, .2, 1)
 
-    const slices = 32.0 //Math.max(volume.dims[0], Math.max(volume.dims[1], volume.dims[2])) * 2.0
+    // compute the most distant corner
+    {
+      let md = -Number.MAX_VALUE
+      for (let corner = 0; corner < 8; corner++) {
+        let x = (corner & 1) === 1 ? 1 : -1.0
+        let y = (corner & 2) === 2 ? 1 : -1.0
+        let z = (corner & 4) === 4 ? 1 : -1.0
+
+        let d = Length(
+          x - state.orbitCamera.state.eye[0],
+          y - state.orbitCamera.state.eye[1],
+          z - state.orbitCamera.state.eye[2],
+        )
+
+        if (d > md) {
+          furthestPoint[0] = x;
+          furthestPoint[1] = y;
+          furthestPoint[2] = z;
+          md = d;
+        }
+      }
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, pointBuffer)
+      gl.bufferSubData(gl.ARRAY_BUFFER, 8 * 4 * 4, furthestPoint)
+    }
+
+    // compute slice dir
+    {
+      let x = state.orbitCamera.state.eye[0]
+      let y = state.orbitCamera.state.eye[1]
+      let z = state.orbitCamera.state.eye[2]
+
+      let ax = Math.abs(x)
+      let ay = Math.abs(y)
+      let az = Math.abs(z)
+
+      if (ax > ay && ax > az) {
+        sliceDir[0] = Math.sign(x)
+        sliceDir[1] = 0
+        sliceDir[2] = 0
+      } else if (ay > ax && ay > az) {
+        sliceDir[0] = 0
+        sliceDir[1] = Math.sign(y)
+        sliceDir[2] = 0
+      } else {
+        sliceDir[0] = 0
+        sliceDir[1] = 0
+        sliceDir[2] = Math.sign(z)
+      }
+
+      AddLine(
+        furthestPoint[0],
+        furthestPoint[1],
+        furthestPoint[2],
+
+        furthestPoint[0] + sliceDir[0] * 2.0,
+        furthestPoint[1] + sliceDir[1] * 2.0,
+        furthestPoint[2] + sliceDir[2] * 2.0,
+      )
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer)
+      gl.bufferData(gl.ARRAY_BUFFER, lineData, gl.DYNAMIC_DRAW)
+    }
+
+    const slices = 128.0 //Math.max(volume.dims[0], Math.max(volume.dims[1], volume.dims[2])) * 2.0
+
+
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     if (quadProgram) {
@@ -531,29 +719,81 @@ async function Init(rootEl) {
       gl.drawArrays(gl.TRIANGLES, 0, 6 * slices)
     }
 
-    if (boxWireframeProgram) {
+    if (boxProgram) {
       const volume = state.volumes[0]
-      gl.useProgram(boxWireframeProgram.handle)
+      gl.useProgram(boxProgram.handle)
       gl.uniformMatrix4fv(
-        boxWireframeProgram.uniformLocation('projection'),
+        boxProgram.uniformLocation('projection'),
         false,
         state.orbitCamera.state.projection
       );
       gl.uniformMatrix4fv(
-        boxWireframeProgram.uniformLocation('view'),
+        boxProgram.uniformLocation('view'),
         false,
         state.orbitCamera.state.view
       );
 
-      gl.uniform3f(boxWireframeProgram.uniformLocation('dims'),
+      gl.uniform3f(boxProgram.uniformLocation('dims'),
         volume.dims[0] / 256.0,
         volume.dims[1] / 256.0,
         volume.dims[2] / 256.0
       )
 
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boxIndexBuffer)
-
       gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_BYTE, 0)
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+    }
+
+    if (lineProgram) {
+      const volume = state.volumes[0]
+      gl.useProgram(lineProgram.handle)
+      gl.uniformMatrix4fv(
+        lineProgram.uniformLocation('projection'),
+        false,
+        state.orbitCamera.state.projection
+      );
+      gl.uniformMatrix4fv(
+        lineProgram.uniformLocation('view'),
+        false,
+        state.orbitCamera.state.view
+      );
+
+      gl.uniform3f(
+        lineProgram.uniformLocation('dims'),
+        volume.dims[0] / 256.0,
+        volume.dims[1] / 256.0,
+        volume.dims[2] / 256.0
+      )
+
+      gl.bindVertexArray(lineVAO);
+      gl.drawArrays(gl.LINES, 0, lineCount * 2);
+      gl.bindVertexArray(null);
+    }
+
+    if (pointProgram) {
+      const volume = state.volumes[0]
+      gl.useProgram(pointProgram.handle)
+      gl.uniformMatrix4fv(
+        pointProgram.uniformLocation('projection'),
+        false,
+        state.orbitCamera.state.projection
+      );
+      gl.uniformMatrix4fv(
+        pointProgram.uniformLocation('view'),
+        false,
+        state.orbitCamera.state.view
+      );
+
+      gl.uniform3f(
+        pointProgram.uniformLocation('dims'),
+        volume.dims[0] / 256.0,
+        volume.dims[1] / 256.0,
+        volume.dims[2] / 256.0
+      )
+
+      gl.bindVertexArray(pointVAO);
+      gl.drawArrays(gl.POINTS, 0, pointCount);
+      gl.bindVertexArray(null);
     }
 
     requestAnimationFrame(Render)
