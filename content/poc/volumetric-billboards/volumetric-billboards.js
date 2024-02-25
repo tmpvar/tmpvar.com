@@ -145,9 +145,7 @@ function CompileShader(gl, type, source) {
   console.warn(gl.getShaderInfoLog(shader))
   gl.deleteShader(shader)
 }
-
-// props: { uniforms: [.. names ..] }
-function GLCreateRasterProgram(gl, props, vertSource, fragSource) {
+function GLCreateRasterProgram(gl, vertSource, fragSource) {
   const vertShader = CompileShader(gl, gl.VERTEX_SHADER, vertSource)
   const fragShader = CompileShader(gl, gl.FRAGMENT_SHADER, fragSource)
 
@@ -156,22 +154,33 @@ function GLCreateRasterProgram(gl, props, vertSource, fragSource) {
   }
   const program = {
     handle: gl.createProgram(),
-    uniforms: {}
+    uniforms: {},
+    attributes: {},
+    uniformLocation(name) {
+      if (!this.uniforms[name]) {
+        this.uniforms[name] = gl.getUniformLocation(this.handle, name)
+      }
+      return this.uniforms[name]
+    },
+    attributeLocation(name) {
+      if (this.attributes[name] == undefined) {
+        this.attributes[name] = gl.getAttribLocation(this.handle, name)
+        if (this.attributes[name] == -1) {
+          console.warn("attribute location not found", name)
+        }
+      }
+      return this.attributes[name]
+    },
   }
   gl.attachShader(program.handle, vertShader)
   gl.attachShader(program.handle, fragShader)
 
   gl.linkProgram(program.handle)
   if (!gl.getProgramParameter(program.handle, gl.LINK_STATUS)) {
-    console.log(gl.getPRogramInfoLog(program.handle))
+    console.log(gl.getProgramInfoLog(program.handle))
     return
   }
 
-  if (Array.isArray(props.uniforms)) {
-    for (let uniform of props.uniforms) {
-      program.uniforms[uniform] = gl.getUniformLocation(program.handle, uniform)
-    }
-  }
   return program
 }
 
@@ -256,15 +265,14 @@ async function Init(rootEl) {
     state.volumes.push(volume)
   })
 
-  const quadProgram = GLCreateRasterProgram(gl, {
-    uniforms: ['projection', 'view', 'eye', 'occupancy', 'material', 'dims']
-  },
+  const quadProgram = GLCreateRasterProgram(gl,
     /* glsl */`#version 300 es
 
       uniform mat4 projection;
       uniform mat4 view;
       uniform vec3 eye;
       uniform vec3 dims;
+      uniform float sliceCount;
 
       out vec3 uvw;
       flat out int quadIndex;
@@ -321,46 +329,45 @@ async function Init(rootEl) {
           dot(forward, vec3(0.0, 0.0, 1.0))
         );
 
-        int maxIndex = MaxIndex(abs(orthogonal));
+        int parallelIndex = MaxIndex(abs(orthogonal));
         int orthogonalIndex = MinIndex(abs(orthogonal));
 
         vec3 vertPosition;
 
         vec2 vert = verts[vertexIndex] * 2.0 - 1.0;
-        float SliceCount = 128.0; //ceil(max(dims.x, max(dims.y, dims.z)) * 256.0);
-        float InvSliceCount = 1.0 / SliceCount;
+
+        float InvSliceCount = 1.0 / sliceCount;
 
         #if 0
-          float sliceDir = sign(orthogonal[orthogonalIndex]);
+          float sliceDir = sign(orthogonal[parallelIndex]);
           float sliceStart = -sliceDir;
-          float sliceOffset = sliceStart + sliceDir * (float(quadIndex) + 0.5) * InvSliceCount * 2.0;
-
-          vec3 offset = vec3(0.0);
-          if (orthogonalIndex == 0) {
-            offset = vec3(sliceOffset, 0.0, 0.0);
-          } else if (orthogonalIndex == 1) {
-            offset = vec3(0.0, sliceOffset, 0.0);
+          float z = float(quadIndex) * InvSliceCount;
+          // if (sliceDir < 0.0) {
+          //   z = 1.0 - z;
+          // }
+          float sliceOffset = sliceStart + sliceDir * z;
+          vec3 v;
+          if (parallelIndex == 0) {
+            v = vec3(sliceOffset, vert.x, vert.y);
+          } else if (parallelIndex == 1) {
+            v = vec3(vert.x, sliceOffset, vert.y);
           } else {
-            offset = vec3(0.0, 0.0, sliceOffset);
+            v = vec3(vert.x, vert.y, sliceOffset);
           }
 
-
-          vertPosition = vec3(vert.x, vert.y, 0.0);
+          uvw = vec3(vert.x, vert.y, z);
 
           // actual billboards
-          vec3 vpos = vertPosition;
-          vec3 pos = vpos.x * right + vpos.y * up + vpos.z * forward + offset;
-          uvw = pos;
-          uvw.z = 1.0 - uvw.z;
+          vec3 pos = v.x * right + v.y * up + sliceOffset;
           gl_Position = (projection * view) * vec4(pos, 1.0);
         #else
-          float sliceDir = sign(orthogonal[maxIndex]);
+          float sliceDir = sign(orthogonal[parallelIndex]);
           float sliceStart = -sliceDir;
           float sliceOffset = sliceStart + sliceDir * (float(quadIndex) + 0.5) * InvSliceCount * 2.0;
 
-          if (maxIndex == 0) {
+          if (parallelIndex == 0) {
             vertPosition = vec3(sliceOffset, vert.x, vert.y);
-          } else if (maxIndex == 1) {
+          } else if (parallelIndex == 1) {
             vertPosition = vec3(vert.x, sliceOffset, vert.y);
           } else {
             vertPosition = vec3(vert.x, vert.y, sliceOffset);
@@ -373,7 +380,7 @@ async function Init(rootEl) {
           gl_Position = (projection * view) * vec4(vertPosition * dims, 1.0);
         #endif
 
-        // quadIndex = maxIndex;
+        // quadIndex = parallelIndex;
       }
     `,
     /* glsl */ `#version 300 es
@@ -391,9 +398,10 @@ async function Init(rootEl) {
 
       void main() {
         outColor = vec4(uvw, 1.0);
+        // return;
 
         ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
-        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 0.1);
+        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 0.7);
         // return;
 
         if (any(lessThan(uvw, vec3(0.0))) || any(greaterThanEqual(uvw, vec3(1.0)))) {
@@ -404,8 +412,8 @@ async function Init(rootEl) {
 
         int materialIndex = int(texture(occupancy, uvw).r * 255.0);
         if (materialIndex != 0) {
-          // ivec3 col = (materialIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
-          // outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
+          ivec3 col = (materialIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
+          outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
 
           outColor = texelFetch(material, ivec2(materialIndex, 0), 0) * vec4(1.0, 1.0, 1.0, 0.75);
         } else {
@@ -418,6 +426,63 @@ async function Init(rootEl) {
     `
   )
 
+  const boxWireframeProgram = GLCreateRasterProgram(gl,
+    /* glsl */`#version 300 es
+       precision highp float;
+
+      uniform mat4 projection;
+      uniform mat4 view;
+      uniform vec3 eye;
+      uniform vec3 dims;
+      uniform float sliceCount;
+
+      out vec3 uvw;
+      flat out int quadIndex;
+
+      // billboard approach inspired by
+      // https://github.com/superdump/bevy-vertex-pulling/blob/main/examples/quads/quads.wgsl
+      // MIT/Apache license
+
+      const vec3 verts[8] = vec3[8](
+        vec3(0.0, 0.0, 0.0),
+        vec3(1.0, 0.0, 0.0),
+        vec3(0.0, 1.0, 0.0),
+        vec3(1.0, 1.0, 0.0),
+
+        vec3(0.0, 0.0, 1.0),
+        vec3(1.0, 0.0, 1.0),
+        vec3(0.0, 1.0, 1.0),
+        vec3(1.0, 1.0, 1.0)
+      );
+
+      void main() {
+        vec3 vert = verts[gl_VertexID] * 2.0 - 1.0;
+        gl_Position = (projection * view) * vec4(vert * dims, 1.0);
+      }
+    `,
+    `#version 300 es
+    precision highp float;
+
+    out vec4 outColor;
+    void main() {
+      outColor = vec4(1.0, 0.0, 1.0, 0.25);
+    }
+
+    `
+  )
+
+  const boxIndexBuffer = gl.createBuffer()
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boxIndexBuffer)
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint8Array([
+    0, 2, 1, 2, 3, 1,
+    5, 4, 1, 1, 4, 0,
+    0, 4, 6, 0, 6, 2,
+    6, 5, 7, 6, 4, 5,
+    2, 6, 3, 6, 7, 3,
+    7, 1, 3, 7, 5, 1
+  ]), gl.STATIC_DRAW)
+
+
   const screenDims = new Float32Array(2)
   function Render() {
     screenDims[0] = gl.canvas.width
@@ -429,25 +494,27 @@ async function Init(rootEl) {
     state.orbitCamera.tick(screenDims[0], screenDims[1], deltaTime)
     gl.viewport(0, 0, screenDims[0], screenDims[1]);
     gl.enable(gl.BLEND)
+    gl.disable(gl.DEPTH_TEST)
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.clearColor(0.2, 0.2, .2, 1)
 
+    const slices = 32.0 //Math.max(volume.dims[0], Math.max(volume.dims[1], volume.dims[2])) * 2.0
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     if (quadProgram) {
       gl.useProgram(quadProgram.handle);
       const volume = state.volumes[0]
 
-      gl.uniformMatrix4fv(quadProgram.uniforms.projection, false, state.orbitCamera.state.projection);
-      gl.uniformMatrix4fv(quadProgram.uniforms.view, false, state.orbitCamera.state.view);
+      gl.uniformMatrix4fv(quadProgram.uniformLocation('projection'), false, state.orbitCamera.state.projection);
+      gl.uniformMatrix4fv(quadProgram.uniformLocation('view'), false, state.orbitCamera.state.view);
 
-      gl.uniform3f(quadProgram.uniforms.eye,
+      gl.uniform3f(quadProgram.uniformLocation('eye'),
         state.orbitCamera.state.eye[0],
         state.orbitCamera.state.eye[1],
         state.orbitCamera.state.eye[2]
       )
 
-      gl.uniform3f(quadProgram.uniforms.dims,
+      gl.uniform3f(quadProgram.uniformLocation('dims'),
         volume.dims[0] / 256.0,
         volume.dims[1] / 256.0,
         volume.dims[2] / 256.0
@@ -455,13 +522,38 @@ async function Init(rootEl) {
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_3D, volume.occupancy)
-      gl.uniform1i(quadProgram.uniforms.occupancy, 0)
+      gl.uniform1i(quadProgram.uniformLocation('occupancy'), 0)
 
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, volume.material)
-      gl.uniform1i(quadProgram.uniforms.material, 1)
-      const slices = 128.0 //Math.max(volume.dims[0], Math.max(volume.dims[1], volume.dims[2])) * 2.0
+      gl.uniform1i(quadProgram.uniformLocation('material'), 1)
+      gl.uniform1f(quadProgram.uniformLocation('sliceCount'), slices)
       gl.drawArrays(gl.TRIANGLES, 0, 6 * slices)
+    }
+
+    if (boxWireframeProgram) {
+      const volume = state.volumes[0]
+      gl.useProgram(boxWireframeProgram.handle)
+      gl.uniformMatrix4fv(
+        boxWireframeProgram.uniformLocation('projection'),
+        false,
+        state.orbitCamera.state.projection
+      );
+      gl.uniformMatrix4fv(
+        boxWireframeProgram.uniformLocation('view'),
+        false,
+        state.orbitCamera.state.view
+      );
+
+      gl.uniform3f(boxWireframeProgram.uniformLocation('dims'),
+        volume.dims[0] / 256.0,
+        volume.dims[1] / 256.0,
+        volume.dims[2] / 256.0
+      )
+
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boxIndexBuffer)
+
+      gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_BYTE, 0)
     }
 
     requestAnimationFrame(Render)
