@@ -1,6 +1,8 @@
 +++
 title = "Volumetric Billboards"
 date = 2024-02-18
+[extra]
+unlisted = true
 +++
 
 ## Inspiration
@@ -10,7 +12,6 @@ Alex Evan's [Learning From Failure](https://www.youtube.com/watch?v=u9KNtnCZDMI)
 [Original Paper](https://hal.inria.fr/inria-00402067)
 
 ## How it works
-
 
 ## Demo
 
@@ -27,6 +28,9 @@ Alex Evan's [Learning From Failure](https://www.youtube.com/watch?v=u9KNtnCZDMI)
 </section>
 
 ## Downsides
+
+- fill rate
+- the original paper talks about some sort of global slicing mechanism
 
 ## References
 

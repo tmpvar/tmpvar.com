@@ -220,7 +220,8 @@ async function Init(rootEl) {
     const volume = {
       dims: new Float32Array([model.dims[0], model.dims[1], model.dims[2]]),
       occupancy: gl.createTexture(),
-      material: gl.createTexture()
+      material: gl.createTexture(),
+      color: gl.createTexture()
     }
 
     // setup occupancy
@@ -265,129 +266,62 @@ async function Init(rootEl) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
+    // setup color
+    const color = new Uint8Array(volume.dims[0] * volume.dims[1] * volume.dims[1] * 4)
+    const w = volume.dims[0] * 4
+    const h = volume.dims[1]
+    for (let z = 0; z < volume.dims[2]; z++) {
+      let zoff = z * volume.dims[0] * volume.dims[1]
+      for (let y = 0; y < volume.dims[1]; y++) {
+        let yoff = zoff + y * volume.dims[0]
+        for (let x = 0; x < volume.dims[0]; x++) {
+          const material = model.data[x + yoff]
+
+          const idx = x * 4 + y * w + z * w * h;
+          if (material) {
+
+            const materialIndex = material * 4;
+            color[idx + 0] = model.palette[materialIndex + 0]
+            color[idx + 1] = model.palette[materialIndex + 1]
+            color[idx + 2] = model.palette[materialIndex + 2]
+            color[idx + 3] = model.palette[materialIndex + 3]
+          } else {
+            color[idx + 0] = 0.0
+            color[idx + 1] = 0.0
+            color[idx + 2] = 0.0
+            color[idx + 3] = 0.0
+          }
+        }
+      }
+    }
+
+
+    gl.bindTexture(gl.TEXTURE_3D, volume.color)
+    gl.texImage3D(
+      gl.TEXTURE_3D,
+      0,
+      gl.RGBA,
+      volume.dims[0],
+      volume.dims[1],
+      volume.dims[2],
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      color
+    )
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_BASE_LEVEL, 0);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAX_LEVEL, 0);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
     state.volumes.push(volume)
   })
 
   const quadProgram = GLCreateRasterProgram(gl,
-    /* glsl */`#version 300 es
-
-      uniform mat4 projection;
-      uniform mat4 view;
-      uniform vec3 eye;
-      uniform vec3 dims;
-      uniform float sliceCount;
-
-      out vec3 uvw;
-      flat out int quadIndex;
-
-      // billboard approach inspired by
-      // https://github.com/superdump/bevy-vertex-pulling/blob/main/examples/quads/quads.wgsl
-      // MIT/Apache license
-
-      const vec2 verts[6] = vec2[6](
-        vec2(0.0, 0.0), // b00
-        vec2(1.0, 1.0), // b11
-        vec2(0.0, 1.0), // b10
-
-        vec2(0.0, 0.0), // b00
-        vec2(1.0, 0.0), // b01
-        vec2(1.0, 1.0)  // b11
-      );
-
-      int
-      MinIndex(vec3 v) {
-        bvec3 mask = lessThanEqual(v.xyz, max(v.yzx, v.zxy));
-        if (mask.x) {
-          return 0;
-        } else if (mask.y) {
-          return 1;
-        } else {
-          return 2;
-        }
-      }
-
-      int
-      MaxIndex(vec3 v) {
-        bvec3 mask = greaterThanEqual(v.xyz, max(v.yzx, v.zxy));
-        if (mask.x) {
-          return 0;
-        } else if (mask.y) {
-          return 1;
-        } else {
-          return 2;
-        }
-      }
-
-      void main() {
-        quadIndex = gl_VertexID / 6;
-        int vertexIndex = gl_VertexID % 6;
-
-        mat4 invView = view;//inverse(view);
-
-        vec3 right = normalize(vec3(invView[0].x, invView[1].x, invView[2].x));
-        vec3 up = normalize(vec3(invView[0].y, invView[1].y, invView[2].y));
-        vec3 forward = normalize(vec3(invView[0].z, invView[1].z, invView[2].z));
-
-        vec3 orthogonal = vec3(
-          dot(forward, vec3(1.0, 0.0, 0.0)),
-          dot(forward, vec3(0.0, 1.0, 0.0)),
-          dot(forward, vec3(0.0, 0.0, 1.0))
-        );
-
-        int parallelIndex = MaxIndex(abs(orthogonal));
-        int orthogonalIndex = MinIndex(abs(orthogonal));
-
-        vec3 vertPosition;
-
-        vec2 vert = verts[vertexIndex] * 2.0 - 1.0;
-
-        float InvSliceCount = 1.0 / sliceCount;
-
-        #if 1
-          float sliceDir = sign(orthogonal[orthogonalIndex]);
-          float sliceStart = -sliceDir;
-          float sliceOffset = sliceStart + sliceDir * float(quadIndex) * InvSliceCount * 2.0;
-
-
-          vec3 v = vec3(vert.x, vert.y, sliceOffset);
-          if (parallelIndex == 0) {
-            v = vec3(sliceOffset, vert.x, vert.y);
-          } else if (parallelIndex == 1) {
-            v = vec3(vert.x, sliceOffset, vert.y);
-          } else {
-            v = vec3(vert.x, vert.y, sliceOffset);
-          }
-
-          // uvw = vec3(vert.x, vert.y, sliceOffset) * 0.5 + 0.5;
-
-          // actual billboards
-          v = v.x * right + v.y * up + v.z * forward;
-          uvw = v * 0.5 + 0.5;
-          gl_Position = (projection * view) * vec4(v * dims, 1.0);
-        #else
-          float sliceDir = sign(orthogonal[parallelIndex]);
-          float sliceStart = -sliceDir;
-          float sliceOffset = sliceStart + sliceDir * (float(quadIndex) + 0.5) * InvSliceCount * 2.0;
-
-          if (parallelIndex == 0) {
-            vertPosition = vec3(sliceOffset, vert.x, vert.y);
-          } else if (parallelIndex == 1) {
-            vertPosition = vec3(vert.x, sliceOffset, vert.y);
-          } else {
-            vertPosition = vec3(vert.x, vert.y, sliceOffset);
-          }
-
-          uvw = vertPosition;
-          // orthogonal slices
-          uvw = vertPosition * 0.5 + 0.5;
-          uvw.z = 1.0 - uvw.z;
-          gl_Position = (projection * view) * vec4(vertPosition * dims, 1.0);
-        #endif
-
-        // quadIndex = parallelIndex;
-      }
-    `,
+    await (await fetch('./quad.vert')).text(),
     /* glsl */ `#version 300 es
       precision highp float;
       precision highp int;
@@ -395,18 +329,56 @@ async function Init(rootEl) {
 
       uniform sampler3D occupancy;
       uniform sampler2D material;
+      // full color volume
+      uniform sampler3D color;
 
       in vec3 uvw;
       flat in int quadIndex;
 
       out vec4 outColor;
 
-      void main() {
-        outColor = vec4(uvw, 1.0);
-        return;
+      vec4
+      Lerp3D(vec4 c000,
+             vec4 c100,
+             vec4 c010,
+             vec4 c110,
 
+             vec4 c001,
+             vec4 c101,
+             vec4 c011,
+             vec4 c111,
+
+             vec3 t) {
+
+        // front face
+        vec4 c00 = c000 * (1.0 - t.x) + c100 * t.x;
+        vec4 c01 = c010 * (1.0 - t.x) + c110 * t.x;
+
+        // back face
+        vec4 c10 = c001 * (1.0 - t.x) + c101 * t.x;
+        vec4 c11 = c011 * (1.0 - t.x) + c111 * t.x;
+
+        vec4 c0 = c00 * (1.0 - t.z) + c10 * t.z;
+        vec4 c1 = c01 * (1.0 - t.z) + c11 * t.z;
+
+        return c0 * (1.0 - t.y) + c1 * t.y;
+      }
+
+
+      vec4 GetMaterial(vec3 uvw) {
+        int materialIndex = int(texture(occupancy, uvw).r * 255.0);
+        if (materialIndex != 0) {
+          return texelFetch(material, ivec2(materialIndex, 0), 0);
+        }
+        return vec4(0.0);
+      }
+
+      void main() {
         ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
-        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 0.27);
+        outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
+        // return;
+
+        outColor = vec4(uvw, 1.0);
         // return;
 
         if (any(lessThan(uvw, vec3(0.0))) || any(greaterThanEqual(uvw, vec3(1.0)))) {
@@ -415,17 +387,36 @@ async function Init(rootEl) {
           return;
         }
 
-        int materialIndex = int(texture(occupancy, uvw).r * 255.0);
-        if (materialIndex != 0) {
-          ivec3 col = (materialIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
-          outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
+        outColor = texture(color, uvw);
+        return;
 
-          outColor = texelFetch(material, ivec2(materialIndex, 0), 0) * vec4(1.0, 1.0, 1.0, 0.75);
-        } else {
-          discard;
-          // ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
-          // outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
-        }
+        vec3 id = 1.0 / vec3(textureSize(occupancy, 0)) * 0.1;
+        outColor = Lerp3D(
+          GetMaterial(uvw + vec3(0.0, 0.0, 0.0)),
+          GetMaterial(uvw + vec3(id.x, 0.0, 0.0)),
+          GetMaterial(uvw + vec3(0.0, id.y, 0.0)),
+          GetMaterial(uvw + vec3(id.x, id.y, 0.0)),
+
+          GetMaterial(uvw + vec3(0.0, 0.0,   id.z)),
+          GetMaterial(uvw + vec3(id.x, 0.0,  id.z)),
+          GetMaterial(uvw + vec3(0.0, id.y,  id.z)),
+          GetMaterial(uvw + vec3(id.x, id.y, id.z)),
+          vec3(.5)
+        );
+
+        // int materialIndex = int(texture(occupancy, uvw).r * 255.0);
+        // if (materialIndex != 0) {
+        //   outColor = texture(occupancy, uvw).rrrr;
+        //   return;
+        //   ivec3 col = (materialIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
+        //   outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
+
+        //   outColor = texelFetch(material, ivec2(materialIndex, 0), 0) * vec4(1.0, 1.0, 1.0, 1.0);
+        // } else {
+        //   discard;
+        //   // ivec3 col = (quadIndex + 1) * ivec3(158, 2 * 156, 3 * 159);
+        //   // outColor = vec4(vec3(col % ivec3(255, 253, 127)) / 255.0, 1.0);
+        // }
 
       }
     `
@@ -462,7 +453,7 @@ async function Init(rootEl) {
 
       void main() {
         vec3 vert = verts[gl_VertexID] * 2.0 - 1.0;
-        gl_Position = (projection * view) * vec4(vert * dims, 1.0);
+        gl_Position = (projection * view) * vec4(vert, 1.0);
       }
     `,
     `#version 300 es
@@ -504,7 +495,7 @@ async function Init(rootEl) {
         vec3 col = (aPosition.w) * vec3(158, 2 * 156, 3 * 159);
         color = vec4(mod(col, vec3(255, 253, 127)) / 255.0, 0.7);
 
-        gl_Position = (projection * view) * vec4(aPosition.xyz * dims, 1.0);
+        gl_Position = (projection * view) * vec4(aPosition.xyz, 1.0);
         gl_PointSize = 10.0;
       }
     `,
@@ -559,7 +550,7 @@ async function Init(rootEl) {
       out vec4 color;
       void main() {
         color = vec4(1.0);
-        gl_Position = (projection * view) * vec4(aPosition.xyz * dims, 1.0);
+        gl_Position = (projection * view) * vec4(aPosition.xyz, 1.0);
       }
     `,
     `#version 300 es
@@ -603,7 +594,9 @@ async function Init(rootEl) {
 
   const screenDims = new Float32Array(2)
   const furthestPoint = new Float32Array(3)
+  const closestPoint = new Float32Array(3)
   const sliceDir = new Float32Array(3)
+  const perpDir = new Float32Array(2)
   function Render() {
     lineCount = 0;
 
@@ -616,13 +609,13 @@ async function Init(rootEl) {
     state.orbitCamera.tick(screenDims[0], screenDims[1], deltaTime)
     gl.viewport(0, 0, screenDims[0], screenDims[1]);
     gl.enable(gl.BLEND)
-    gl.disable(gl.DEPTH_TEST)
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.clearColor(0.2, 0.2, .2, 1)
 
     // compute the most distant corner
     {
       let md = -Number.MAX_VALUE
+      let lod = Number.MAX_VALUE
       for (let corner = 0; corner < 8; corner++) {
         let x = (corner & 1) === 1 ? 1 : -1.0
         let y = (corner & 2) === 2 ? 1 : -1.0
@@ -639,6 +632,13 @@ async function Init(rootEl) {
           furthestPoint[1] = y;
           furthestPoint[2] = z;
           md = d;
+        }
+
+        if (d < lod) {
+          closestPoint[0] = x;
+          closestPoint[1] = y;
+          closestPoint[2] = z;
+          lod = d;
         }
       }
 
@@ -660,14 +660,23 @@ async function Init(rootEl) {
         sliceDir[0] = Math.sign(x)
         sliceDir[1] = 0
         sliceDir[2] = 0
+
+        perpDir[0] = Math.sign(y) || 1
+        perpDir[1] = Math.sign(z) || 1
       } else if (ay > ax && ay > az) {
         sliceDir[0] = 0
         sliceDir[1] = Math.sign(y)
         sliceDir[2] = 0
+
+        perpDir[0] = Math.sign(x) || 1
+        perpDir[1] = Math.sign(z) || 1
       } else {
         sliceDir[0] = 0
         sliceDir[1] = 0
         sliceDir[2] = Math.sign(z)
+
+        perpDir[0] = Math.sign(x) || 1
+        perpDir[1] = Math.sign(y) || 1
       }
 
       AddLine(
@@ -684,12 +693,13 @@ async function Init(rootEl) {
       gl.bufferData(gl.ARRAY_BUFFER, lineData, gl.DYNAMIC_DRAW)
     }
 
-    const slices = 128.0 //Math.max(volume.dims[0], Math.max(volume.dims[1], volume.dims[2])) * 2.0
+    const slices = Math.max(state.volumes[0].dims[0], Math.max(state.volumes[0].dims[1], state.volumes[0].dims[2])) * 10.0
 
 
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     if (quadProgram) {
+      gl.disable(gl.DEPTH_TEST)
       gl.useProgram(quadProgram.handle);
       const volume = state.volumes[0]
 
@@ -707,6 +717,29 @@ async function Init(rootEl) {
         volume.dims[1] / 256.0,
         volume.dims[2] / 256.0
       )
+      gl.uniform3f(quadProgram.uniformLocation('furthestPoint'),
+        furthestPoint[0],
+        furthestPoint[1],
+        furthestPoint[2]
+      )
+
+      gl.uniform3f(quadProgram.uniformLocation('closestPoint'),
+        closestPoint[0],
+        closestPoint[1],
+        closestPoint[2]
+      )
+
+      gl.uniform3f(quadProgram.uniformLocation('sliceDir'),
+        sliceDir[0],
+        sliceDir[1],
+        sliceDir[2]
+      )
+
+
+      gl.uniform2f(quadProgram.uniformLocation('perpDir'),
+        perpDir[0],
+        perpDir[1]
+      )
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_3D, volume.occupancy)
@@ -715,11 +748,17 @@ async function Init(rootEl) {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, volume.material)
       gl.uniform1i(quadProgram.uniformLocation('material'), 1)
+
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_3D, volume.color)
+      gl.uniform1i(quadProgram.uniformLocation('color'), 2)
+
       gl.uniform1f(quadProgram.uniformLocation('sliceCount'), slices)
-      gl.drawArrays(gl.TRIANGLES, 0, 6 * slices)
+      gl.drawArrays(gl.TRIANGLES, 0, 6 * (slices + 1))
+      gl.disable(gl.DEPTH_TEST)
     }
 
-    if (boxProgram) {
+    if (false && boxProgram) {
       const volume = state.volumes[0]
       gl.useProgram(boxProgram.handle)
       gl.uniformMatrix4fv(
@@ -744,7 +783,7 @@ async function Init(rootEl) {
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
     }
 
-    if (lineProgram) {
+    if (false && lineProgram) {
       const volume = state.volumes[0]
       gl.useProgram(lineProgram.handle)
       gl.uniformMatrix4fv(
@@ -770,7 +809,7 @@ async function Init(rootEl) {
       gl.bindVertexArray(null);
     }
 
-    if (pointProgram) {
+    if (false && pointProgram) {
       const volume = state.volumes[0]
       gl.useProgram(pointProgram.handle)
       gl.uniformMatrix4fv(
