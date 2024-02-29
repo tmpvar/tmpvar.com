@@ -278,18 +278,20 @@ async function Init(rootEl) {
           const material = model.data[x + yoff]
 
           const idx = x * 4 + y * w + z * w * h;
+          const alpha = 0.5
           if (material) {
 
             const materialIndex = material * 4;
             color[idx + 0] = model.palette[materialIndex + 0]
             color[idx + 1] = model.palette[materialIndex + 1]
             color[idx + 2] = model.palette[materialIndex + 2]
-            color[idx + 3] = model.palette[materialIndex + 3]
+            // color[idx + 3] = model.palette[materialIndex + 3]
+            color[idx + 3] = 256 * alpha
           } else {
-            color[idx + 0] = 0.0
-            color[idx + 1] = 0.0
-            color[idx + 2] = 0.0
-            color[idx + 3] = 0.0
+            color[idx + 0] = 1.0
+            color[idx + 1] = 1.0
+            color[idx + 2] = 1.0
+            color[idx + 3] = 0 * alpha
           }
         }
       }
