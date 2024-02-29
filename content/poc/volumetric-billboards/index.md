@@ -7,7 +7,7 @@ unlisted = true
 
 ## Inspiration
 
-Alex Evan's [Learning From Failure](https://www.youtube.com/watch?v=u9KNtnCZDMI) talk and [slides](http://media.lolrus.mediamolecule.com/AlexEvans_SIGGRAPH-2015.pdf)
+Alex Evan's [Learning From Failure](https://www.youtube.com/watch?v=u9KNtnCZDMI) talk and [slides](https://web.archive.org/web/20221206083222/http://media.lolrus.mediamolecule.com/AlexEvans_SIGGRAPH-2015.pdf)
 
 [Original Paper](https://hal.inria.fr/inria-00402067)
 

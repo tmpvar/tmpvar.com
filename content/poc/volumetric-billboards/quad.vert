@@ -117,5 +117,5 @@ main() {
   uvw.z = 1.0 - uvw.z;
   // uvw = 1.0 - uvw;
 
-  gl_Position = (projection * view) * vec4(v * dims, 1.0);
+  gl_Position = (projection * view) * vec4(v, 1.0);
 }
