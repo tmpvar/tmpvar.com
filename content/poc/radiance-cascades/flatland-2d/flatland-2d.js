@@ -491,6 +491,7 @@ async function ProbeRayDDA2DBegin() {
           let UpperLevel = ubo.level + 1;
 
           if (UpperLevel >= ubo.levelCount) {
+            // TODO: sample environment / sky lighting
             return vec4f(0.0, 0.0, 0.0, 1.0);
           }
 
@@ -500,9 +501,7 @@ async function ProbeRayDDA2DBegin() {
           let UpperProbeDiameter = 2 * (ubo.probeRadius << 1);
           let UpperCascadeWidth = ubo.width / UpperProbeDiameter;
 
-          let uv = (lowerProbeCenter/f32(UpperProbeDiameter)) / f32(UpperCascadeWidth);
-          let index = uv * f32(UpperCascadeWidth) - 0.5;
-
+          let index = lowerProbeCenter/f32(UpperProbeDiameter) - 0.5;
           var basePos = vec2<i32>(floor(index));
 
           let bufferStartIndex = UpperLevelBufferOffset + UpperLevelRayIndex;
