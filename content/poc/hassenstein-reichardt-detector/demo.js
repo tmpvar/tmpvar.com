@@ -1,9 +1,9 @@
 Init(document.getElementById('demo-content'))
 
 function CreateReceptor(x, y) {
-  const MaxSamples = 1 << 3
-  const SampleRate = 100
-  const LPCutoff = 1
+  const MaxSamples = 1 << 5
+  const SampleRate = 1000
+  const LPCutoff = 1000
   const Radius = 10
 
   return {
@@ -24,12 +24,12 @@ function CreateReceptor(x, y) {
       let rc = 1.0 / LPCutoff * TAU;
       let dt = 1.0 / SampleRate;
       let alpha = dt / (rc + dt);
-      let value = this.ring[0];
 
-      const start = Math.max(0, this.head - MaxSamples) % MaxSamples
-      for (let i = 0; i < MaxSamples; i++) {
-        const index = start + i
-        value = value + alpha * (this.ring[index] - value);
+      const start = Math.max(0, this.head - MaxSamples)
+      const end = this.head
+      let value = this.ring[0];
+      for (let i = start; i < end; i++) {
+        value = value + alpha * (this.ring[i % MaxSamples] - value);
       }
       return value;
     },
@@ -98,18 +98,18 @@ function CreateReceptorPair(a, b) {
       const height = 50
       const width = 100
       let xoff = Math.min(a.pos[0], b.pos[0])
-      const yoff = Math.max(a.pos[0], b.pos[0]) + height + 10
+      const yoff = Math.max(a.pos[0], b.pos[0]) + 10 + height
       const xstep = width / MaxSamples
 
       ctx.fillStyle = "rgba(255, 255, 255, 0.2)"
       ctx.strokeStyle = "#fff"
       ctx.fillRect(xoff, yoff - height, width, height)
-
+      const ycenter = yoff - height * 0.5
       ctx.beginPath()
       for (let i = start; i < end; i++) {
         let value = this.ring[i % MaxSamples]
-        ctx.moveTo(xoff, yoff)
-        ctx.lineTo(xoff, yoff - value * (height - 5))
+        ctx.moveTo(xoff, ycenter)
+        ctx.lineTo(xoff, ycenter + value * height * 2.0)
         xoff += xstep;
       }
       ctx.stroke()
@@ -125,7 +125,8 @@ function Init(rootElement) {
   const canvas = rootElement.querySelector('canvas')
   const ctx = canvas.getContext('2d')
   const mouse = {
-    pos: [0, 0]
+    pos: [0, 0],
+    down: false
   }
   canvas.addEventListener('mousemove', (e) => {
     let ratioX = canvas.width / canvas.clientWidth
@@ -133,6 +134,9 @@ function Init(rootElement) {
     mouse.pos[0] = e.offsetX * ratioX
     mouse.pos[1] = e.offsetY * ratioY
   })
+
+  canvas.addEventListener('mousedown', (e) => { mouse.down = true })
+  canvas.addEventListener('mouseup', (e) => { mouse.down = false })
 
   const receptors = [
     CreateReceptor(490, 512),
@@ -149,7 +153,7 @@ function Init(rootElement) {
     ctx.fillStyle = "#222"
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    ctx.fillStyle = "white"
+    ctx.fillStyle = mouse.down ? "white" : "#000"
     ctx.beginPath()
     ctx.arc(mouse.pos[0], LightRadius * 3, LightRadius, 0, TAU)
     ctx.fill()
@@ -157,7 +161,7 @@ function Init(rootElement) {
     // draw the receptors
     for (let i = 0; i < receptors.length; i++) {
       const value = Math.max(0, LightRadius - Math.abs(receptors[i].pos[0] - mouse.pos[0])) / LightRadius > 0 ? 1.0 : 0.0
-      receptors[i].add(value)
+      receptors[i].add(mouse.down ? value : 0.0)
       receptors[i].render(ctx);
     }
 
