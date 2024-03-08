@@ -23,3 +23,5 @@ unlisted = true
 </section>
 
 ## References
+
+- [A synaptic mechanism possibly underlying directional selectivity to motion](https://royalsocietypublishing.org/doi/pdf/10.1098/rspb.1978.0075)
