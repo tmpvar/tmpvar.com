@@ -1,6 +1,6 @@
 import CreateOrbitCamera from "./camera-orbit.js"
 
-Init(document.getElementById('ssao-content'))
+Init(document.getElementById('ssao-content'), [1024, 1024])
 
 function CompileShader(gl, type, source) {
   const shader = gl.createShader(type)
@@ -88,7 +88,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
   const boxTextureDiameter = Math.pow(2, Math.ceil(Math.log2(Math.sqrt(maxBoxes))))
   const boxBufferEntryCount = Math.pow(boxTextureDiameter, 2)
-  console.log('boxTextureDiameter', boxTextureDiameter, 'boxBufferEntryCount', boxBufferEntryCount)
+
   const rasterizer = {
     batchSize: 0,
     indexBufferType: gl.UNSIGNED_INT,
@@ -392,8 +392,42 @@ function Now() {
   }
 }
 
+function CreateFullScreener(clickToFullscreenElement, elementToFullscreen, initialDims) {
+  clickToFullscreenElement.addEventListener('click', _ => {
+    if (!document.fullscreenElement) {
+      elementToFullscreen.requestFullscreen({
+        navigationUI: 'hide'
+      })
+    } else if (document.exitFullscreen) {
+      elementToFullscreen.width = initialDims[0]
+      elementToFullscreen.height = initialDims[1]
+      document.exitFullscreen();
+    }
+  })
 
-function Init(rootEl) {
+  return {
+    tick() {
+      // TODO: this assumes a canvas element type
+      if (document.fullscreenElement === elementToFullscreen) {
+        if (elementToFullscreen.height != window.innerHeight) {
+          elementToFullscreen.height = window.innerHeight
+        }
+        if (elementToFullscreen.width != window.innerWidth) {
+          elementToFullscreen.width = window.innerWidth
+        }
+      } else {
+        if (elementToFullscreen.height !== initialDims[1]) {
+          elementToFullscreen.height = initialDims[1]
+        }
+        if (elementToFullscreen.width !== initialDims[0]) {
+          elementToFullscreen.width = initialDims[0]
+        }
+      }
+    }
+  }
+}
+
+function Init(rootEl, dimensions) {
   // Read in a bunch of disables from the search part of the url
   const disable = {}
   {
@@ -408,7 +442,14 @@ function Init(rootEl) {
 
   console.log('disable', disable)
 
+
   const canvas = rootEl.querySelector('canvas')
+  const fullscreener = CreateFullScreener(
+    rootEl.querySelector(".go-fullscreen"),
+    canvas,
+    dimensions
+  )
+
   let webglVersion = 2
   let gl = !disable.webgl2 && canvas.getContext('webgl2')
   if (!gl) {
@@ -423,7 +464,7 @@ function Init(rootEl) {
     lastFrameTime: Now()
   }
   const camera = CreateOrbitCamera(canvas)
-  const boxRasterizer = CreateBoxRasterizer(gl, 1024*1024, {
+  const boxRasterizer = CreateBoxRasterizer(gl, 1024 * 1024, {
     disable
   })
 
@@ -443,7 +484,6 @@ function Init(rootEl) {
     boxRasterizer.boxes.radius[offset + 2] = (Math.random() + 0.1) * 0.2;
   }
 
-  // TODO: what do do when this isn't available?
   if (GLHasExtension(gl, 'OES_texture_float', disable)) {
     gl.bindTexture(gl.TEXTURE_2D, boxRasterizer.boxes.centerTexture)
     gl.texImage2D(
@@ -477,6 +517,7 @@ function Init(rootEl) {
     const deltaTime = (now - state.lastFrameTime)
     state.lastFrameTime = now
 
+    fullscreener.tick()
     camera.tick(gl.drawingBufferWidth, gl.drawingBufferHeight, deltaTime)
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight)
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
