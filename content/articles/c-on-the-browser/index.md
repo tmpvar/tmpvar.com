@@ -75,7 +75,7 @@ In the browser
 
 or natively
 
-```shell
+```bash
 $ clang -x c++ examples/add.h -DAdd_TEST -o add-test && ./add-test
 result: 13
 ```
