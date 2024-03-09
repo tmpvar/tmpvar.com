@@ -537,7 +537,6 @@ async function Init(rootEl) {
   gl.vertexAttribPointer(pointProgram.attributeLocation('aPosition'), 4, gl.FLOAT, false, 0, 0)
   gl.bindVertexArray(null)
 
-
   const lineProgram = GLCreateRasterProgram(gl,
     /* glsl */`#version 300 es
        precision highp float;
