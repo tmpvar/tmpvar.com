@@ -1,9 +1,10 @@
 ## Pending
-- setup sebbbi box renderer
-- spam random boxes to the screen
-- add fullscreen toggle
-- add orbit camera
+- what do do when `OES_texture_float` isn't available?
 - collect depth buffer in FBO
 - downsample depth buffer
 
 ## 2024-03-09
+- add fullscreen toggle
+- setup sebbbi box renderer
+- spam random boxes to the screen
+- add orbit camera

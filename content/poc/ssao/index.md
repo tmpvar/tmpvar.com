@@ -7,11 +7,10 @@ unlisted = true
 
 ## Demo
 
-<section id="ssao-content">
-  <section class="controls">
-  </section>
-  <section class="center-align">
+<section id="ssao-content" class="content">
+  <section class="center-align relative">
     <canvas width="1024" height="1024"></canvas>
+    <a class="go-fullscreen"></a>
   </section>
   <script src="ssao.js" type="module"></script>
   <p>
