@@ -114,12 +114,12 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
       if (this.vao) {
         gl.bindVertexArray(this.vao)
-      } else {
-        if (this.vertexIDBuffer) {
-          gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexIDBuffer);
-          gl.enableVertexAttribArray(this.program.attributeLocation('vertexID'))
-          gl.vertexAttribPointer(this.program.attributeLocation('vertexID'), 1, gl.FLOAT, false, 0, 0)
-        }
+      }
+
+      if (this.vertexIDBuffer) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexIDBuffer);
+        gl.enableVertexAttribArray(this.program.attributeLocation('vertexID'))
+        gl.vertexAttribPointer(this.program.attributeLocation('vertexID'), 1, gl.FLOAT, false, 0, 0)
       }
 
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
@@ -146,12 +146,12 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
   // Build index buffer for a bunch of boxes
   {
     const CubeIndicesLUT = [
-      0, 2, 1, 2, 3, 1,
-      5, 4, 1, 1, 4, 0,
-      0, 4, 6, 0, 6, 2,
-      6, 5, 7, 6, 4, 5,
-      2, 6, 3, 6, 7, 3,
-      7, 1, 3, 7, 5, 1,
+      0, 2, 1, 2, 3, 1, // front
+      5, 4, 1, 1, 4, 0, // bottom
+      0, 4, 6, 0, 6, 2, // left
+      6, 5, 7, 6, 4, 5, // back
+      2, 6, 3, 6, 7, 3, // top
+      7, 1, 3, 7, 5, 1, // right
     ];
 
     let indices = null;
@@ -190,6 +190,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
     fragmentBody = fragmentBody || `
       outColor = vec4(uvw, 1.0);
       // outColor = vec4(1.0);
+      outColor = vec4(normal * 0.5 + 0.5, 1.0);
     `
 
     if (gl instanceof WebGL2RenderingContext) {
@@ -199,14 +200,17 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
       vertexSource = `#version 300 es
         precision highp float;
+
+        in float vertexID;
+
         uniform mat4 worldToScreen;
         uniform vec3 eye;
         uniform float vertexIndexOffset;
-
-        uniform sampler2D boxCenter;
+        uniform sampler2D boxCenterTexture;
 
         out vec3 uvw;
         out vec3 eyeRelativePos;
+        out vec3 boxRelativePos;
 
         void
         main() {
@@ -219,9 +223,11 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
           uvw = vec3(vertPosition);
 
-          // vec3 pos = (boxCorner + uvw * boxes[boxIndex].radius * 2.0) * boxes[boxIndex].scale;
           vec3 pos = (uvw * 2.0 - 1.0) * 0.1;
           eyeRelativePos = pos - eye;
+
+          // TODO: look this up in boxCenterTexture
+          boxRelativePos = pos;
           gl_Position = worldToScreen * vec4(pos, 1.0);
         }
       `
@@ -231,25 +237,39 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
         in vec3 uvw;
         in vec3 eyeRelativePos;
+        in vec3 boxRelativePos;
+
+        vec3 ComputeFaceNormal(vec3 v) {
+          vec3 vabs = abs(v);
+          return v * vec3(
+            greaterThanEqual(
+              vabs,
+              vec3(max(vabs.x, max(vabs.y, vabs.z)))
+            )
+          );
+        }
 
         void main() {
+          vec3 normal = normalize(ComputeFaceNormal(boxRelativePos));
           ${fragmentBody}
         }
       `
     }
 
-    if (gl instanceof WebGLRenderingContext) {
-      // There is no gl_VertexID in webgl 1.0, so we build a vertex attribute buffer
-      // that can fill in the gaps
-      rasterizer.vertexIDBuffer = gl.createBuffer()
-      const vertexID = new Float32Array(rasterizer.batchSize)
-      for (let i = 0; i < rasterizer.batchSize; i++) {
-        vertexID[i] = i;
-      }
-      gl.bindBuffer(gl.ARRAY_BUFFER, rasterizer.vertexIDBuffer)
-      gl.bufferData(gl.ARRAY_BUFFER, vertexID, gl.STATIC_DRAW)
-      gl.bindBuffer(gl.ARRAY_BUFFER, null)
 
+    // There is no gl_VertexID in webgl 1.0, so we build a vertex attribute buffer
+    // that can fill in the gaps
+    rasterizer.vertexIDBuffer = gl.createBuffer()
+    const vertexID = new Float32Array(rasterizer.batchSize)
+    for (let i = 0; i < rasterizer.batchSize; i++) {
+      vertexID[i] = i;
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, rasterizer.vertexIDBuffer)
+    gl.bufferData(gl.ARRAY_BUFFER, vertexID, gl.STATIC_DRAW)
+    gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+
+    if (gl instanceof WebGLRenderingContext) {
       vertexSource = `
         precision highp float;
 
@@ -263,8 +283,8 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         uniform float vertexIndexOffset;
 
         varying vec3 uvw;
-        varying vec3 normal;
         varying vec3 eyeRelativePos;
+        varying vec3 boxRelativePos;
 
         void
         main() {
@@ -284,6 +304,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
           // vec3 pos = boxCenter + boxRadius * (uvw * 2.0 - 1.0);
           vec3 pos = (uvw * 2.0 - 1.0) * 0.1;
           eyeRelativePos = pos - eye;
+          boxRelativePos = pos;
           gl_Position = worldToScreen * vec4(pos, 1.0);
         }
       `
@@ -293,7 +314,21 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         #define outColor gl_FragColor
 
         varying vec3 uvw;
+        varying vec3 boxRelativePos;
+        varying vec3 eyeRelativePos;
+
+        vec3 ComputeFaceNormal(vec3 v) {
+          vec3 vabs = abs(v);
+          return v * vec3(
+            greaterThanEqual(
+              vabs,
+              vec3(max(vabs.x, max(vabs.y, vabs.z)))
+            )
+          );
+        }
+
         void main() {
+          vec3 normal = normalize(ComputeFaceNormal(boxRelativePos));
           ${fragmentBody}
         }
       `
