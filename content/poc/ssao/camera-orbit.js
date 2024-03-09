@@ -306,7 +306,7 @@ export default function CreateOrbitCamera(canvas) {
     eye: [0.0, 2.0, 0.0],
     target: [0.0, 0.0, 0.0],
     up: [0.0, 1.0, 0.0],
-    distance: 0.5,
+    distance: 2.5,
     targetDistance: 0.5,
     minDistance: 0.01,
     maxDistance: 10,
