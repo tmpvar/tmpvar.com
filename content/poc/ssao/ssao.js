@@ -60,12 +60,12 @@ function GLCreateRasterProgram(gl, vertSource, fragSource) {
   return program
 }
 
-
 function GLHasExtension(gl, name, manualDisables) {
   let result = null
   if (gl instanceof WebGL2RenderingContext) {
     const SupersededExtensionsInWebGL2 = {
-      'OES_element_index_uint': true
+      'OES_element_index_uint': true,
+      'OES_texture_float': true,
     }
 
     if (SupersededExtensionsInWebGL2[name]) {
@@ -199,12 +199,23 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
   // Create the center and radius textures
   {
     gl.bindTexture(gl.TEXTURE_2D, rasterizer.boxes.centerTexture)
+    if (gl instanceof WebGL2RenderingContext) {
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, 0);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0);
+    }
+
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
     gl.bindTexture(gl.TEXTURE_2D, rasterizer.boxes.radiusTexture)
+
+    if (gl instanceof WebGL2RenderingContext) {
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, 0);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0);
+    }
+
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -232,19 +243,24 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
         in float vertexID;
 
+        uniform sampler2D boxCenterTexture;
+        uniform sampler2D boxRadiusTexture;
+        uniform float boxTextureDiameter;
+
         uniform mat4 worldToScreen;
         uniform vec3 eye;
         uniform float vertexIndexOffset;
-        uniform sampler2D boxCenterTexture;
-        uniform sampler2D boxRadiusTexture;
+
 
         out vec3 uvw;
-        out vec3 eyeRelativePos;
         out vec3 boxRelativePos;
+        out vec3 eyeRelativePos;
+        out vec3 boxRadius;
 
         void
         main() {
-          int vertexIndex = gl_VertexID + int(vertexIndexOffset);
+          // int vertexIndex = gl_VertexID + int(vertexIndexOffset);
+          int vertexIndex = int(vertexID) + int(vertexIndexOffset);
           int boxIndex = (vertexIndex >> 3);
 
           ivec3 vertPosition = ivec3((vertexIndex & 1) >> 0,
@@ -253,11 +269,16 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
           uvw = vec3(vertPosition);
 
-          vec3 pos = (uvw * 2.0 - 1.0) * 0.1;
-          eyeRelativePos = pos - eye;
+          ivec2 texel = ivec2(
+            mod(float(boxIndex), boxTextureDiameter),
+            boxIndex / int(boxTextureDiameter)
+          );
 
-          // TODO: look this up in boxCenterTexture
-          boxRelativePos = pos;
+          vec3 boxCenter = texelFetch(boxCenterTexture, texel, 0).xyz;
+          boxRadius = texelFetch(boxRadiusTexture, texel, 0).xyz;
+          vec3 pos = boxCenter + boxRadius * (uvw * 2.0 - 1.0);
+          eyeRelativePos = pos - eye;
+          boxRelativePos = pos - boxCenter;
           gl_Position = worldToScreen * vec4(pos, 1.0);
         }
       `
@@ -266,8 +287,9 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         out vec4 outColor;
 
         in vec3 uvw;
-        in vec3 eyeRelativePos;
         in vec3 boxRelativePos;
+        in vec3 eyeRelativePos;
+        in vec3 boxRadius;
 
         vec3 ComputeFaceNormal(vec3 v) {
           vec3 vabs = abs(v);
@@ -280,7 +302,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         }
 
         void main() {
-          vec3 normal = normalize(ComputeFaceNormal(boxRelativePos));
+          vec3 normal = normalize(ComputeFaceNormal(boxRelativePos / boxRadius));
           ${fragmentBody}
         }
       `
@@ -333,6 +355,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
           vertPosition.z = mod(boxVertIndex, 2.0);
 
           uvw = floor(vertPosition);
+
           vec2 uv = vec2(
             mod(boxIndex, boxTextureDiameter),
             (boxIndex / boxTextureDiameter)
@@ -340,10 +363,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
           vec3 boxCenter = texture2DLod(boxCenterTexture, uv, 0.0).xyz;
           boxRadius = texture2DLod(boxRadiusTexture, uv, 0.0).xyz;
-          // boxRadius = vec3(0.1, 0.2, 0.3);
-
           vec3 pos = boxCenter + boxRadius * (uvw * 2.0 - 1.0);
-          // vec3 pos = (uvw * 2.0 - 1.0) * 0.1;
           eyeRelativePos = pos - eye;
           boxRelativePos = pos - boxCenter;
           gl_Position = worldToScreen * vec4(pos, 1.0);
@@ -485,11 +505,16 @@ function Init(rootEl, dimensions) {
   }
 
   if (GLHasExtension(gl, 'OES_texture_float', disable)) {
+    let internalFormat = gl.RGB
+    if (gl instanceof WebGL2RenderingContext) {
+      internalFormat = gl.RGB32F
+    }
+
     gl.bindTexture(gl.TEXTURE_2D, boxRasterizer.boxes.centerTexture)
     gl.texImage2D(
       gl.TEXTURE_2D,
       0,
-      gl.RGB,
+      internalFormat,
       boxRasterizer.boxes.textureDiameter,
       boxRasterizer.boxes.textureDiameter,
       0,
@@ -502,7 +527,7 @@ function Init(rootEl, dimensions) {
     gl.texImage2D(
       gl.TEXTURE_2D,
       0,
-      gl.RGB,
+      internalFormat,
       boxRasterizer.boxes.textureDiameter,
       boxRasterizer.boxes.textureDiameter,
       0,
