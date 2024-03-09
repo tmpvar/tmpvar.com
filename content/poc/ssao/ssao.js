@@ -86,19 +86,23 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
   const BoxVertexCount = 8
   config = config || {}
 
+  const boxTextureDiameter = Math.pow(2, Math.ceil(Math.log2(Math.sqrt(maxBoxes))))
+  const boxBufferEntryCount = Math.pow(boxTextureDiameter, 2)
+  console.log('boxTextureDiameter', boxTextureDiameter, 'boxBufferEntryCount', boxBufferEntryCount)
   const rasterizer = {
     batchSize: 0,
-
     indexBufferType: gl.UNSIGNED_INT,
     indexBuffer: gl.createBuffer(),
     vertexIDBuffer: null,
     vao: null,
     boxes: {
       count: 0,
-      center: new Float32Array(maxBoxes * 3),
-      centerBuffer: gl.createBuffer(),
-      radius: new Float32Array(maxBoxes * 3),
-      radiusBuffer: gl.createBuffer()
+      center: new Float32Array(boxBufferEntryCount * 3),
+      radius: new Float32Array(boxBufferEntryCount * 3),
+
+      textureDiameter: boxTextureDiameter,
+      centerTexture: gl.createTexture(),
+      radiusTexture: gl.createTexture()
     },
     render(worldToScreen, eye) {
       const totalIndices = this.boxes.count * BoxIndexCount
@@ -130,12 +134,22 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         eye[2]
       )
 
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.boxes.centerTexture)
+      gl.uniform1i(this.program.uniformLocation('boxCenterTexture'), 0)
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, this.boxes.radiusTexture)
+      gl.uniform1i(this.program.uniformLocation('boxRadiusTexture'), 1)
+
+      gl.uniform1f(this.program.uniformLocation('boxTextureDiameter'), this.boxes.textureDiameter)
+
       let remaining = this.boxes.count * BoxIndexCount
       let batchIndex = 0
       while (remaining > 0) {
-        const vertexIndexOffset = batchIndex * this.batchSize
+        let vertexIndexOffset = batchIndex * this.batchSize
         gl.uniform1f(this.program.uniformLocation('vertexIndexOffset'), vertexIndexOffset)
-        gl.drawElements(gl.TRIANGLES, remaining, this.indexBufferType, 0)
+        gl.drawElements(gl.TRIANGLES, remaining % this.batchSize, this.indexBufferType, 0)
 
         remaining -= this.batchSize
         batchIndex++
@@ -182,6 +196,21 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
   }
 
+  // Create the center and radius textures
+  {
+    gl.bindTexture(gl.TEXTURE_2D, rasterizer.boxes.centerTexture)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    gl.bindTexture(gl.TEXTURE_2D, rasterizer.boxes.radiusTexture)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  }
+
   // Build the program
   {
     let vertexSource = ''
@@ -207,6 +236,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         uniform vec3 eye;
         uniform float vertexIndexOffset;
         uniform sampler2D boxCenterTexture;
+        uniform sampler2D boxRadiusTexture;
 
         out vec3 uvw;
         out vec3 eyeRelativePos;
@@ -275,16 +305,19 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
         attribute float vertexID;
 
-        uniform sampler2D boxCenter;
-        uniform sampler2D boxRadius;
+        uniform sampler2D boxCenterTexture;
+        uniform sampler2D boxRadiusTexture;
+        uniform float boxTextureDiameter;
 
         uniform mat4 worldToScreen;
         uniform vec3 eye;
         uniform float vertexIndexOffset;
 
+
         varying vec3 uvw;
         varying vec3 eyeRelativePos;
         varying vec3 boxRelativePos;
+        varying vec3 boxRadius;
 
         void
         main() {
@@ -300,11 +333,19 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
           vertPosition.z = mod(boxVertIndex, 2.0);
 
           uvw = floor(vertPosition);
-          vec3 boxRadius = vec3(1.0, 2.0, 3.0);
-          // vec3 pos = boxCenter + boxRadius * (uvw * 2.0 - 1.0);
-          vec3 pos = (uvw * 2.0 - 1.0) * 0.1;
+          vec2 uv = vec2(
+            mod(boxIndex, boxTextureDiameter),
+            (boxIndex / boxTextureDiameter)
+          ) / boxTextureDiameter;
+
+          vec3 boxCenter = texture2DLod(boxCenterTexture, uv, 0.0).xyz;
+          boxRadius = texture2DLod(boxRadiusTexture, uv, 0.0).xyz;
+          // boxRadius = vec3(0.1, 0.2, 0.3);
+
+          vec3 pos = boxCenter + boxRadius * (uvw * 2.0 - 1.0);
+          // vec3 pos = (uvw * 2.0 - 1.0) * 0.1;
           eyeRelativePos = pos - eye;
-          boxRelativePos = pos;
+          boxRelativePos = pos - boxCenter;
           gl_Position = worldToScreen * vec4(pos, 1.0);
         }
       `
@@ -316,8 +357,10 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         varying vec3 uvw;
         varying vec3 boxRelativePos;
         varying vec3 eyeRelativePos;
+        varying vec3 boxRadius;
 
         vec3 ComputeFaceNormal(vec3 v) {
+
           vec3 vabs = abs(v);
           return v * vec3(
             greaterThanEqual(
@@ -328,7 +371,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         }
 
         void main() {
-          vec3 normal = normalize(ComputeFaceNormal(boxRelativePos));
+          vec3 normal = normalize(ComputeFaceNormal(boxRelativePos / boxRadius));
           ${fragmentBody}
         }
       `
@@ -380,19 +423,54 @@ function Init(rootEl) {
     lastFrameTime: Now()
   }
   const camera = CreateOrbitCamera(canvas)
-  const boxRasterizer = CreateBoxRasterizer(gl, 1024, {
+  const boxRasterizer = CreateBoxRasterizer(gl, 1024*1024, {
     disable
   })
 
-  boxRasterizer.boxes.count = 1
+  boxRasterizer.boxes.count = 400000
 
   for (let i = 0; i < boxRasterizer.boxes.count; i++) {
-    boxRasterizer.boxes.center[i * 3 + 0] = 0.0 // Math.random() * 5.0;
-    boxRasterizer.boxes.center[i * 3 + 1] = 0.0 // Math.random() * 5.0;
-    boxRasterizer.boxes.center[i * 3 + 2] = 0.0 // Math.random() * 5.0;
+    const offset = i * 3
+    boxRasterizer.boxes.center[offset + 1] = (Math.random() * 2.0 - 1.0) * 5.0;
+    boxRasterizer.boxes.center[offset + 0] = (Math.random() * 2.0 - 1.0) * 5.0;
+    boxRasterizer.boxes.center[offset + 2] = (Math.random() * 2.0 - 1.0) * 5.0;
   }
 
-  // TODO: upload the center texture
+  for (let i = 0; i < boxRasterizer.boxes.count; i++) {
+    const offset = i * 3
+    boxRasterizer.boxes.radius[offset + 0] = (Math.random() + 0.1) * 0.2;
+    boxRasterizer.boxes.radius[offset + 1] = (Math.random() + 0.1) * 0.2;
+    boxRasterizer.boxes.radius[offset + 2] = (Math.random() + 0.1) * 0.2;
+  }
+
+  // TODO: what do do when this isn't available?
+  if (GLHasExtension(gl, 'OES_texture_float', disable)) {
+    gl.bindTexture(gl.TEXTURE_2D, boxRasterizer.boxes.centerTexture)
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGB,
+      boxRasterizer.boxes.textureDiameter,
+      boxRasterizer.boxes.textureDiameter,
+      0,
+      gl.RGB,
+      gl.FLOAT,
+      boxRasterizer.boxes.center
+    )
+
+    gl.bindTexture(gl.TEXTURE_2D, boxRasterizer.boxes.radiusTexture)
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGB,
+      boxRasterizer.boxes.textureDiameter,
+      boxRasterizer.boxes.textureDiameter,
+      0,
+      gl.RGB,
+      gl.FLOAT,
+      boxRasterizer.boxes.radius
+    )
+  }
 
   function Render() {
     const now = Now()
