@@ -318,11 +318,11 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         uniform sampler2D boxCenterTexture;
         uniform sampler2D boxRadiusTexture;
         uniform float boxTextureDiameter;
+        uniform float inverseBoxTextureDiameter;
 
         uniform mat4 worldToScreen;
         uniform vec3 eye;
         uniform float vertexIndexOffset;
-
 
         varying vec3 uvw;
         varying vec3 eyeRelativePos;
@@ -332,22 +332,22 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         void
         main() {
           float vertexIndex = vertexID + vertexIndexOffset;
-          float boxIndex = vertexIndex / 8.0;
+          float boxIndex = vertexIndex * 0.125;
           float boxVertIndex = mod(vertexIndex, 8.0);
           vec3 vertPosition = vec3(0.0);
 
           vertPosition.x = mod(boxVertIndex, 2.0);
-          boxVertIndex /= 2.0;
+          boxVertIndex *= 0.5;
           vertPosition.y = mod(boxVertIndex, 2.0);
-          boxVertIndex /= 2.0;
+          boxVertIndex *= 0.5;
           vertPosition.z = mod(boxVertIndex, 2.0);
 
           uvw = floor(vertPosition);
 
           vec2 uv = vec2(
             mod(boxIndex, boxTextureDiameter),
-            (boxIndex / boxTextureDiameter)
-          ) / boxTextureDiameter;
+            (boxIndex * inverseBoxTextureDiameter)
+          ) * inverseBoxTextureDiameter;
 
           vec3 boxCenter = texture2DLod(boxCenterTexture, uv, 0.0).xyz;
           boxRadius = texture2DLod(boxRadiusTexture, uv, 0.0).xyz;
@@ -368,7 +368,6 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         varying vec3 boxRadius;
 
         vec3 ComputeFaceNormal(vec3 v) {
-
           vec3 vabs = abs(v);
           return v * vec3(
             greaterThanEqual(
@@ -403,6 +402,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
     gl.uniform1i(rasterizer.program.uniformLocation('boxTextureDiameter'), rasterizer.boxes.textureDiameter)
   } else {
     gl.uniform1f(rasterizer.program.uniformLocation('boxTextureDiameter'), rasterizer.boxes.textureDiameter)
+    gl.uniform1f(rasterizer.program.uniformLocation('inverseBoxTextureDiameter'), 1.0 / rasterizer.boxes.textureDiameter)
   }
 
   return rasterizer
