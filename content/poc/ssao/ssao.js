@@ -131,13 +131,16 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         gl.vertexAttribPointer(this.program.attributeLocation('vertexID'), 1, gl.FLOAT, false, 0, 0)
       }
 
-
-
       let remaining = this.boxes.count * BoxIndexCount
       let batchIndex = 0
+      const vertexIndexOffsetLocation = this.program.uniformLocation('vertexIndexOffset')
       while (remaining > 0) {
         let vertexIndexOffset = batchIndex * this.batchSize
-        gl.uniform1f(this.program.uniformLocation('vertexIndexOffset'), vertexIndexOffset)
+        if (gl instanceof WebGL2RenderingContext) {
+          gl.uniform1i(vertexIndexOffsetLocation, vertexIndexOffset)
+        } else {
+          gl.uniform1f(vertexIndexOffsetLocation, vertexIndexOffset)
+        }
         gl.drawElements(gl.TRIANGLES, remaining % this.batchSize, this.indexBufferType, 0)
 
         remaining -= this.batchSize
@@ -219,7 +222,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
     fragmentBody = fragmentBody || `
       outColor = vec4(uvw, 1.0);
       // outColor = vec4(1.0);
-      // outColor = vec4(normal * 0.5 + 0.5, 1.0);
+      outColor = vec4(normal * 0.5 + 0.5, 1.0);
     `
 
     if (gl instanceof WebGL2RenderingContext) {
@@ -236,22 +239,22 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
         uniform mat4 worldToScreen;
         uniform vec3 eye;
-        uniform float vertexIndexOffset;
+        uniform int vertexIndexOffset;
 
         out vec3 uvw;
         out vec3 boxRelativePos;
-        // out vec3 eyeRelativePos;
+        out vec3 eyeRelativePos;
         flat out vec3 boxRadius;
 
         #define vertexID gl_VertexID
         void
         main() {
-          int vertexIndex = vertexID + int(vertexIndexOffset);
+          int vertexIndex = vertexID + vertexIndexOffset;
           int boxIndex = (vertexIndex >> 3);
 
           uvw = vec3((vertexIndex & 1) >> 0,
-                                     (vertexIndex & 2) >> 1,
-                                     (vertexIndex & 4) >> 2);
+                     (vertexIndex & 2) >> 1,
+                     (vertexIndex & 4) >> 2);
 
           ivec2 texel = ivec2(
             boxIndex % boxTextureDiameter,
@@ -262,7 +265,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
           boxRadius = texelFetch(boxRadiusTexture, texel, 0).xyz;
 
           vec3 pos = boxCenter + boxRadius * (uvw * 2.0 - 1.0);
-          // eyeRelativePos = pos - eye;
+          eyeRelativePos = pos - eye;
           boxRelativePos = pos - boxCenter;
           gl_Position = worldToScreen * vec4(pos, 1.0);
         }
@@ -273,7 +276,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
         in vec3 uvw;
         in vec3 boxRelativePos;
-        // in vec3 eyeRelativePos;
+        in vec3 eyeRelativePos;
         flat in vec3 boxRadius;
 
         vec3 ComputeFaceNormal(vec3 v) {
