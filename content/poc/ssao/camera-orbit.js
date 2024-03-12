@@ -307,7 +307,7 @@ export default function CreateOrbitCamera(canvas) {
     target: [0.0, 0.0, 0.0],
     up: [0.0, 1.0, 0.0],
     distance: 2.5,
-    targetDistance: 10.5,
+    targetDistance: 20.5,
     minDistance: 0.001,
     maxDistance: 100,
     projection: new Float32Array(16),
@@ -315,7 +315,7 @@ export default function CreateOrbitCamera(canvas) {
     worldToScreen: new Float32Array(16),
     screenToWorld: new Float32Array(16),
     sensitivity: 0.005,
-    scrollSensitivity: 0.01,
+    scrollSensitivity: 0.005,
     fov: 90 * DegreesToRadians,
 
     mouse: {
@@ -367,28 +367,20 @@ export default function CreateOrbitCamera(canvas) {
     }
   }
 
-  const MoveMouse = (x, y) => {
-    let ratioX = canvas.width / canvas.clientWidth
-    let ratioY = canvas.height / canvas.clientHeight
-    state.mouse.pos[0] = x * ratioX
-    state.mouse.pos[1] = y * ratioY
-  }
-
   window.addEventListener("mouseup", e => {
     state.mouse.down = false
   })
 
   canvas.addEventListener("mousedown", (e) => {
     state.mouse.down = true
-    MoveMouse(e.offsetX, e.offsetY);
     state.mouse.lastPos[0] = state.mouse.pos[0]
     state.mouse.lastPos[1] = state.mouse.pos[1]
-
     e.preventDefault()
   }, { passive: false })
 
-  canvas.addEventListener("mousemove", e => {
-    MoveMouse(e.offsetX, e.offsetY)
+  window.addEventListener("mousemove", e => {
+    state.mouse.pos[0] = e.clientX
+    state.mouse.pos[1] = e.clientY
     e.preventDefault()
 
     if (state.mouse.down) {
@@ -397,10 +389,6 @@ export default function CreateOrbitCamera(canvas) {
 
       state.mouse.lastPos[0] = state.mouse.pos[0]
       state.mouse.lastPos[1] = state.mouse.pos[1]
-
-      if (Math.abs(dx) < 1.0 && Math.abs(dy) < 1.0) {
-        return;
-      }
 
       camera.rotate(dx, -dy)
     }
