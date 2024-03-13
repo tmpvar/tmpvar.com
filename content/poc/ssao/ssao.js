@@ -60,7 +60,16 @@ function GLCreateRasterProgram(gl, vertSource, fragSource) {
   return program
 }
 
-function GLHasExtension(gl, name, manualDisables) {
+
+function HasFeature(gl, name, manualDisables) {
+  const otherFeatures = {
+    sebbbi_mirror_trick: true
+  }
+
+  if (otherFeatures[name]) {
+    return !manualDisables || manualDisables[name] !== true
+  }
+
   let result = null
   if (gl instanceof WebGL2RenderingContext) {
     const SupersededExtensionsInWebGL2 = {
@@ -82,7 +91,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
   if (!gl) {
     throw new Error('no webgl available')
   }
-  const BoxIndexCount = 36
+  const BoxIndexCount = HasFeature(gl, 'sebbbi_mirror_trick', config.disable) ? 18 : 36
   const BoxVertexCount = 8
   config = config || {}
 
@@ -109,7 +118,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
       if (!totalIndices) {
         return
       }
-      const batchCount = (totalIndices / this.batchSize + 1) | 0
+
       if (!this.program) {
         return
       }
@@ -163,7 +172,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
     let indices = null;
     const MaxShortBatchCount = Math.floor(0xFFFF / BoxIndexCount) * BoxIndexCount
     if (maxBoxes * BoxIndexCount > 0xFFFF) {
-      if (GLHasExtension(gl, 'OES_element_index_uint', config.disable)) {
+      if (HasFeature(gl, 'OES_element_index_uint', config.disable)) {
         indices = new Uint32Array(maxBoxes * BoxIndexCount)
         rasterizer.indexBufferType = gl.UNSIGNED_INT
       } else {
@@ -222,8 +231,25 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
     fragmentBody = fragmentBody || `
       outColor = vec4(uvw, 1.0);
       // outColor = vec4(1.0);
-      outColor = vec4(normal * 0.5 + 0.5, 1.0);
+      outColor = vec4(normalize(normal) * 0.5 + 0.5, 1.0);
     `
+
+    let mirrorSource = ''
+    if (HasFeature(gl, 'sebbbi_mirror_trick', config.disable)) {
+      mirrorSource = `
+        vec3 eyeRelativePos = (eye - boxCenter);
+        if (eyeRelativePos.x > 0.0) {
+          uvw.x = 1.0 - uvw.x;
+        }
+        if (eyeRelativePos.y > 0.0) {
+          uvw.y = 1.0 - uvw.y;
+        }
+        if (eyeRelativePos.z > 0.0) {
+          uvw.z = 1.0 - uvw.z;
+        }
+      `
+    }
+
 
     if (gl instanceof WebGL2RenderingContext) {
       rasterizer.vao = gl.createVertexArray()
@@ -231,7 +257,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
 
 
       vertexSource = `#version 300 es
-        precision highp float;
+        precision lowp float;
 
         uniform sampler2D boxCenterTexture;
         uniform sampler2D boxRadiusTexture;
@@ -241,10 +267,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         uniform vec3 eye;
         uniform int vertexIndexOffset;
 
-        out vec3 uvw;
-        out vec3 boxRelativePos;
-        out vec3 eyeRelativePos;
-        flat out vec3 boxRadius;
+        out vec3 boxPosition;
 
         #define vertexID gl_VertexID
         void
@@ -252,9 +275,9 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
           int vertexIndex = vertexID + vertexIndexOffset;
           int boxIndex = (vertexIndex >> 3);
 
-          uvw = vec3((vertexIndex & 1) >> 0,
-                     (vertexIndex & 2) >> 1,
-                     (vertexIndex & 4) >> 2);
+          vec3 uvw = vec3((vertexIndex & 1) >> 0,
+                          (vertexIndex & 2) >> 1,
+                          (vertexIndex & 4) >> 2);
 
           ivec2 texel = ivec2(
             boxIndex % boxTextureDiameter,
@@ -262,22 +285,19 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
           );
 
           vec3 boxCenter = texelFetch(boxCenterTexture, texel, 0).xyz;
-          boxRadius = texelFetch(boxRadiusTexture, texel, 0).xyz;
+          vec3 boxRadius = texelFetch(boxRadiusTexture, texel, 0).xyz;
+
+          ${mirrorSource}
 
           vec3 pos = boxCenter + boxRadius * (uvw * 2.0 - 1.0);
-          eyeRelativePos = pos - eye;
-          boxRelativePos = pos - boxCenter;
+          boxPosition = (pos - boxCenter) / boxRadius;
           gl_Position = worldToScreen * vec4(pos, 1.0);
         }
       `
       fragmentSource = `#version 300 es
-        precision highp float;
+        precision lowp float;
         out vec4 outColor;
-
-        in vec3 uvw;
-        in vec3 boxRelativePos;
-        in vec3 eyeRelativePos;
-        flat in vec3 boxRadius;
+        in vec3 boxPosition;
 
         vec3 ComputeFaceNormal(vec3 v) {
           vec3 vabs = abs(v);
@@ -290,8 +310,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         }
 
         void main() {
-          vec3 normal = normalize(ComputeFaceNormal(boxRelativePos / boxRadius));
-          ${fragmentBody}
+          outColor = vec4(ComputeFaceNormal(boxPosition) * 0.5 + 0.5, 1.0);
         }
       `
     }
@@ -308,7 +327,6 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
     gl.bufferData(gl.ARRAY_BUFFER, vertexID, gl.STATIC_DRAW)
     gl.bindBuffer(gl.ARRAY_BUFFER, null)
 
-
     if (gl instanceof WebGLRenderingContext) {
       vertexSource = `
         precision highp float;
@@ -324,10 +342,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         uniform vec3 eye;
         uniform float vertexIndexOffset;
 
-        varying vec3 uvw;
-        varying vec3 eyeRelativePos;
-        varying vec3 boxRelativePos;
-        varying vec3 boxRadius;
+        varying vec3 boxPosition;
 
         void
         main() {
@@ -342,7 +357,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
           boxVertIndex *= 0.5;
           vertPosition.z = mod(boxVertIndex, 2.0);
 
-          uvw = floor(vertPosition);
+          vec3 uvw = floor(vertPosition);
 
           vec2 uv = vec2(
             mod(boxIndex, boxTextureDiameter),
@@ -350,22 +365,21 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
           ) * inverseBoxTextureDiameter;
 
           vec3 boxCenter = texture2DLod(boxCenterTexture, uv, 0.0).xyz;
-          boxRadius = texture2DLod(boxRadiusTexture, uv, 0.0).xyz;
+          vec3 boxRadius = texture2DLod(boxRadiusTexture, uv, 0.0).xyz;
+
+          ${mirrorSource}
+
           vec3 pos = boxCenter + boxRadius * (uvw * 2.0 - 1.0);
-          eyeRelativePos = pos - eye;
-          boxRelativePos = pos - boxCenter;
+          boxPosition = (pos - boxCenter) / boxRadius;
           gl_Position = worldToScreen * vec4(pos, 1.0);
         }
       `
 
       fragmentSource = `
-        precision highp float;
+        precision lowp float;
         #define outColor gl_FragColor
 
-        varying vec3 uvw;
-        varying vec3 boxRelativePos;
-        varying vec3 eyeRelativePos;
-        varying vec3 boxRadius;
+        varying vec3 boxPosition;
 
         vec3 ComputeFaceNormal(vec3 v) {
           vec3 vabs = abs(v);
@@ -378,8 +392,7 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         }
 
         void main() {
-          vec3 normal = normalize(ComputeFaceNormal(boxRelativePos / boxRadius));
-          ${fragmentBody}
+          outColor = vec4(ComputeFaceNormal(boxPosition) * 0.5 + 0.5, 1.0);
         }
       `
     }
@@ -576,8 +589,8 @@ function Init(rootEl, dimensions) {
 
   for (let i = 0; i < boxRasterizer.boxes.count; i++) {
     const offset = i * 3
-    boxRasterizer.boxes.center[offset + 1] = (Math.random() * 2.0 - 1.0) * 20.0;
     boxRasterizer.boxes.center[offset + 0] = (Math.random() * 2.0 - 1.0) * 20.0;
+    boxRasterizer.boxes.center[offset + 1] = (Math.random() * 2.0 - 1.0) * 20.0;
     boxRasterizer.boxes.center[offset + 2] = (Math.random() * 2.0 - 1.0) * 20.0;
   }
 
@@ -588,7 +601,7 @@ function Init(rootEl, dimensions) {
     boxRasterizer.boxes.radius[offset + 2] = (Math.random() + 0.1) * 0.5;
   }
 
-  if (GLHasExtension(gl, 'OES_texture_float', disable)) {
+  if (HasFeature(gl, 'OES_texture_float', disable)) {
     let internalFormat = gl.RGB
     if (gl instanceof WebGL2RenderingContext) {
       internalFormat = gl.RGB16F
@@ -635,7 +648,11 @@ function Init(rootEl, dimensions) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     gl.enable(gl.DEPTH_TEST)
     gl.depthMask(true)
-    gl.enable(gl.CULL_FACE)
+    if (HasFeature(gl, 'sebbbi_mirror_trick', config.disable)) {
+      gl.disable(gl.CULL_FACE)
+    } else {
+      gl.enable(gl.CULL_FACE)
+    }
     boxRasterizer.render(camera.state.worldToScreen, camera.state.eye)
 
     requestAnimationFrame(Render)
