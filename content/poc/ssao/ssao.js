@@ -75,6 +75,7 @@ function HasFeature(gl, name, manualDisables) {
     const SupersededExtensionsInWebGL2 = {
       'OES_element_index_uint': true,
       'OES_texture_float': true,
+      'OES_texture_half_float': true,
     }
 
     if (SupersededExtensionsInWebGL2[name]) {
@@ -98,22 +99,129 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
   const boxTextureDiameter = Math.pow(2, Math.ceil(Math.log2(Math.sqrt(maxBoxes))))
   const boxBufferEntryCount = Math.pow(boxTextureDiameter, 2)
 
+  const useFloat16 = HasFeature(gl, 'OES_texture_half_float', config.disable)
+
+  const f32tof16Scratch = new DataView(new ArrayBuffer(4))
+  function f32tof16(value) {
+    f32tof16Scratch.setFloat32(0, value, true)
+    const f = f32tof16Scratch.getUint32(0, true)
+
+    // from: https://stackoverflow.com/questions/1659440/32-bit-to-16-bit-floating-point-conversion/60047308#60047308
+    // see also: http://www.fox-toolkit.org/ftp/fasthalffloatconversion.pdf
+    const b = f + 0x00001000; // round-to-nearest-even: add last bit after truncated mantissa
+    const e = (b & 0x7F800000) >> 23; // exponent
+    const m = b & 0x007FFFFF; // mantissa; in line below: 0x007FF000 = 0x00800000-0x00001000 = decimal indicator flag - initial rounding
+
+    // sign : normalized : denormalized : saturate
+    const r = (
+      (b & 0x80000000) >> 16 |
+      (e > 112) * ((((e - 112) << 10) & 0x7C00) |
+        m >> 13) |
+      ((e < 113) & (e > 101)) * ((((0x007FF000 + m) >> (125 - e)) + 1) >> 1) |
+      (e > 143) * 0x7FFF
+    );
+    return r
+  }
+
   const rasterizer = {
+    useFloat16,
     batchSize: 0,
     indexBufferType: gl.UNSIGNED_INT,
     indexBuffer: gl.createBuffer(),
     vertexIDBuffer: null,
     vao: null,
-    boxes: {
-      count: 0,
-      center: new Float32Array(boxBufferEntryCount * 3),
-      radius: new Float32Array(boxBufferEntryCount * 3),
 
+    boxes: {
+      dirty: false,
+      count: 0,
+      center: useFloat16 ? new Uint16Array(boxBufferEntryCount * 3) : new Float32Array(boxBufferEntryCount * 3),
+      radius: useFloat16 ? new Uint16Array(boxBufferEntryCount * 3) : new Float32Array(boxBufferEntryCount * 3),
+
+      add(cx, cy, cz, rx, ry, rz) {
+        const idx = this.count++
+        const offset = idx * 3
+
+        if (useFloat16) {
+          cx = f32tof16(cx)
+          cy = f32tof16(cy)
+          cz = f32tof16(cz)
+
+          rx = f32tof16(rx)
+          ry = f32tof16(ry)
+          rz = f32tof16(rz)
+        }
+
+        this.center[offset + 0] = cx
+        this.center[offset + 1] = cy
+        this.center[offset + 2] = cz
+
+        this.radius[offset + 0] = rx
+        this.radius[offset + 1] = ry
+        this.radius[offset + 2] = rz
+
+        this.dirty = true
+      },
+
+      reset() {
+        this.dirty = true
+      },
       textureDiameter: boxTextureDiameter,
       centerTexture: gl.createTexture(),
       radiusTexture: gl.createTexture()
     },
+
+    update() {
+      if (!this.boxes.dirty) {
+        return
+      }
+      this.boxes.dirty = false
+
+      console.log("UPDATE")
+
+      let internalFormat = gl.RGB
+      let type = gl.FLOAT
+      if (this.useFloat16) {
+        if (gl instanceof WebGL2RenderingContext) {
+          internalFormat = gl.RGB16F
+          type = gl.HALF_FLOAT
+        } else {
+          type = this.useFloat16.HALF_FLOAT_OES
+        }
+      } else if (HasFeature(gl, 'OES_texture_float', disable)) {
+        internalFormat = gl.RGB
+        type = gl.FLOAT
+      }
+
+      gl.bindTexture(gl.TEXTURE_2D, this.boxes.centerTexture)
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        internalFormat,
+        this.boxes.textureDiameter,
+        this.boxes.textureDiameter,
+        0,
+        gl.RGB,
+        type,
+        this.boxes.center
+      )
+
+      gl.bindTexture(gl.TEXTURE_2D, this.boxes.radiusTexture)
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        internalFormat,
+        this.boxes.textureDiameter,
+        this.boxes.textureDiameter,
+        0,
+        gl.RGB,
+        type,
+        this.boxes.radius
+      )
+    },
+
     render(worldToScreen, eye) {
+      this.update()
+
       const totalIndices = this.boxes.count * BoxIndexCount
       if (!totalIndices) {
         return
@@ -469,7 +577,7 @@ function CreateFullScreener(clickToFullscreenElement, elementToFullscreen) {
   }
 }
 
-function CreateFrameTimer(gl, maxHistoricalFrames) {
+function CreateFrameTimer(gl, maxHistoricalFrames, config) {
   const canvas = document.createElement('canvas')
   canvas.width = 1024
   canvas.height = 100
@@ -506,8 +614,12 @@ function CreateFrameTimer(gl, maxHistoricalFrames) {
 
       ctx.font = "16px monospace"
       ctx.fillStyle = "white"
-      ctx.fillText(`${dt.toFixed(2)}`, 10, 30)
-      ctx.fillText(`boxes: ${boxCount}`, 100, 30)
+
+      const texty = canvas.height - 10
+      ctx.fillText(`${dt.toFixed(2)}`, 10, texty)
+      ctx.fillText(`boxes: ${boxCount}`, 100, texty)
+      ctx.fillText(`webgl2: ${gl instanceof WebGL2RenderingContext}`, 250, texty)
+      ctx.fillText(`f16: ${!!HasFeature(gl, 'OES_texture_half_float', config.disable)}`, 400, texty)
 
       for (let i = start; i < end; i++) {
         const sample = this.frames[i % maxHistoricalFrames]
@@ -554,8 +666,6 @@ function Init(rootEl, dimensions) {
     canvas
   )
 
-  let webglVersion = 2
-
   const config = {
     antialias: false,
     stencil: false,
@@ -566,7 +676,6 @@ function Init(rootEl, dimensions) {
   let gl = !disable.webgl2 && canvas.getContext('webgl2', config)
   if (!gl) {
     console.log('using webgl1')
-    webglVersion = 1
     gl = canvas.getContext('webgl', config)
     if (!gl) {
       throw new Error('webgl not available')
@@ -575,7 +684,9 @@ function Init(rootEl, dimensions) {
     console.log('using webgl2')
   }
 
-  const frameTimer = CreateFrameTimer(gl, 256)
+  const frameTimer = CreateFrameTimer(gl, 256, {
+    disable
+  })
 
   const state = {
     lastFrameTime: Now()
@@ -585,52 +696,16 @@ function Init(rootEl, dimensions) {
     disable
   })
 
-  boxRasterizer.boxes.count = 100000
+  const boxCount = 150000
 
-  for (let i = 0; i < boxRasterizer.boxes.count; i++) {
-    const offset = i * 3
-    boxRasterizer.boxes.center[offset + 0] = (Math.random() * 2.0 - 1.0) * 20.0;
-    boxRasterizer.boxes.center[offset + 1] = (Math.random() * 2.0 - 1.0) * 20.0;
-    boxRasterizer.boxes.center[offset + 2] = (Math.random() * 2.0 - 1.0) * 20.0;
-  }
-
-  for (let i = 0; i < boxRasterizer.boxes.count; i++) {
-    const offset = i * 3
-    boxRasterizer.boxes.radius[offset + 0] = (Math.random() + 0.1) * 0.5;
-    boxRasterizer.boxes.radius[offset + 1] = (Math.random() + 0.1) * 0.5;
-    boxRasterizer.boxes.radius[offset + 2] = (Math.random() + 0.1) * 0.5;
-  }
-
-  if (HasFeature(gl, 'OES_texture_float', disable)) {
-    let internalFormat = gl.RGB
-    if (gl instanceof WebGL2RenderingContext) {
-      internalFormat = gl.RGB16F
-    }
-
-    gl.bindTexture(gl.TEXTURE_2D, boxRasterizer.boxes.centerTexture)
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      internalFormat,
-      boxRasterizer.boxes.textureDiameter,
-      boxRasterizer.boxes.textureDiameter,
-      0,
-      gl.RGB,
-      gl.FLOAT,
-      boxRasterizer.boxes.center
-    )
-
-    gl.bindTexture(gl.TEXTURE_2D, boxRasterizer.boxes.radiusTexture)
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      internalFormat,
-      boxRasterizer.boxes.textureDiameter,
-      boxRasterizer.boxes.textureDiameter,
-      0,
-      gl.RGB,
-      gl.FLOAT,
-      boxRasterizer.boxes.radius
+  for (let i = 0; i < boxCount; i++) {
+    boxRasterizer.boxes.add(
+      (Math.random() * 2.0 - 1.0) * 30.0,
+      (Math.random() * 2.0 - 1.0) * 30.0,
+      (Math.random() * 2.0 - 1.0) * 30.0,
+      (Math.random() + 0.1) * 0.5,
+      (Math.random() + 0.1) * 0.5,
+      (Math.random() + 0.1) * 0.5
     )
   }
 
