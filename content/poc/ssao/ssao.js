@@ -70,6 +70,10 @@ function HasFeature(gl, name, manualDisables) {
     return !manualDisables || manualDisables[name] !== true
   }
 
+  if (manualDisables[name]) {
+    return false;
+  }
+
   let result = null
   if (gl instanceof WebGL2RenderingContext) {
     const SupersededExtensionsInWebGL2 = {
@@ -179,7 +183,8 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
       console.log("UPDATE")
 
       let internalFormat = gl.RGB
-      let type = gl.FLOAT
+      let type = gl.UNSIGNED_BYTE
+
       if (this.useFloat16) {
         if (gl instanceof WebGL2RenderingContext) {
           internalFormat = gl.RGB16F
@@ -187,8 +192,10 @@ function CreateBoxRasterizer(gl, maxBoxes, config, fragmentBody) {
         } else {
           type = this.useFloat16.HALF_FLOAT_OES
         }
-      } else if (HasFeature(gl, 'OES_texture_float', disable)) {
-        internalFormat = gl.RGB
+      } else if (HasFeature(gl, 'OES_texture_float', config.disable)) {
+        if (gl instanceof WebGL2RenderingContext) {
+          internalFormat = gl.RGB32F
+        }
         type = gl.FLOAT
       }
 
