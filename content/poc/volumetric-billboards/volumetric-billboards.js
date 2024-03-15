@@ -611,7 +611,7 @@ async function Init(rootEl) {
     gl.viewport(0, 0, screenDims[0], screenDims[1]);
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.clearColor(0.2, 0.2, .2, 1)
+    gl.clearColor(0.1, 0.1, .1, 1)
 
     // compute the most distant corner
     {
