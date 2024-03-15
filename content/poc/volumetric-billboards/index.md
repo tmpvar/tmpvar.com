@@ -2,7 +2,6 @@
 title = "Volumetric Billboards"
 date = 2024-02-18
 [extra]
-unlisted = true
 +++
 
 ## Inspiration
@@ -11,15 +10,13 @@ Alex Evan's [Learning From Failure](https://www.youtube.com/watch?v=u9KNtnCZDMI)
 
 [Original Paper](https://hal.inria.fr/inria-00402067)
 
-## How it works
-
 ## Demo
 
 <section id="volumetric-billboards-content" class="has-webgpu">
   <section class="controls">
   </section>
   <section class="center-align">
-    <canvas width="1024" height="1024"></canvas>
+    <canvas width="1024" height="512"></canvas>
   </section>
   <script src="volumetric-billboards.js" type="module"></script>
   <p>
