@@ -1697,9 +1697,9 @@ Example on Windows:
     // probe params
     {
       Param('probeRadius', 'i32', (parentEl, value) => {
-        let newValue = Math.pow(2, value) * 0.5;
-        parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = ${newValue}`
-        return newValue
+        let probeDiameter = Math.pow(2, value);
+        parentEl.querySelector('output').innerHTML = `2<sup>${value}</sup> = ${probeDiameter}`
+        return probeDiameter * 0.5
       })
 
       Param('probeRayCount', 'i32', (parentEl, value) => {
@@ -1897,10 +1897,7 @@ Example on Windows:
     // Fill the probe atlas via ray casting
     {
       const probeDiameter = state.params.probeRadius * 2.0
-      const levelCount = Math.min(
-        Math.round(Math.log(state.canvas.width / probeDiameter) / Math.log(Math.pow(2, state.params.branchingFactor))),
-        state.params.maxProbeLevel
-      );
+      const levelCount = state.params.maxProbeLevel
 
       for (let level = levelCount; level >= 0; level--) {
         let currentProbeDiameter = probeDiameter << level;
