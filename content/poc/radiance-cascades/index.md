@@ -201,7 +201,7 @@ Things are simpler in 2D so we'll start there.
         <output></output>
       </div>
       <div class="maxProbeLevel-control control">
-        max probe level: <input type="range" min="0" max="9" value="5">
+        levels: <input type="range" min="0" max="9" value="5">
         <output></output>
       </div>
     </div>
