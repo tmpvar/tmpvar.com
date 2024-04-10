@@ -59,6 +59,7 @@
 - isosurface-extraction: render the marching cubes 33 output for the current scene
 
 ## Pending
+- tool: add a hex -> glsl vec3 conversion tool
 - global: add a page level image expander
 - radiance-cascades: fix timestamp queries on Chrome Beta
   + https://developer.chrome.com/blog/new-in-webgpu-121#chrome121
