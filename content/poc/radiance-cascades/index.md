@@ -14,6 +14,9 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
   - shadertoy: [Radiance Cascades 2d Smooth WIP
  ](https://www.shadertoy.com/view/mlSfRD) - Suslik's fork of fad's work
 
+ - blog posts:
+   - Yaazarai wrote about [Radiance Cascades](https://mini.gmshaders.com/p/radiance-cascades) on GM Shader Tuts
+
 ## 2D
 
 Things are simpler in 2D so we'll start there.
