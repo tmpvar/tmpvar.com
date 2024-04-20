@@ -1,13 +1,13 @@
 +++
-title = "Convering PNG to a Win32 Resource File (.res) without Visual Studio"
+title = "Convering PNG to a Win32 Resource File (.res)"
 date = 2024-04-19
-description = "Avoid the pesky conversion to .ico just to throw it away for .res"
+description = "Application icons from PNGs on windows the easy way"
 keywords = "ico, png, .res, resource, win32, c++, handmade"
 [extra]
 enableSampleImage = true
 +++
 
-Wanting to add application icons to my prototyping platform (hotcart) I discovered there is pretty trivial way to add icons to applications without using the Visual Studio GUI or tools like rc.exe.
+Wanting to add application icons to my prototyping platform (hotcart) I discovered there is pretty trivial way to add icons to applications without using the Visual Studio GUI or tools like `rc.exe`.
 
 <!-- more -->
 
