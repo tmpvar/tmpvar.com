@@ -9,10 +9,12 @@
 
   {% if page.description %}
   <meta name="twitter:description" content="{{ page.description | safe }}">
-  <meta property="og:description" content="{{ page.description | safe }}">
+  <meta property="og:description" content="">
+  <meta name="description" content="{{ page.description | safe }}">
   {% else %}
   <meta name="twitter:description" content="{{ page.summary }}">
   <meta property="og:description" content="{{ page.summary }}">
+  <meta name="description" content="{{ page.summary }}">
   {% endif %}
 
   <meta name="twitter:card" content="summary_large_image">
