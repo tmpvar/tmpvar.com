@@ -42,21 +42,22 @@ async function Init(rootElement) {
   })
 
   function Frame() {
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     if (state.audioContext) {
       const now = state.audioContext.currentTime
       if (state.down && state.nextPlay < now) {
         PlaySound(state.audioContext, state.sound, state.analyser, 0)
-        state.nextPlay = now + Math.random() * 0.05
+        state.nextPlay = now + Math.random() * Math.random()
       }
 
       if (state.analyser) {
         state.analyser.getByteTimeDomainData(state.dataArray);
 
-        ctx.fillStyle = "rgb(200 200 200)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         ctx.lineWidth = 2;
-        ctx.strokeStyle = "rgb(0 0 0)";
+        ctx.strokeStyle = "rgb(157, 230, 78)"
 
         ctx.beginPath();
 
