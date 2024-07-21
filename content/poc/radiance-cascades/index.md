@@ -248,9 +248,54 @@ Things are simpler in 2D so we'll start there.
   <script type="module" src="flatland-2d/flatland-2d.js"></script>
 </section>
 
-## 3D
+## Screenspace probes with Worldspace Intervals (3D)
 
-### World Space Storage Requirements (3D)
+<section id="ssprobes-wsintervals-content">
+  <p>
+    Compute a storage cost table for screen-space probes with world space intervals
+  </p>
+
+  <section class="controls" class="webgpu-required">
+    <h4>World Space</h4>
+    <div class="indent">
+      <div class="WorldSpace_C0_Directions-control control">
+        <input type="range" min="1" max="32" value="2"> probe directions
+        <output></output>
+      </div>
+    </div>
+    <h4>Screen Space</h4>
+    <div class="indent">
+      <div class="ScreenSpace_C0_ProbeSpacing-control control">
+        <input type="range" min="1" max="32" value="2"> probe spacing
+        <output></output>
+      </div>
+    </div>
+    <h4>General</h4>
+    <div class="indent">
+      <div class="General_Keep_Unmerged-control control">
+        <input type="checkbox" value="1" checked> keep merged and unmerged ray cascades
+        <div class="param-note">
+          This keeps the data around that is used to compute reflections for surfaces defined by GGX or similar roughness models.
+        </div>
+        <output></output>
+      </div>
+      <div class="General_Use_Min_And_Max_Depth-control control">
+        <input type="checkbox" value="1" checked> place screenspace probes on min <b>and</b> max depth
+        <div class="param-note">
+          This helps with scenes that have high depth complexity with thin objects.
+        <div>
+        <output></output>
+      </div>
+    </div>
+  </section>
+  <section class='results'>
+  </section>
+  <p>
+    source: <a href="ssprobes-wsintervals/ssprobes-wsintervals.js" target="_blank">ssprobes-wsintervals/ssprobes-wsintervals.js</a>
+  </p>
+  <script type="module" src="ssprobes-wsintervals/ssprobes-wsintervals.js"></script>
+
+## World Space Probes (3D)
 <section id="world-space-storage-requirements-3d-content">
   <p>
     Compute a storage cost table for world space probes, using a ping-pong buffer, at various
