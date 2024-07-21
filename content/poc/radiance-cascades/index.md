@@ -14,8 +14,9 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
   - shadertoy: [Radiance Cascades 2d Smooth WIP
  ](https://www.shadertoy.com/view/mlSfRD) - Suslik's fork of fad's work
 
- - blog posts:
-   - Yaazarai wrote about [Radiance Cascades](https://mini.gmshaders.com/p/radiance-cascades) on GM Shader Tuts
+ - blog posts / videos:
+   - [Yaazarai](https://twitter.com/yaazarai) wrote about [Radiance Cascades](https://mini.gmshaders.com/p/radiance-cascades) on GM Shader Tuts
+   - [SimonDev](https://www.youtube.com/@simondev758) made a nice introductory video: [Exploring a New Approach to Realistic Lighting: Radiance Cascades](https://www.youtube.com/watch?v=3so7xdZHKxw)
 
 ## 2D
 
@@ -266,7 +267,7 @@ Things are simpler in 2D so we'll start there.
     <h4>Screen Space</h4>
     <div class="indent">
       <div class="ScreenSpace_C0_ProbeSpacing-control control">
-        <input type="range" min="1" max="32" value="2"> probe spacing
+        <input type="range" min="0" max="10" value="2"> probe spacing
         <output></output>
       </div>
     </div>
