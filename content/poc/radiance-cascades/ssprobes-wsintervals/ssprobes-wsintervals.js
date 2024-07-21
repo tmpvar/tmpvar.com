@@ -102,36 +102,5 @@ function Init(rootEl) {
   }
 
   Update()
-
-  // const root = document.querySelector('#ssprobes-wsintervals-content')
-
-  // const tbody = root.querySelector('tbody')
-  // const rayCount = 6
-  // const bytesPerRay = 16
-  // const MB = Math.pow(1024, 2)
-  // for (let d = 4; d<11; d++) {
-  //   let diameter = Math.pow(2, d)
-  //   let volume = Math.pow(diameter, 3)
-  //   let area = Math.pow(diameter, 2)
-
-  //   const row = document.createElement('tr')
-  //   const cellDiameter = document.createElement('td')
-  //   cellDiameter.innerText = diameter
-  //   row.appendChild(cellDiameter)
-
-  //   {
-  //     const cellMemory = document.createElement('td')
-  //     cellMemory.innerText = (volume * rayCount * bytesPerRay)/MB * 2
-  //     row.appendChild(cellMemory)
-  //   }
-
-  //   {
-  //     const cellMemory = document.createElement('td')
-  //     cellMemory.innerText = (area * rayCount * bytesPerRay)/MB * 2
-  //     row.appendChild(cellMemory)
-  //   }
-
-  //   tbody.appendChild(row)
-  // }
 }
 
