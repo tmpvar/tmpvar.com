@@ -35,8 +35,8 @@ function Init(rootEl) {
       return displayValue
     })
     Param('ScreenSpace_C0_ProbeSpacing', 'i32', (parentEl, value) => {
-      let displayValue = Math.pow(value, 2)
-      parentEl.querySelector('output').innerHTML = `<span>${displayValue} (<span class="highlight-orange">${value}</span><sup>2</sup</span>)`
+      let displayValue = Math.pow(2, value)
+      parentEl.querySelector('output').innerHTML = `<span>${displayValue} (2<sup><span class="highlight-orange">${value}</sup</span>)`
       return displayValue
     })
 
