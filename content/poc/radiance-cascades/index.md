@@ -273,7 +273,7 @@ Things are simpler in 2D so we'll start there.
     <h4>General</h4>
     <div class="indent">
       <div class="General_Keep_Unmerged-control control">
-        <input type="checkbox" value="1" checked> keep merged and unmerged ray cascades
+        <input type="checkbox" value="1" checked> keep merged and unmerged cascades
         <div class="param-note">
           This keeps the data around that is used to compute reflections for surfaces defined by GGX or similar roughness models.
         </div>
