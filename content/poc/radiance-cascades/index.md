@@ -18,6 +18,8 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
    - [Yaazarai](https://twitter.com/yaazarai) wrote about [Radiance Cascades](https://mini.gmshaders.com/p/radiance-cascades) on GM Shader Tuts
    - [SimonDev](https://www.youtube.com/@simondev758) made a nice introductory video: [Exploring a New Approach to Realistic Lighting: Radiance Cascades](https://www.youtube.com/watch?v=3so7xdZHKxw)
 
+ - calulators and other utilities
+  - [https://mastodon.social/@kornel] made a [calcualator](https://kornel.ski/radiance) to compute the optimal cascade interval lengths based on the penumbra angle, minimum light size and probe spacing.
 ## 2D
 
 Things are simpler in 2D so we'll start there.
