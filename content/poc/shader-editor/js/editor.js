@@ -90,14 +90,14 @@ function InitWebGL(canvas) {
   }
 }
 
-async function InitEditor(editorEl) {
+async function InitEditor(editorEl, initialContent) {
   require.config({ paths: { vs: 'js/monaco-editor/min/vs' } });
   const monaco = await new Promise(resolve => {
     require(['vs/editor/editor.main'], resolve)
   })
 
   const editor = monaco.editor.create(editorEl, {
-    value: window.localStorage.getItem('shader-editor') || '',
+    value: initialContent || '',
     language: 'c',
     minimap: {
       enabled: false
@@ -113,14 +113,18 @@ async function Init() {
   const gpu = InitWebGL(document.querySelector('#output'))
 
   const initialContent = window.localStorage.getItem('shader-editor') || `#version 300 es
-  precision highp float;
+precision highp float;
 
-  in vec2 uv;
-  out vec4 fragColor;
+in vec2 uv;
+out vec4 fragColor;
 
-  void main() {
-    fragColor = vec4(uv, 0.0, 1.0);
-  }
+uniform float time;
+
+void main() {
+  vec3 col = 0.5 + 0.5*cos(time + uv.xyx + vec3(0,2,4));
+  fragColor = vec4(col, 1.0);
+}
+
   `
   const editor = await InitEditor(document.querySelector('#editor'), initialContent)
 
@@ -173,6 +177,7 @@ function ExecuteFrame(dt, state) {
   gl.clear(gl.COLOR_BUFFER_BIT);
 
   gl.useProgram(state.debugProgram)
+  gl.uniform1f(gl.getUniformLocation(state.debugProgram, 'time'), dt * 0.001)
   gpu.fullscreenRenderer()
 
   requestAnimationFrame((dt) => ExecuteFrame(dt, state))
