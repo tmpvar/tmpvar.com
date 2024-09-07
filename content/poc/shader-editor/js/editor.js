@@ -1,3 +1,36 @@
+const LocalStorageVersion = 1
+
+const DemoShader = `#version 300 es
+precision highp float;
+in vec2 uv;
+uniform float time;
+out vec4 fragColor;
+
+#pass Pass0
+void main() {
+  vec3 col = 0.5 + 0.5*cos(time + uv.xyx + vec3(0,2,4));
+  fragColor = vec4(col, 1.0);
+  fragColor = vec4(1.0);
+}
+
+#pass Pass1
+void main() {
+  fragColor = vec4(uv, 0.0, 1.0);
+}
+
+#pass Output
+uniform sampler2D pass_Pass0;
+uniform sampler2D pass_Pass1;
+void main() {
+  fragColor = mix(
+    texture(pass_Pass0, uv),
+    texture(pass_Pass1, uv),
+    sin(time) * 0.5 + 0.5
+  );
+}
+`
+
+
 const Floor = Math.floor
 
 Init()
@@ -5,7 +38,7 @@ Init()
 function CreateFullscreenRenderer(gl) {
   const vertexBuffer = new Float32Array([-1, -1, -1, 4, 4, -1])
   const vao = gl.createVertexArray()
-  console.log('vao', vao)
+
   gl.bindVertexArray(vao)
   var buf = gl.createBuffer(gl)
   gl.bindBuffer(gl.ARRAY_BUFFER, buf)
@@ -109,43 +142,110 @@ async function InitEditor(editorEl, initialContent) {
   return editor
 }
 
+const passDelimiter = '#pass'
+const passSamplerPrefix = 'pass_'
+function PreprocessShaderSource(source) {
+  const lines = source.split(/\r?\n/)
+
+  let currentPassName = '_common_'
+
+  const passSources = {
+    '_common_': ''
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (line.startsWith(passDelimiter)) {
+      currentPassName = line.slice(passDelimiter.length).trim()
+      passSources[currentPassName] = `// #pass ${currentPassName}\n`
+    } else {
+      passSources[currentPassName] += `${line}\n`
+    }
+  }
+
+  return passSources
+}
+
+function UpdateSource(gpu, programs, source) {
+  const passes = PreprocessShaderSource(source)
+  const gl = gpu.gl
+  for (const [name, source] of Object.entries(passes)) {
+    if (name === '_common_') {
+      continue
+    }
+    const passSource = passes._common_ + source
+    // TODO: hash the source to determine if we should rebuild the program
+    console.group('compile pass \'%s\'', name)
+    console.log(passSource)
+
+    const handle = CreateRasterProgram(gl, passSource);
+    if (handle) {
+      if (programs[name]) {
+        gl.deleteProgram(programs[name].handle)
+      } else {
+        programs[name] = { name: name }
+      }
+
+      programs[name].dependencies = []
+      programs[name].uniformLocations = {}
+      programs[name].handle = handle
+      if (!programs[name].framebuffer) {
+        if (name !== 'Output') {
+          programs[name].framebuffer = gl.createFramebuffer()
+          programs[name].texture = gl.createTexture()
+
+          gl.bindTexture(gl.TEXTURE_2D, programs[name].texture)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, 0);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+        } else {
+          programs[name].framebuffer = null
+        }
+      }
+
+      const uniformCount = gl.getProgramParameter(handle, gl.ACTIVE_UNIFORMS)
+      for (let i = 0; i < uniformCount; i++) {
+        const uniform = gl.getActiveUniform(handle, i);
+        if (uniform.name.startsWith(passSamplerPrefix)) {
+          programs[name].dependencies.push(uniform.name.slice(passSamplerPrefix.length))
+        }
+
+        programs[name].uniformLocations[uniform.name] = gl.getUniformLocation(handle, uniform.name)
+      }
+    } else {
+      console.log('NO HANDLE')
+    }
+    console.groupEnd()
+  }
+}
+
 async function Init() {
   const gpu = InitWebGL(document.querySelector('#output'))
 
-  const initialContent = window.localStorage.getItem('shader-editor') || `#version 300 es
-precision highp float;
+  const savedVersion = window.localStorage.getItem('shader-editor-version')
+  const initialContent = savedVersion === LocalStorageVersion
+    ? window.localStorage.getItem('shader-editor') || DemoShader
+    : DemoShader
 
-in vec2 uv;
-out vec4 fragColor;
-
-uniform float time;
-
-void main() {
-  vec3 col = 0.5 + 0.5*cos(time + uv.xyx + vec3(0,2,4));
-  fragColor = vec4(col, 1.0);
-}
-
-  `
   const editor = await InitEditor(document.querySelector('#editor'), initialContent)
 
   const state = {
     gpu,
     editor,
-    debugProgram: CreateRasterProgram(gpu.gl, initialContent)
+    programs: {}
   }
+
+  UpdateSource(gpu, state.programs, initialContent)
+  console.log(state.programs)
 
   // DEBUG: wire up persistence via local storage
   editor.getModel().onDidChangeContent((event) => {
     const latestContent = editor.getModel().createSnapshot().read() || ''
     window.localStorage.setItem('shader-editor', latestContent)
     console.clear()
-    console.log('latestContent', latestContent)
-
-    const newProgram = CreateRasterProgram(gpu.gl, latestContent);
-    if (newProgram) {
-      gpu.gl.deleteProgram(state.program)
-      state.debugProgram = newProgram
-    }
+    UpdateSource(gpu, state.programs, latestContent)
   })
 
   requestAnimationFrame((dt) => ExecuteFrame(dt, state))
@@ -176,10 +276,61 @@ function ExecuteFrame(dt, state) {
   gl.clearColor(1.0, 0.0, 0.0, 1.0);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-  gl.useProgram(state.debugProgram)
-  gl.uniform1f(gl.getUniformLocation(state.debugProgram, 'time'), dt * 0.001)
-  gpu.fullscreenRenderer()
 
+  const executed = {}
+  const pending = Object.keys(state.programs).sort((a, b) => {
+    const ap = state.programs[a]
+    const bp = state.programs[b]
+    return bp.dependencies.length - ap.dependencies.length
+  })
+
+  // TODO: this won't actually work for a proper tree. We'll need an actual traversal algorithm here
+  //       it would be better to precompute this on rebuild anyway.
+  while (pending.length) {
+    const passName = pending.pop()
+    const program = state.programs[passName]
+    gl.useProgram(program.handle)
+    gl.uniform1f(gl.getUniformLocation(program.handle, 'time'), dt * 0.001)
+
+    let textureIndex = 0
+    for (const depName of program.dependencies) {
+      const dep = state.programs[depName]
+      const textureId = textureIndex++
+      gl.activeTexture(gl.TEXTURE0 + textureId);
+      gl.bindTexture(gl.TEXTURE_2D, dep.texture);
+      gl.uniform1i(program.uniformLocations[passSamplerPrefix + depName], textureId);
+    }
+
+    if (program.framebuffer) {
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, program.framebuffer)
+      gl.viewport(0, 0, gpu.canvas.width, gpu.canvas.height)
+      gl.bindTexture(gl.TEXTURE_2D, program.texture)
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        // TODO: allow size adjustments
+        gpu.canvas.width,
+        gpu.canvas.height,
+        0,
+        // TODO: allow format changes
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        null);
+
+      gl.framebufferTexture2D(
+        gl.FRAMEBUFFER,
+        // TODO: pull this from the preprocessor, based on the number of outputs
+        gl.COLOR_ATTACHMENT0,
+        gl.TEXTURE_2D,
+        program.texture,
+        0
+      )
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    }
+    gpu.fullscreenRenderer()
+  }
   requestAnimationFrame((dt) => ExecuteFrame(dt, state))
 }
 
