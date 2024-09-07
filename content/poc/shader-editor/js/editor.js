@@ -30,7 +30,6 @@ void main() {
 }
 `
 
-
 const Floor = Math.floor
 
 Init()
@@ -225,6 +224,8 @@ async function Init() {
   const gpu = InitWebGL(document.querySelector('#output'))
 
   const savedVersion = window.localStorage.getItem('shader-editor-version')
+  window.localStorage.setItem('shader-editor-version', LocalStorageVersion)
+
   const initialContent = savedVersion === LocalStorageVersion
     ? window.localStorage.getItem('shader-editor') || DemoShader
     : DemoShader
