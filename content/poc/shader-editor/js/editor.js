@@ -1,38 +1,37 @@
-const LocalStorageVersion = '1'
+const LocalStorageVersion = '2'
 
-const DemoShader = `#version 300 es
-precision highp float;
-in vec2 uv;
+const DemoShader = `in vec2 uv;
 uniform float time;
-out vec4 fragColor;
 
-#pass Pass0
-void main() {
-  vec3 col = 0.5 + 0.5*cos(time + uv.xyx + vec3(0,2,4));
-  fragColor = vec4(col, 1.0);
-  fragColor = vec4(1.0);
+PassCreate(Pass0, viewport.dims) {
+  vec3 col = 0.5 + 0.5 * cos(time + uv.xyx + vec3(0, 2, 4));
+  PassStore(rgba8, color, vec4(col, 1.0));
 }
 
-#pass Pass1
-void main() {
-  fragColor = vec4(uv, 0.0, 1.0);
+PassCreate(Pass1, viewport.dims) {
+  PassStore(rgba8, color, vec4(uv, 0.0, 1.0));
 }
 
-#pass Pass2
-uniform sampler2D pass_Pass1;
-void main() {
-  fragColor = vec4(uv, texture(pass_Pass1, uv).x, 1.0);
+PassCreate(
+  Pass2,
+  viewport.dims
+) {
+  vec3 r = texture(
+    PassGetSampler(Pass1, color),
+    uv
+  ).xxx;
+
+  PassStore(rgba8, color, vec4(r, 1.0));
 }
 
-#pass Output
-uniform sampler2D pass_Pass0;
-uniform sampler2D pass_Pass2;
-void main() {
-  fragColor = mix(
-    texture(pass_Pass0, uv),
-    texture(pass_Pass2, uv),
+PassCreate(Output, viewport.dims) {
+  vec4 result = mix(
+    texture(PassGetSampler(Pass0, color), uv),
+    texture(PassGetSampler(Pass2, color), uv),
     sin(time) * 0.5 + 0.5
   );
+
+  PassStore(rgba8, color, result);
 }
 `
 
@@ -149,36 +148,252 @@ async function InitEditor(editorEl, initialContent) {
 
 const passDelimiter = '#pass'
 const passSamplerPrefix = 'pass_'
-function PreprocessShaderSource(source) {
-  const lines = source.split(/\r?\n/)
+const PassDefinition = 'PassCreate'
+const PassStore = 'PassStore'
+const PassGetSampler = 'PassGetSampler'
 
-  let currentPassName = '_common_'
+function ReadParams(source, cursor, raiseError) {
+  const originalByteOffset = cursor.byteOffset
+  let depth = 0
+  let isCollecting = false
+  let params = ''
+  const len = source.length
+  for (; cursor.byteOffset < len; cursor.byteOffset++) {
+    const c = source[cursor.byteOffset]
+    if (c === '(') {
+      depth++;
+      if (!isCollecting) {
+        isCollecting = true
+        continue
+      }
+    } else if (c === ')') {
+      depth--
+    }
 
-  const passSources = {
-    '_common_': ''
+    if (isCollecting && !depth) {
+      if (c === ')') {
+        cursor.byteOffset++
+      }
+      break
+    }
+
+    params += c
   }
 
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (line.startsWith(passDelimiter)) {
-      currentPassName = line.slice(passDelimiter.length).trim()
-      passSources[currentPassName] = `// #pass ${currentPassName}\n`
+  if (!isCollecting) {
+    raiseError('invalid params, never found starting (', {
+      cursor
+    })
+
+    // Reset the byte offset, but effectively skip the token
+    cursor.byteOffset = originalByteOffset
+    return
+  }
+
+  if (cursor.byteOffset >= len) {
+    raiseError('invalid params, never found ending )', {
+      cursor
+    })
+
+    // Reset the byte offset, but effectively skip the token
+    cursor.byteOffset = originalByteOffset
+    return
+  }
+
+  return params
+}
+
+function ReadScopeBody(source, cursor, raiseError) {
+  const originalByteOffset = cursor.byteOffset
+  let depth = 0
+  let isCollecting = false
+  let result = ''
+  const len = source.length
+  for (; cursor.byteOffset < len; cursor.byteOffset++) {
+
+    const c = source[cursor.byteOffset]
+
+    if (c === '{') {
+      depth++;
+      if (!isCollecting) {
+        isCollecting = true
+        continue
+      }
+    } else if (c === '}') {
+      depth--
+    }
+
+    if (isCollecting && !depth) {
+      if (c === ')') {
+        // cursor.byteOffset++
+      }
+      break
+    }
+
+    result += c
+  }
+
+  if (!isCollecting) {
+    raiseError('invalid scope, never found starting {', {
+      cursor
+    })
+
+    // Reset the byte offset, but effectively skip the token
+    cursor.byteOffset = originalByteOffset
+    return
+  }
+
+  if (cursor.byteOffset >= len) {
+    raiseError('invalid scope, never found ending }', {
+      cursor
+    })
+
+    // Reset the byte offset, but effectively skip the token
+    cursor.byteOffset = originalByteOffset
+    return
+  }
+
+  return result
+}
+
+function TokenizeSource(source, framegraph, activePass, raiseError) {
+  let identifierToken = ''
+  const cursor = {
+    byteOffset: 0
+  }
+
+  let strippedSource = ''
+  for (; cursor.byteOffset < source.length; cursor.byteOffset++) {
+    const char = source[cursor.byteOffset]
+    const code = char.codePointAt(0)
+    if (
+      // A-Z
+      (code >= 64 && code <= 90) ||
+      // a-z
+      (code >= 97 && code <= 122) ||
+      // 0-9, but not first character
+      (code >= 48 && code <= 57 && identifierToken != '') ||
+      char === '_'
+    ) {
+      identifierToken += char
     } else {
-      passSources[currentPassName] += `${line}\n`
+      switch (identifierToken) {
+        case PassDefinition: {
+          const params = ReadParams(source, cursor, raiseError)
+          // TODO: recurse instead of split
+          const parts = params.split(',').map(p => p.trim())
+          const name = parts[0]
+
+          const body = ReadScopeBody(source, cursor, raiseError)
+          framegraph[name] = {
+            inputs: {},
+            outputs: {},
+            body: ''
+          }
+          framegraph[name].body = TokenizeSource(body, framegraph, name, raiseError)
+          strippedSource += '// @stripped-pass: ' + name
+          break
+        }
+
+        case PassStore: {
+          if (!activePass) {
+            return raiseError(`${PassStore} not allowed outside of a render pass. Utility functions should return color and let the pass handle attachment storage.`, {
+              cursor
+            })
+          }
+
+          const params = ReadParams(source, cursor)
+          // TODO: recurse instead of split
+          const parts = params.split(',').map(p => p.trim())
+          const type = parts.shift().trim()
+          const name = parts.shift().trim()
+          const rest = parts.join(',')
+          strippedSource += `PassOutput_${name} = ${rest}` + source[cursor.byteOffset]
+          framegraph[activePass].outputs[name] = type
+          break
+        }
+
+        case PassGetSampler: {
+          if (!activePass) {
+            return raiseError(`${GetSampler} not allowed outside of a render pass, you should pass sampler2D as an argument instead.`, {
+              cursor
+            })
+          }
+          const params = ReadParams(source, cursor, raiseError)
+          // TODO: recurse instead of split
+          const parts = params.split(',').map(p => p.trim())
+          const passName = parts[0]
+          const outputName = parts[1]
+
+          const samplerName = `PassInput_${passName}_${outputName}`;
+          strippedSource += samplerName + source[cursor.byteOffset]
+
+          framegraph[activePass].inputs[samplerName] = {
+            pass: passName,
+            output: outputName
+          }
+
+          break
+        }
+
+        default: {
+          strippedSource += identifierToken
+          strippedSource += char
+          break
+        }
+      }
+
+      identifierToken = ''
     }
   }
+  return strippedSource
+}
 
-  return passSources
+function PreprocessShaderSource(source) {
+  const framegraph = Object.create(null)
+  const strippedSource = TokenizeSource(source, framegraph, '', (error, context) => {
+    console.error(error, context)
+  })
+  console.log(strippedSource)
+  console.log(JSON.stringify(framegraph, null, 2))
+  return {
+    strippedSource,
+    framegraph
+  }
 }
 
 function UpdateSource(gpu, programs, source) {
-  const passes = PreprocessShaderSource(source)
+  const { strippedSource, framegraph } = PreprocessShaderSource(source)
+
+  const header = `#version 300 es
+precision highp float;\n`
+
   const gl = gpu.gl
-  for (const [name, source] of Object.entries(passes)) {
-    if (name === '_common_') {
-      continue
+  for (const [name, node] of Object.entries(framegraph)) {
+    let passSource = header
+    const dependencies = []
+    const inputs = []
+    for (const inputName of Object.keys(node.inputs)) {
+      passSource += `uniform sampler2D ${inputName};\n`
+      dependencies.push({
+        passName: node.inputs[inputName].pass,
+        uniformName: inputName
+      })
     }
-    const passSource = passes._common_ + source
+    passSource += `\n`
+
+
+    for (const outputName of Object.keys(node.outputs)) {
+      passSource += `out vec4 PassOutput_${outputName};\n`
+    }
+
+    passSource += `\n`
+
+    passSource += strippedSource.replace(
+      `// @stripped-pass: ${name}`,
+      `void main() {${node.body}}\n`
+    )
+
     // TODO: hash the source to determine if we should rebuild the program
     console.group('compile pass \'%s\'', name)
     console.log(passSource)
@@ -191,7 +406,7 @@ function UpdateSource(gpu, programs, source) {
         programs[name] = { name: name }
       }
 
-      programs[name].dependencies = []
+      programs[name].dependencies = dependencies
       programs[name].uniformLocations = {}
       programs[name].handle = handle
       if (!programs[name].framebuffer) {
@@ -213,10 +428,6 @@ function UpdateSource(gpu, programs, source) {
       const uniformCount = gl.getProgramParameter(handle, gl.ACTIVE_UNIFORMS)
       for (let i = 0; i < uniformCount; i++) {
         const uniform = gl.getActiveUniform(handle, i);
-        if (uniform.name.startsWith(passSamplerPrefix)) {
-          programs[name].dependencies.push(uniform.name.slice(passSamplerPrefix.length))
-        }
-
         programs[name].uniformLocations[uniform.name] = gl.getUniformLocation(handle, uniform.name)
       }
     } else {
@@ -236,9 +447,9 @@ function UpdateSource(gpu, programs, source) {
     visited[programName] = true
 
     const program = programs[programName]
-    for (const dep of program.dependencies) {
-      if (!visited[dep]) {
-        visit(dep)
+    for (const {passName} of program.dependencies) {
+      if (!visited[passName]) {
+        visit(passName)
       }
     }
     executionOrder.push(programName)
@@ -253,12 +464,12 @@ function UpdateSource(gpu, programs, source) {
     const program = programs[programName]
     gl.useProgram(program.handle)
     let textureIndex = 0
-    for (const depName of program.dependencies) {
-      const dep = programs[depName]
+    for (const {passName, uniformName} of program.dependencies) {
+      const dep = programs[passName]
       const textureId = textureIndex++
       gl.activeTexture(gl.TEXTURE0 + textureId);
       gl.bindTexture(gl.TEXTURE_2D, dep.texture);
-      gl.uniform1i(program.uniformLocations[passSamplerPrefix + depName], textureId);
+      gl.uniform1i(program.uniformLocations[uniformName], textureId);
     }
   }
   gl.bindTexture(gl.TEXTURE_2D, null);
