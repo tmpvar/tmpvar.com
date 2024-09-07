@@ -1,4 +1,4 @@
-const LocalStorageVersion = 1
+const LocalStorageVersion = '1'
 
 const DemoShader = `#version 300 es
 precision highp float;
@@ -18,13 +18,19 @@ void main() {
   fragColor = vec4(uv, 0.0, 1.0);
 }
 
+#pass Pass2
+uniform sampler2D pass_Pass1;
+void main() {
+  fragColor = vec4(uv, texture(pass_Pass1, uv).x, 1.0);
+}
+
 #pass Output
 uniform sampler2D pass_Pass0;
-uniform sampler2D pass_Pass1;
+uniform sampler2D pass_Pass2;
 void main() {
   fragColor = mix(
     texture(pass_Pass0, uv),
-    texture(pass_Pass1, uv),
+    texture(pass_Pass2, uv),
     sin(time) * 0.5 + 0.5
   );
 }
@@ -218,6 +224,48 @@ function UpdateSource(gpu, programs, source) {
     }
     console.groupEnd()
   }
+
+  // linearize dependency tree
+  const visited = {}
+  const executionOrder = []
+  function visit(programName) {
+    if (visited[programName]) {
+      return
+    }
+
+    visited[programName] = true
+
+    const program = programs[programName]
+    for (const dep of program.dependencies) {
+      if (!visited[dep]) {
+        visit(dep)
+      }
+    }
+    executionOrder.push(programName)
+  }
+
+  for (const programName of Object.keys(programs)) {
+    visit(programName)
+  }
+
+  // Setup program inputs
+  for (const programName of Object.keys(programs)) {
+    const program = programs[programName]
+    gl.useProgram(program.handle)
+    let textureIndex = 0
+    for (const depName of program.dependencies) {
+      const dep = programs[depName]
+      const textureId = textureIndex++
+      gl.activeTexture(gl.TEXTURE0 + textureId);
+      gl.bindTexture(gl.TEXTURE_2D, dep.texture);
+      gl.uniform1i(program.uniformLocations[passSamplerPrefix + depName], textureId);
+    }
+  }
+  gl.bindTexture(gl.TEXTURE_2D, null);
+
+  return {
+    executionOrder
+  }
 }
 
 async function Init() {
@@ -235,10 +283,13 @@ async function Init() {
   const state = {
     gpu,
     editor,
-    programs: {}
+    programs: {},
+    framegraph: {
+      executionOrder: []
+    }
   }
 
-  UpdateSource(gpu, state.programs, initialContent)
+  state.framegraph = UpdateSource(gpu, state.programs, initialContent)
   console.log(state.programs)
 
   // DEBUG: wire up persistence via local storage
@@ -246,7 +297,7 @@ async function Init() {
     const latestContent = editor.getModel().createSnapshot().read() || ''
     window.localStorage.setItem('shader-editor', latestContent)
     console.clear()
-    UpdateSource(gpu, state.programs, latestContent)
+    state.framegraph = UpdateSource(gpu, state.programs, latestContent)
   })
 
   requestAnimationFrame((dt) => ExecuteFrame(dt, state))
@@ -277,30 +328,10 @@ function ExecuteFrame(dt, state) {
   gl.clearColor(1.0, 0.0, 0.0, 1.0);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-
-  const executed = {}
-  const pending = Object.keys(state.programs).sort((a, b) => {
-    const ap = state.programs[a]
-    const bp = state.programs[b]
-    return bp.dependencies.length - ap.dependencies.length
-  })
-
-  // TODO: this won't actually work for a proper tree. We'll need an actual traversal algorithm here
-  //       it would be better to precompute this on rebuild anyway.
-  while (pending.length) {
-    const passName = pending.pop()
+  for (const passName of state.framegraph.executionOrder) {
     const program = state.programs[passName]
     gl.useProgram(program.handle)
     gl.uniform1f(gl.getUniformLocation(program.handle, 'time'), dt * 0.001)
-
-    let textureIndex = 0
-    for (const depName of program.dependencies) {
-      const dep = state.programs[depName]
-      const textureId = textureIndex++
-      gl.activeTexture(gl.TEXTURE0 + textureId);
-      gl.bindTexture(gl.TEXTURE_2D, dep.texture);
-      gl.uniform1i(program.uniformLocations[passSamplerPrefix + depName], textureId);
-    }
 
     if (program.framebuffer) {
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, program.framebuffer)
