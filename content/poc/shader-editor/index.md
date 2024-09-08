@@ -19,7 +19,7 @@ unlisted = true
 ## Keywords
 
 #### `PassCreate(passName)`
-Add a pass with the _unique_ name `passName`, this creates a scope that allows other
+Add a pass with the _unique_ name `passName`, this creates a renderpass that can be refererenced from other passes.
 
 #### `PassGetSampler(sourcePassName, sourcePassOutput)`
 __Note:__ this is only allowed inside a `PassCreate` block
@@ -31,6 +31,13 @@ __Note:__ this is only allowed inside a `PassCreate` block
 
 Store a value in the specified `outputName` at the thread's current. This is effectively writing to one of the global `out` variables
 - formats: `rgba8`, `r32f`, etc..
+
+#### `PassSetSize(width, height)`
+__Note:__ this is only allowed inside a `PassCreate` block
+
+Sets the width and height of the pass. If not provided, it will default to the viewport size.
+
+TODO: add support for scaling this relative to the viewport size
 
 ## DEVLOG
 
@@ -46,10 +53,13 @@ Store a value in the specified `outputName` at the thread's current. This is eff
 - consider persisting undo/redo snapshot
 
 ### Pending
-- implement `PassSetSize(vec2)`
-- actually resize render target based on `PassSetSize`
+- handle nested `PassGetSampler` inside `PassStore`
+- ignore `Pass*` instructions that live in comments
+- add expression solver to allow pass size to be scaled
 
 ### 2024-09-08
+- implement `PassSetSize(w, h)`
+- actually resize render target based on `PassSetSize`
 - rename `programs` to `passes`
 - persist editor state on reload (e.g., cursor position and viewport)
 - make parser bugs not break the entire editing experience (try/catch)

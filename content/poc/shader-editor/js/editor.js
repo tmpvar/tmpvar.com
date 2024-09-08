@@ -1,43 +1,35 @@
-const LocalStorageVersion = '3'
+const LocalStorageVersion = '5'
 const EditorStateLocalStorageKey = 'shader-editor'
 
 // Syntax additions
 const PassDefinition = 'PassCreate'
 const PassStore = 'PassStore'
 const PassGetSampler = 'PassGetSampler'
+const PassSetSize = 'PassSetSize'
 
 const DemoShader = `in vec2 uv;
 uniform float time;
 
-PassCreate(Pass0, viewport.dims) {
+PassCreate(Background) {
   vec3 col = 0.5 + 0.5 * cos(time + uv.xyx + vec3(0, 2, 4));
   PassStore(rgba8, color, vec4(col, 1.0));
 }
 
-PassCreate(Pass1, viewport.dims) {
-  PassStore(rgba8, color, vec4(uv, 0.0, 1.0));
+PassCreate(Pass0) {
+  PassSetSize(460, 160);
+  float v = step(1.0 - length(fract((gl_FragCoord) / 30.0) - 0.5), 0.1);
+  PassStore(rgba8, color, vec4(v));
 }
 
-PassCreate(
-  Pass2,
-  viewport.dims
-) {
-  vec3 r = texture(
-    PassGetSampler(Pass1, color),
-    uv
-  ).xxx;
-
-  PassStore(rgba8, color, vec4(r, 1.0));
-}
-
-PassCreate(Output, viewport.dims) {
-  vec4 result = mix(
-    texture(PassGetSampler(Pass0, color), uv),
-    texture(PassGetSampler(Pass2, color), uv),
-    sin(time) * 0.5 + 0.5
+PassCreate(Output) {
+  vec4 background = texture(PassGetSampler(Background, color), uv);
+  vec4 grid = texelFetch(
+    PassGetSampler(Pass0, color),
+    ivec2(gl_FragCoord.xy),
+    0
   );
 
-  PassStore(rgba8, color, result);
+  PassStore(rgba8, color, mix(background, grid, 0.5));
 }
 `
 
@@ -122,6 +114,8 @@ function InitWebGL(canvas) {
   })
 
   const gl = canvas.getContext('webgl2', options)
+  // a reusable fbo
+  const fbo = gl.createFramebuffer()
   const container = canvas.parentElement
 
   return {
@@ -129,6 +123,7 @@ function InitWebGL(canvas) {
     canvas,
     dims: [0, 0],
     gl: gl,
+    fbo,
     fullscreenRenderer: CreateFullscreenRenderer(gl)
   }
 }
@@ -146,6 +141,7 @@ async function InitEditor(editorEl, initialContent) {
       enabled: false
     },
     tabSize: 2,
+    automaticLayout: true,
     theme: 'vs-dark'
   })
   editor.focus()
@@ -316,7 +312,7 @@ function TokenizeSource(source, framegraph, activePass, raiseError) {
 
         case PassGetSampler: {
           if (!activePass) {
-            return raiseError(`${GetSampler} not allowed outside of a render pass, you should pass sampler2D as an argument instead.`, {
+            return raiseError(`${PassGetSampler} not allowed outside of a render pass, you should pass sampler2D as an argument instead.`, {
               cursor
             })
           }
@@ -332,6 +328,32 @@ function TokenizeSource(source, framegraph, activePass, raiseError) {
           framegraph[activePass].inputs[samplerName] = {
             pass: passName,
             output: outputName
+          }
+
+          break
+        }
+
+        case PassSetSize: {
+          if (!activePass) {
+            return raiseError(`${PassSetSize} not allowed outside of a render pass - it controls the size of the pass!`, {
+              cursor
+            })
+          }
+
+          const params = ReadParams(source, cursor, raiseError)
+          // TODO: recurse instead of split
+          const parts = params.split(',').map(p => parseFloat(p.trim()))
+          if (parts.length != 2) {
+            return raiseError(`${PassSetSize} only accepts two parameters currently: width and height`, {
+              cursor
+            })
+          }
+
+          strippedSource += `// size: ${parts[0]} x ${parts[1]}`
+          framegraph[activePass].size = (out, initial) => {
+            // TODO: handle expressions that utilize initial
+            out[0] = parts[0]
+            out[1] = parts[1]
           }
 
           break
@@ -412,9 +434,11 @@ precision highp float;\n`
       passes[name].dependencies = dependencies
       passes[name].uniformLocations = {}
       passes[name].program = program
-      if (!passes[name].framebuffer) {
+
+      passes[name].size = framegraph[name].size
+
+      if (!passes[name].texture) {
         if (name !== 'Output') {
-          passes[name].framebuffer = gl.createFramebuffer()
           passes[name].texture = gl.createTexture()
 
           gl.bindTexture(gl.TEXTURE_2D, passes[name].texture)
@@ -424,7 +448,7 @@ precision highp float;\n`
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 
         } else {
-          passes[name].framebuffer = null
+          passes[name].texture = null
         }
       }
 
@@ -470,13 +494,13 @@ precision highp float;\n`
     for (const { passName, uniformName } of pass.dependencies) {
       const dep = passes[passName]
       const textureId = textureIndex++
+      console.log(programName, 'binds', passName, 'to', uniformName)
       gl.activeTexture(gl.TEXTURE0 + textureId);
       gl.bindTexture(gl.TEXTURE_2D, dep.texture);
       gl.uniform1i(pass.uniformLocations[uniformName], textureId);
     }
   }
   gl.bindTexture(gl.TEXTURE_2D, null);
-
   return {
     executionOrder
   }
@@ -533,7 +557,7 @@ async function Init() {
     passes: {},
     framegraph: {
       executionOrder: []
-    }
+    },
   }
 
   TryUpdateSource(state, initialContent)
@@ -542,20 +566,19 @@ async function Init() {
   let latestContent = initialContent
   editor.getModel().onDidChangeContent((event) => {
     latestContent = editor.getModel().createSnapshot().read() || ''
-    // console.clear()
+    console.clear()
     TryUpdateSource(state, latestContent)
     PersistEditorState(latestContent, editor)
   })
 
   addEventListener("visibilitychange", (event) => {
     PersistEditorState(latestContent, editor)
-    console.log('save editor state')
   });
 
   requestAnimationFrame((dt) => ExecuteFrame(dt, state))
 }
 
-
+const v2scratch = [0, 0]
 function ExecuteFrame(dt, state) {
   const gpu = state.gpu
   // Ensure we're sized properly w.r.t. pixel ratio
@@ -576,8 +599,9 @@ function ExecuteFrame(dt, state) {
   }
 
   const gl = gpu.gl;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   gl.viewport(0, 0, gpu.canvas.width, gpu.canvas.height)
-  gl.clearColor(1.0, 0.0, 0.0, 1.0);
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
   for (const passName of state.framegraph.executionOrder) {
@@ -585,17 +609,22 @@ function ExecuteFrame(dt, state) {
     gl.useProgram(pass.program)
     gl.uniform1f(gl.getUniformLocation(pass.program, 'time'), dt * 0.001)
 
-    if (pass.framebuffer) {
-      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, pass.framebuffer)
-      gl.viewport(0, 0, gpu.canvas.width, gpu.canvas.height)
+    if (pass.texture) {
+      v2scratch[0] = gpu.canvas.width
+      v2scratch[1] = gpu.canvas.height
+      if (pass.size) {
+        pass.size(v2scratch, v2scratch)
+      }
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.gpu.fbo)
+      gl.viewport(0, 0, v2scratch[0], v2scratch[1])
       gl.bindTexture(gl.TEXTURE_2D, pass.texture)
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
         gl.RGBA,
-        // TODO: allow size adjustments
-        gpu.canvas.width,
-        gpu.canvas.height,
+        v2scratch[0],
+        v2scratch[1],
         0,
         // TODO: allow format changes
         gl.RGBA,
@@ -612,6 +641,7 @@ function ExecuteFrame(dt, state) {
       )
     } else {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      gl.viewport(0, 0, gpu.canvas.width, gpu.canvas.height)
     }
     gpu.fullscreenRenderer()
   }
