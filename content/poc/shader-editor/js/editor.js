@@ -399,17 +399,19 @@ precision highp float;\n`
     console.group('compile pass \'%s\'', name)
     console.log(passSource)
 
-    const handle = CreateRasterProgram(gl, passSource);
-    if (handle) {
+    const program = CreateRasterProgram(gl, passSource);
+    if (program) {
       if (passes[name]) {
-        gl.deleteProgram(passes[name].handle)
+        if (passes[name].program) {
+          gl.deleteProgram(passes[name].program)
+        }
       } else {
         passes[name] = { name: name }
       }
 
       passes[name].dependencies = dependencies
       passes[name].uniformLocations = {}
-      passes[name].handle = handle
+      passes[name].program = program
       if (!passes[name].framebuffer) {
         if (name !== 'Output') {
           passes[name].framebuffer = gl.createFramebuffer()
@@ -426,13 +428,13 @@ precision highp float;\n`
         }
       }
 
-      const uniformCount = gl.getProgramParameter(handle, gl.ACTIVE_UNIFORMS)
+      const uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS)
       for (let i = 0; i < uniformCount; i++) {
-        const uniform = gl.getActiveUniform(handle, i);
-        passes[name].uniformLocations[uniform.name] = gl.getUniformLocation(handle, uniform.name)
+        const uniform = gl.getActiveUniform(program, i);
+        passes[name].uniformLocations[uniform.name] = gl.getUniformLocation(program, uniform.name)
       }
     } else {
-      console.log('NO HANDLE')
+      console.log('invalid program')
     }
     console.groupEnd()
   }
@@ -462,15 +464,15 @@ precision highp float;\n`
 
   // Setup program inputs
   for (const programName of Object.keys(passes)) {
-    const program = passes[programName]
-    gl.useProgram(program.handle)
+    const pass = passes[programName]
+    gl.useProgram(pass.program)
     let textureIndex = 0
-    for (const { passName, uniformName } of program.dependencies) {
+    for (const { passName, uniformName } of pass.dependencies) {
       const dep = passes[passName]
       const textureId = textureIndex++
       gl.activeTexture(gl.TEXTURE0 + textureId);
       gl.bindTexture(gl.TEXTURE_2D, dep.texture);
-      gl.uniform1i(program.uniformLocations[uniformName], textureId);
+      gl.uniform1i(pass.uniformLocations[uniformName], textureId);
     }
   }
   gl.bindTexture(gl.TEXTURE_2D, null);
@@ -580,8 +582,8 @@ function ExecuteFrame(dt, state) {
 
   for (const passName of state.framegraph.executionOrder) {
     const pass = state.passes[passName]
-    gl.useProgram(pass.handle)
-    gl.uniform1f(gl.getUniformLocation(pass.handle, 'time'), dt * 0.001)
+    gl.useProgram(pass.program)
+    gl.uniform1f(gl.getUniformLocation(pass.program, 'time'), dt * 0.001)
 
     if (pass.framebuffer) {
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, pass.framebuffer)
