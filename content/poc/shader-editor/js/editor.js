@@ -1,4 +1,4 @@
-const LocalStorageVersion = '2'
+const LocalStorageVersion = '3'
 
 const DemoShader = `in vec2 uv;
 uniform float time;
@@ -447,7 +447,7 @@ precision highp float;\n`
     visited[programName] = true
 
     const program = programs[programName]
-    for (const {passName} of program.dependencies) {
+    for (const { passName } of program.dependencies) {
       if (!visited[passName]) {
         visit(passName)
       }
@@ -464,7 +464,7 @@ precision highp float;\n`
     const program = programs[programName]
     gl.useProgram(program.handle)
     let textureIndex = 0
-    for (const {passName, uniformName} of program.dependencies) {
+    for (const { passName, uniformName } of program.dependencies) {
       const dep = programs[passName]
       const textureId = textureIndex++
       gl.activeTexture(gl.TEXTURE0 + textureId);
@@ -479,17 +479,39 @@ precision highp float;\n`
   }
 }
 
+function TryUpdateSource(state, content) {
+  try {
+    state.framegraph = UpdateSource(state.gpu, state.programs, content)
+    return true
+  } catch (e) {
+    console.error('UpdateSource threw:\n%s', e.stack)
+    return false
+  }
+}
+
 async function Init() {
   const gpu = InitWebGL(document.querySelector('#output'))
 
   const savedVersion = window.localStorage.getItem('shader-editor-version')
   window.localStorage.setItem('shader-editor-version', LocalStorageVersion)
 
-  const initialContent = savedVersion === LocalStorageVersion
-    ? window.localStorage.getItem('shader-editor') || DemoShader
-    : DemoShader
+  let initialContent = DemoShader
+  let initialViewState = null
+  if (savedVersion === LocalStorageVersion) {
+    const storedStateStr = window.localStorage.getItem('shader-editor')
+    if (storedStateStr) {
+      try {
+        const storedState = JSON.parse(storedStateStr)
+        initialContent = storedState.content
+        initialViewState = storedState.viewState
+      } catch (e) {
+
+      }
+    }
+  }
 
   const editor = await InitEditor(document.querySelector('#editor'), initialContent)
+  initialViewState && editor.restoreViewState(initialViewState)
 
   const state = {
     gpu,
@@ -500,15 +522,21 @@ async function Init() {
     }
   }
 
-  state.framegraph = UpdateSource(gpu, state.programs, initialContent)
+  TryUpdateSource(state, initialContent)
   console.log(state.programs)
+  window.model = editor.getModel()
 
-  // DEBUG: wire up persistence via local storage
   editor.getModel().onDidChangeContent((event) => {
     const latestContent = editor.getModel().createSnapshot().read() || ''
-    window.localStorage.setItem('shader-editor', latestContent)
     console.clear()
-    state.framegraph = UpdateSource(gpu, state.programs, latestContent)
+    TryUpdateSource(state, latestContent)
+
+    const viewState = editor.saveViewState()
+    // DEBUG: wire up persistence via local storage
+    window.localStorage.setItem('shader-editor', JSON.stringify({
+      viewState,
+      content: latestContent
+    }))
   })
 
   requestAnimationFrame((dt) => ExecuteFrame(dt, state))
