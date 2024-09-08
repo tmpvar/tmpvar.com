@@ -363,7 +363,7 @@ function PreprocessShaderSource(source) {
   }
 }
 
-function UpdateSource(gpu, programs, source) {
+function UpdateSource(gpu, passes, source) {
   const { strippedSource, framegraph } = PreprocessShaderSource(source)
 
   const header = `#version 300 es
@@ -401,35 +401,35 @@ precision highp float;\n`
 
     const handle = CreateRasterProgram(gl, passSource);
     if (handle) {
-      if (programs[name]) {
-        gl.deleteProgram(programs[name].handle)
+      if (passes[name]) {
+        gl.deleteProgram(passes[name].handle)
       } else {
-        programs[name] = { name: name }
+        passes[name] = { name: name }
       }
 
-      programs[name].dependencies = dependencies
-      programs[name].uniformLocations = {}
-      programs[name].handle = handle
-      if (!programs[name].framebuffer) {
+      passes[name].dependencies = dependencies
+      passes[name].uniformLocations = {}
+      passes[name].handle = handle
+      if (!passes[name].framebuffer) {
         if (name !== 'Output') {
-          programs[name].framebuffer = gl.createFramebuffer()
-          programs[name].texture = gl.createTexture()
+          passes[name].framebuffer = gl.createFramebuffer()
+          passes[name].texture = gl.createTexture()
 
-          gl.bindTexture(gl.TEXTURE_2D, programs[name].texture)
+          gl.bindTexture(gl.TEXTURE_2D, passes[name].texture)
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, 0);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 
         } else {
-          programs[name].framebuffer = null
+          passes[name].framebuffer = null
         }
       }
 
       const uniformCount = gl.getProgramParameter(handle, gl.ACTIVE_UNIFORMS)
       for (let i = 0; i < uniformCount; i++) {
         const uniform = gl.getActiveUniform(handle, i);
-        programs[name].uniformLocations[uniform.name] = gl.getUniformLocation(handle, uniform.name)
+        passes[name].uniformLocations[uniform.name] = gl.getUniformLocation(handle, uniform.name)
       }
     } else {
       console.log('NO HANDLE')
@@ -447,7 +447,7 @@ precision highp float;\n`
 
     visited[programName] = true
 
-    const program = programs[programName]
+    const program = passes[programName]
     for (const { passName } of program.dependencies) {
       if (!visited[passName]) {
         visit(passName)
@@ -456,17 +456,17 @@ precision highp float;\n`
     executionOrder.push(programName)
   }
 
-  for (const programName of Object.keys(programs)) {
+  for (const programName of Object.keys(passes)) {
     visit(programName)
   }
 
   // Setup program inputs
-  for (const programName of Object.keys(programs)) {
-    const program = programs[programName]
+  for (const programName of Object.keys(passes)) {
+    const program = passes[programName]
     gl.useProgram(program.handle)
     let textureIndex = 0
     for (const { passName, uniformName } of program.dependencies) {
-      const dep = programs[passName]
+      const dep = passes[passName]
       const textureId = textureIndex++
       gl.activeTexture(gl.TEXTURE0 + textureId);
       gl.bindTexture(gl.TEXTURE_2D, dep.texture);
@@ -482,7 +482,7 @@ precision highp float;\n`
 
 function TryUpdateSource(state, content) {
   try {
-    state.framegraph = UpdateSource(state.gpu, state.programs, content)
+    state.framegraph = UpdateSource(state.gpu, state.passes, content)
     return true
   } catch (e) {
     console.error('UpdateSource threw:\n%s', e.stack)
@@ -528,14 +528,14 @@ async function Init() {
   const state = {
     gpu,
     editor,
-    programs: {},
+    passes: {},
     framegraph: {
       executionOrder: []
     }
   }
 
   TryUpdateSource(state, initialContent)
-  console.log(state.programs)
+  console.log(state.passes)
   window.model = editor.getModel()
   let latestContent = initialContent
   editor.getModel().onDidChangeContent((event) => {
@@ -579,14 +579,14 @@ function ExecuteFrame(dt, state) {
   gl.clear(gl.COLOR_BUFFER_BIT);
 
   for (const passName of state.framegraph.executionOrder) {
-    const program = state.programs[passName]
-    gl.useProgram(program.handle)
-    gl.uniform1f(gl.getUniformLocation(program.handle, 'time'), dt * 0.001)
+    const pass = state.passes[passName]
+    gl.useProgram(pass.handle)
+    gl.uniform1f(gl.getUniformLocation(pass.handle, 'time'), dt * 0.001)
 
-    if (program.framebuffer) {
-      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, program.framebuffer)
+    if (pass.framebuffer) {
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, pass.framebuffer)
       gl.viewport(0, 0, gpu.canvas.width, gpu.canvas.height)
-      gl.bindTexture(gl.TEXTURE_2D, program.texture)
+      gl.bindTexture(gl.TEXTURE_2D, pass.texture)
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
@@ -605,7 +605,7 @@ function ExecuteFrame(dt, state) {
         // TODO: pull this from the preprocessor, based on the number of outputs
         gl.COLOR_ATTACHMENT0,
         gl.TEXTURE_2D,
-        program.texture,
+        pass.texture,
         0
       )
     } else {

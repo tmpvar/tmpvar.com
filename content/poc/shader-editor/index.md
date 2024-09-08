@@ -46,11 +46,10 @@ Store a value in the specified `outputName` at the thread's current. This is eff
 - consider persisting undo/redo snapshot
 
 ### Pending
-- rename `programs` to `passes`
 - implement `PassSetSize(vec2)`
 - actually resize render target based on `PassSetSize`
 
 ### 2024-09-08
+- rename `programs` to `passes`
 - persist editor state on reload (e.g., cursor position and viewport)
 - make parser bugs not break the entire editing experience (try/catch)
-
