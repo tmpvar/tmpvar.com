@@ -1,4 +1,10 @@
 const LocalStorageVersion = '3'
+const EditorStateLocalStorageKey = 'shader-editor'
+
+// Syntax additions
+const PassDefinition = 'PassCreate'
+const PassStore = 'PassStore'
+const PassGetSampler = 'PassGetSampler'
 
 const DemoShader = `in vec2 uv;
 uniform float time;
@@ -146,11 +152,6 @@ async function InitEditor(editorEl, initialContent) {
   return editor
 }
 
-const passDelimiter = '#pass'
-const passSamplerPrefix = 'pass_'
-const PassDefinition = 'PassCreate'
-const PassStore = 'PassStore'
-const PassGetSampler = 'PassGetSampler'
 
 function ReadParams(source, cursor, raiseError) {
   const originalByteOffset = cursor.byteOffset
@@ -489,6 +490,15 @@ function TryUpdateSource(state, content) {
   }
 }
 
+function PersistEditorState(content, editor) {
+  const viewState = editor.saveViewState()
+  // DEBUG: wire up persistence via local storage
+  window.localStorage.setItem(EditorStateLocalStorageKey, JSON.stringify({
+    viewState,
+    content: content
+  }))
+}
+
 async function Init() {
   const gpu = InitWebGL(document.querySelector('#output'))
 
@@ -498,14 +508,16 @@ async function Init() {
   let initialContent = DemoShader
   let initialViewState = null
   if (savedVersion === LocalStorageVersion) {
-    const storedStateStr = window.localStorage.getItem('shader-editor')
+    const storedStateStr = window.localStorage.getItem(EditorStateLocalStorageKey)
     if (storedStateStr) {
       try {
         const storedState = JSON.parse(storedStateStr)
-        initialContent = storedState.content
+        if (storedState.content) {
+          initialContent = storedState.content
+        }
         initialViewState = storedState.viewState
       } catch (e) {
-
+        console.warn('invalid persistent state, ignoring')
       }
     }
   }
@@ -525,19 +537,18 @@ async function Init() {
   TryUpdateSource(state, initialContent)
   console.log(state.programs)
   window.model = editor.getModel()
-
+  let latestContent = initialContent
   editor.getModel().onDidChangeContent((event) => {
-    const latestContent = editor.getModel().createSnapshot().read() || ''
-    console.clear()
+    latestContent = editor.getModel().createSnapshot().read() || ''
+    // console.clear()
     TryUpdateSource(state, latestContent)
-
-    const viewState = editor.saveViewState()
-    // DEBUG: wire up persistence via local storage
-    window.localStorage.setItem('shader-editor', JSON.stringify({
-      viewState,
-      content: latestContent
-    }))
+    PersistEditorState(latestContent, editor)
   })
+
+  addEventListener("visibilitychange", (event) => {
+    PersistEditorState(latestContent, editor)
+    console.log('save editor state')
+  });
 
   requestAnimationFrame((dt) => ExecuteFrame(dt, state))
 }

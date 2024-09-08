@@ -51,4 +51,6 @@ Store a value in the specified `outputName` at the thread's current. This is eff
 - actually resize render target based on `PassSetSize`
 
 ### 2024-09-08
+- persist editor state on reload (e.g., cursor position and viewport)
 - make parser bugs not break the entire editing experience (try/catch)
+
