@@ -12,6 +12,7 @@ const PassSetSize = 'PassSetSize'
 
 const DemoShader = `in vec2 uv;
 uniform float time;
+uniform vec4 mouse;
 
 vec4 Background() {
   vec3 col = 0.5 + 0.5 * cos(time + uv.xyx + vec3(0, 2, 4));
@@ -19,7 +20,10 @@ vec4 Background() {
 }
 
 vec4 Pass0() {
-  float v = step(1.0 - length(fract((gl_FragCoord) / 30.0) - 0.5), 0.1);
+  float v = step(
+    1.0 - length(fract((gl_FragCoord + mouse) / 30.0) - 0.5),
+    0.1
+  );
   return vec4(v);
 }
 
