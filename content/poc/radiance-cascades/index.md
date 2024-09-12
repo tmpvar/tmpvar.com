@@ -1,7 +1,7 @@
 +++
 title = "Radiance Cascades"
 date = 2020-04-01
-description = "Building intuition around a Radiance Cascades, a global illumination approach developed for Path of Exile 2 by Suslik (Alexander Sannikov)"
+description = "Building intuition around Radiance Cascades, a global illumination approach developed for Path of Exile 2 by Alexander Sannikov"
 +++
 
 Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
@@ -19,7 +19,7 @@ Trying to build up my intuition around Suslik's Radiance Cascades GI approach.
    - [SimonDev](https://www.youtube.com/@simondev758) made a nice introductory video: [Exploring a New Approach to Realistic Lighting: Radiance Cascades](https://www.youtube.com/watch?v=3so7xdZHKxw)
 
  - calulators and other utilities
-  - [https://mastodon.social/@kornel] made a [calcualator](https://kornel.ski/radiance) to compute the optimal cascade interval lengths based on the penumbra angle, minimum light size and probe spacing.
+  - [kornel](https://mastodon.social/@kornel) made a [calcualator](https://kornel.ski/radiance) to compute the optimal cascade interval lengths based on the penumbra angle, minimum light size and probe spacing.
 ## 2D
 
 Things are simpler in 2D so we'll start there.
