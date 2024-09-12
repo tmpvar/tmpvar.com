@@ -353,6 +353,7 @@ async function Init() {
     framegraph: {
       executionOrder: []
     },
+    rawMouse: [0, 0]
   }
 
   TryUpdateSource(state, initialContent)
@@ -369,6 +370,12 @@ async function Init() {
   addEventListener("visibilitychange", (event) => {
     PersistEditorState(latestContent, editor)
   });
+
+  addEventListener("mousemove", (event) => {
+    state.rawMouse[0] = event.clientX
+    state.rawMouse[1] = event.clientY
+  })
+
 
   requestAnimationFrame((dt) => ExecuteFrame(dt, state))
 }
@@ -403,6 +410,13 @@ function ExecuteFrame(dt, state) {
     const pass = state.passes[passName]
     gl.useProgram(pass.program)
     gl.uniform1f(gl.getUniformLocation(pass.program, 'time'), dt * 0.001)
+
+    const mouseLoc = gl.getUniformLocation(pass.program, 'mouse')
+    if (mouseLoc) {
+      const x = rect.width - (state.rawMouse[0] - rect.left)
+      const y = state.rawMouse[1] - rect.top
+      gl.uniform4f(mouseLoc, x, y, 0.0, 0.0);
+    }
 
     if (pass.texture) {
       v2scratch[0] = gpu.canvas.width

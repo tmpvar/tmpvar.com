@@ -1,0 +1,7 @@
+# Pending
+- use a previous pass' output as feedback (via pingpong)
+- specify pass dimensions (hardcode)
+- specify pass dimensions (expression via mathjs)
+
+# 2024/09/11
+- mouse input
