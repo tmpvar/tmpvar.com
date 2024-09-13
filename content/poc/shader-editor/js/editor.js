@@ -1,7 +1,7 @@
 
 import * as yaml from 'https://unpkg.com/yaml@2.5.1/browser/dist/index.js'
 
-const LocalStorageVersion = '6'
+const LocalStorageVersion = '7'
 const EditorStateLocalStorageKey = 'shader-editor'
 
 // Syntax additions
@@ -33,12 +33,12 @@ vec4 MainImage(sampler2D backgroundSampler, sampler2D pass0Sampler) {
   return mix(background, grid, 0.5);
 }
 
----
-
-MainImage:
-  inputs:
-    - Background
-    - Pass0
+/* @framegraph
+  MainImage:
+    inputs:
+      - Background
+      - Pass0
+*/
 `
 
 const Floor = Math.floor
@@ -156,10 +156,51 @@ async function InitEditor(editorEl, initialContent) {
   return editor
 }
 
-function PreprocessShaderSource(source) {
-  const [glsl, wiringSource] = source.split('---')
+function ParseYaml(source, raiseError) {
+  let indentation = '';
+  let first = true
 
-  const framegraph = yaml.parse(wiringSource)
+  const lines = source.split(/\r?\n/).map(line => {
+    if (!line.trim()) {
+      return
+    }
+
+    const match = line.match(/^(\s+)?([\/\*][\/\*]+)?(\s+)?([\w\d_\-:\s]+)$/)
+
+    if (!match) {
+      return
+    }
+
+    let prefix = ''
+    // if there are comment characters
+    if (match[2]) {
+      prefix = match[3] || ''
+    } else {
+      prefix = match[1] || ''
+    }
+    if (first) {
+      first = false
+      indentation = prefix
+    }
+
+    if (!match[4]) {
+      return
+    }
+    return prefix.replace(indentation, '') +  match[4]
+  }).filter(Boolean)
+
+  try {
+    const cleaned = lines.join('\n')
+    return yaml.parse(cleaned)
+  } catch (e) {
+    raiseError(e)
+  }
+}
+
+function PreprocessShaderSource(source, raiseError) {
+  const [glsl, wiringSource] = source.split(/\/[\/\*]+\s*@framegraph/)
+
+  const framegraph = ParseYaml(wiringSource, raiseError)
   console.log(JSON.stringify(framegraph, null, 2))
 
   function AddNode(name) {
@@ -190,8 +231,8 @@ function PreprocessShaderSource(source) {
   }
 }
 
-function UpdateSource(gpu, passes, source) {
-  const { strippedSource, framegraph } = PreprocessShaderSource(source)
+function UpdateSource(gpu, passes, source, raiseError) {
+  const { strippedSource, framegraph } = PreprocessShaderSource(source, raiseError)
 
   const header = `#version 300 es
 precision highp float;
@@ -209,56 +250,56 @@ out vec4 _PassOutput;
 
     passSource += strippedSource
 
-    const depArgs = node.dependencies.map(inputName=>`PassInput_${inputName}`)
+    const depArgs = node.dependencies.map(inputName => `PassInput_${inputName}`)
     passSource += `void main() {
   _PassOutput = ${name}(${depArgs.join(', ')});
 }
     `
 
-      // TODO: hash the source to determine if we should rebuild the program
-      console.group('compile pass \'%s\'', name)
-      console.log(passSource)
+    // TODO: hash the source to determine if we should rebuild the program
+    console.group('compile pass \'%s\'', name)
+    console.log(passSource)
 
-      const program = CreateRasterProgram(gl, passSource);
-      if (program) {
-        if (passes[name]) {
-          if (passes[name].program) {
-            gl.deleteProgram(passes[name].program)
-          }
-        } else {
-          passes[name] = { name: name }
-        }
-
-        passes[name].dependencies = node ? node.dependencies : []
-        passes[name].uniformLocations = {}
-        passes[name].program = program
-
-        passes[name].size = framegraph[name].size
-
-        if (!passes[name].texture) {
-          if (name !== 'MainImage') {
-            passes[name].texture = gl.createTexture()
-
-            gl.bindTexture(gl.TEXTURE_2D, passes[name].texture)
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, 0);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-          } else {
-            passes[name].texture = null
-          }
-        }
-
-        const uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS)
-        for (let i = 0; i < uniformCount; i++) {
-          const uniform = gl.getActiveUniform(program, i);
-          passes[name].uniformLocations[uniform.name] = gl.getUniformLocation(program, uniform.name)
+    const program = CreateRasterProgram(gl, passSource);
+    if (program) {
+      if (passes[name]) {
+        if (passes[name].program) {
+          gl.deleteProgram(passes[name].program)
         }
       } else {
-        console.log('invalid program')
+        passes[name] = { name: name }
       }
-      console.groupEnd()
+
+      passes[name].dependencies = node ? node.dependencies : []
+      passes[name].uniformLocations = {}
+      passes[name].program = program
+
+      passes[name].size = framegraph[name].size
+
+      if (!passes[name].texture) {
+        if (name !== 'MainImage') {
+          passes[name].texture = gl.createTexture()
+
+          gl.bindTexture(gl.TEXTURE_2D, passes[name].texture)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, 0);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+        } else {
+          passes[name].texture = null
+        }
+      }
+
+      const uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS)
+      for (let i = 0; i < uniformCount; i++) {
+        const uniform = gl.getActiveUniform(program, i);
+        passes[name].uniformLocations[uniform.name] = gl.getUniformLocation(program, uniform.name)
+      }
+    } else {
+      console.log('invalid program')
+    }
+    console.groupEnd()
   }
 
   // linearize dependency tree
@@ -300,14 +341,20 @@ out vec4 _PassOutput;
     }
   }
   gl.bindTexture(gl.TEXTURE_2D, null);
+  console.log(executionOrder)
   return {
     executionOrder
   }
 }
 
 function TryUpdateSource(state, content) {
+
+  function RaiseError(e) {
+    console.error(e)
+  }
+
   try {
-    state.framegraph = UpdateSource(state.gpu, state.passes, content)
+    state.framegraph = UpdateSource(state.gpu, state.passes, content, RaiseError)
     return true
   } catch (e) {
     console.error('UpdateSource threw:\n%s', e.stack)
