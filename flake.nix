@@ -10,7 +10,6 @@
     flake-utils.lib.eachDefaultSystem(system:
       let pkgs = nixpkgs.legacyPackages.${system}; in
       {
-        #devShells.default = import ./shell.nix { inherit pkgs; };
         devShells.default = pkgs.mkShell {
           packages = [
             pkgs.zola
@@ -26,7 +25,6 @@
                    version = "0.0.3";
                    sha256 = "5509ddd6f160fec6f02fd5d1d2d501e8dda44c34df912ead31ea3be36d15a2b3";
                 }
-                #esbenp.prettier-vscodie
                 {
                   name = "atom-keybindings";
                   publisher = "ms-vscode";
@@ -37,10 +35,6 @@
             })
           ];
         };
-
-        shellHook = ''
-          codium .
-        '';
       }
     );
 }
