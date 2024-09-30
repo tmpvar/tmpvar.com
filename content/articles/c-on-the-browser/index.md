@@ -3,7 +3,7 @@ title = "Running C on the browser with WebAssembly"
 date = 2023-10-29
 
 [extra]
-unlisted = true
+unlisted = false
 +++
 
 <!--
