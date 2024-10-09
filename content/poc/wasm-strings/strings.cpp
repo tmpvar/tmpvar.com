@@ -1,4 +1,5 @@
-// compile with: emcc -O2 --std=c++20 strings.cpp -s EXPORT_ES6=1 -lembind
+// compile with:
+// emcc -O2 --std=c++20 strings.cpp -s EXPORT_ES6=1 -lembind -o build/strings.js
 #include <emscripten/bind.h>
 #include <format>
 #include <string>
