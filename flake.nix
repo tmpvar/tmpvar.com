@@ -10,14 +10,27 @@
     flake-utils.lib.eachDefaultSystem(system:
       let pkgs = nixpkgs.legacyPackages.${system}; in
       {
+        nativeBuildInputs = with pkgs; [ gdb clang clang-tools emscripten ];
         devShells.default = pkgs.mkShell {
-          packages = [
-            pkgs.zola
+          packages = with pkgs; [
+            zola
+            clang
+            clang-tools
+            lld
+            emscripten
+            nodejs
+            closurecompiler
+            watchexec
+            binaryen
 
             (pkgs.vscode-with-extensions.override {
               vscode = pkgs.vscodium;
               vscodeExtensions = with pkgs.vscode-extensions; [
                 esbenp.prettier-vscode
+
+                llvm-vs-code-extensions.vscode-clangd
+                xaver.clang-format
+                jnoortheen.nix-ide
               ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
                 {
                    publisher = "ggsimm";
