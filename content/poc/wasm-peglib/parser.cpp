@@ -1,13 +1,12 @@
 // compile with:
 // emcc -O2 --std=c++20 parser.cpp -s EXPORT_ES6=1 -lembind -o build/parser.js
 #include <emscripten/bind.h>
-#include <iostream>
-
+#include <format>
 #include "peglib.h"
 
 using namespace emscripten;
 
-int Parse(std::string source) {
+std::string Parse(std::string source) {
   // (2) Make a parser
   peg::parser parser(R"(
         # Grammar for Calculator...
@@ -20,7 +19,7 @@ int Parse(std::string source) {
     )");
 
   if (static_cast<bool>(parser) != true) {
-    return -1;
+    return std::string("failed to parse grammar");
   }
 
   // (3) Setup actions
@@ -50,8 +49,11 @@ int Parse(std::string source) {
   parser.enable_packrat_parsing(); // Enable packrat parsing.
 
   int val = 0;
-  parser.parse(source, val);
-  return val;
+  auto ret = parser.parse(source, val);
+  if (ret == true) {
+    return std::format("{}", val);
+  }
+  return std::format("failed to parse: '{}'", source);
 }
 
 EMSCRIPTEN_BINDINGS(peglib) {

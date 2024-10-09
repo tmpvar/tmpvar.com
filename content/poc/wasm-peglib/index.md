@@ -1,5 +1,5 @@
 +++
-title = "WASM parser"
+title = "WASM peglib"
 date = 2024-10-07
 [extra]
 +++
