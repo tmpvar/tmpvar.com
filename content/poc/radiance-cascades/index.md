@@ -71,11 +71,11 @@ Things are simpler in 2D so we'll start there.
         <output></output>
       </div>
       <div class="probeDiameter-control control">
-        probe diameter (level 0): <input type="range" min="2" max="7" value="6">
+        probe diameter (level 0): <input type="range" min="2" max="10" value="7">
         <output></output>
       </div>
       <div class="intervalRadius-control control">
-        interval radius (level 0): <input type="range" min="0" max="64" value="9">
+        interval radius (level 0): <input type="range" min="0" max="64" value="18">
         <output></output>
       </div>
       <div class="branchingFactor-control control">

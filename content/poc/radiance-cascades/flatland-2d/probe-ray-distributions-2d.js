@@ -19,6 +19,7 @@ function ProbeRayDistributions2DBegin(rootEl) {
   }
 
   state.ctx.lineWidth = 2;
+  state.ctx.imageSmoothingEnabled = true;
 
   const Param = CreateParamReader(state, controlEl)
 
@@ -90,12 +91,8 @@ function ProbeRayDistributions2DBegin(rootEl) {
 
     const TAU = Math.PI * 2.0
     state.ctx.save()
-    let scale = 2.0;
-    state.ctx.scale(scale, scale);
-    state.ctx.lineWidth = 1.0 / scale;
 
     let cascadeRayCounts = [];
-    let index = 0
     for (let level = 0; level <= state.params.maxLevel; level++) {
       let currentProbeDiameter = state.params.probeDiameter << level;
       let currentProbeRadius = currentProbeDiameter / 2
@@ -106,29 +103,19 @@ function ProbeRayDistributions2DBegin(rootEl) {
         : state.params.intervalRadius << ((level - 1) * state.params.branchingFactor)
       let intervalEndRadius = state.params.intervalRadius << (level * state.params.branchingFactor)
 
-
-      // console.log(intervalStartRadius, intervalEndRadius, { currentProbeDiameter, r: intervalEndRadius - intervalStartRadius})
       state.ctx.strokeStyle = levelColors[level]
-
       let cascadeRayCount = 0;
 
       for (let x = 0; x < state.canvas.width; x += currentProbeDiameter) {
+        let centerX = x + currentProbeRadius
         for (let y = 0; y < state.canvas.height; y += currentProbeDiameter) {
-          let centerX = x + currentProbeRadius
           let centerY = y + currentProbeRadius
-
-          // let r = ((index + 1) * 190) % 255
-          // let g = ((index + 1) * 2 * 156) % 255
-          // let b = ((index + 1) * 3 * 159) % 127
-          // index++;
-          // state.ctx.strokeStyle = `rgb(${r},${g},${b})`
-
           state.ctx.beginPath()
           for (let step = 0; step < currentProbeRayCount; step++) {
             let angle = TAU * (step + 0.5) / currentProbeRayCount;
             let dirX = Math.sin(angle)
             let dirY = Math.cos(angle)
-            // state.ctx.moveTo(centerX, centerY);
+
             state.ctx.moveTo(centerX + dirX * intervalStartRadius, centerY + dirY * intervalStartRadius);
             state.ctx.lineTo(centerX + dirX * intervalEndRadius, centerY + dirY * intervalEndRadius)
             cascadeRayCount++
