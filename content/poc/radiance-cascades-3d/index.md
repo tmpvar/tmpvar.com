@@ -4,7 +4,7 @@ date = 2020-04-01
 description = "Building intuition around a Radiance Cascades, a global illumination approach developed for Path of Exile 2 by Suslik (Alexander Sannikov)"
 
 [extra]
-unlisted = true
+unlisted = false
 +++
 
 ## 3D
